@@ -13,11 +13,11 @@
 #ifndef __MEMMAP_TLB__
 #define __MEMMAP_TLB__
 
+#define MEMMAP_DEFAULT_WAKEUP_INTERVAL 200
+
 /* Main function for TLB walkthrough
  * Check accessed page every Memmap_wakeupsIinterval ms
- * myId :   The internal id of the Kthread
- * tid :    The actual tid of the monitored thread
  */
-void MemMap_MonitorTLBThread(int myid, int tid);
+int MemMap_MonitorTLBThread(void *);
 
 #endif //__MEMMAP_TLB__

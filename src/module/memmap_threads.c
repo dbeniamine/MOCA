@@ -10,20 +10,70 @@
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
+#include <linux/kthread.h>
+#include <linux/cpumask.h>  // num_online_cpus
+#include <linux/slab.h>    // kcalloc /kfree
+#include "memmap.h"
+#include "memmap_threads.h"
+#include "memmap_tlb.h"
+
+//Number of threads (one per CPU)
+int MemMap_numThreads=1;
+// Vector clock
+double * MemMap_threadClocks=NULL;
+// Thread task representation
+struct task_struct **MemMap_threadTasks=NULL;
+
 
 // Initializes threads data structures
 void MemMap_InitThreads(void)
 {
-    //TODO
+    int i;
+    MemMap_numThreads=num_online_cpus();
+    printk(KERN_WARNING "MemMap initializing %d threads\n",
+            MemMap_numThreads);
+
+    //Init threads data
+    MemMap_threadClocks=kcalloc(MemMap_numThreads,sizeof(double),GFP_KERNEL);
+    if(! MemMap_threadClocks)
+        MemMap_Panic("Vector clocks alloc failed");
+
+    MemMap_threadTasks=kcalloc(MemMap_numThreads, sizeof(void *),GFP_KERNEL);
+    if(! MemMap_threadTasks)
+        MemMap_Panic("Thread tasks alloc failed");
+
+    // Create one monitor thread per CPU
+    for(i=0;i< MemMap_numThreads;i++)
+    {
+        {
+            printk(KERN_WARNING "Starting thread %d/%d\n", i, MemMap_numThreads);
+            //Creating the thread
+            MemMap_threadTasks[i]=kthread_create(MemMap_MonitorTLBThread, NULL,
+                    "MemMap tlb walker thread");
+            if(!MemMap_threadTasks[i])
+                MemMap_Panic("Kthread create failed");
+            //Bind it on the ith proc
+            kthread_bind(MemMap_threadTasks[i],i);
+            //And finally start it
+            wake_up_process(MemMap_threadTasks[i]);
+        }
+
+    }
 }
-// Start a new thread if needed
-void MemMap_NewThread(void)
-{
-    //TODO
-}
+
 // Kill all remaining kthreads, and remove their memory
 void MemMap_CleanThreads(void)
 {
-    //TODO
+    int i;
+    for(i=0;i<MemMap_numThreads;i++)
+    {
+        printk(KERN_WARNING "Killing thread %d/%d\n", i, MemMap_numThreads);
+        //Avoid suicidal call
+        if(current != MemMap_threadTasks[i])
+            kthread_stop(MemMap_threadTasks[i]);
+    }
+    //Now we are safe: all threads are dead
+    kfree(MemMap_threadTasks);
+    kfree(MemMap_threadClocks);
 }
 

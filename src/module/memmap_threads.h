@@ -13,23 +13,14 @@
 #ifndef __MEMMAP_THREADS__
 #define __MEMMAP_THREADS__
 
-#include <linux/atomic.h>
+//#include <linux/atomic.h>
+#include <linux/smp.h> //for total_cpus
 
-/* Maximum number of threads used by the monitored application
- * The application must not create more thread than this number
- * If the monitored application uses more than Memmap_numthreads threads, the
-* module will abort
-*/
-static int MemMap_numThreads=0;
-// Current number of monitored threads
-static atomic_t MemMap_activeThreads=0
-static int * MemMap_threadClocks=NULL;
 
 // Initializes threads data structures
 void MemMap_InitThreads(void);
-// Start a new thread if needed
-void MemMap_NewThread(void);
 // Kill all remaining kthreads, and remove their memory
 void MemMap_CleanThreads(void);
 
+//TODO: addfunction to manage clock vectors
 #endif //__MEMMAP_THREADS__

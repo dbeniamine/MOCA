@@ -1,9 +1,10 @@
-obj-m += memmap.o
+obj-m := memmap.o
+memmap-objs := memmap_tlb.o memmap_threads.o
 ccflags-m += -Wall -Werror
 
 all: module
 
-module:
+module: 
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
 
 .PHONY: clean

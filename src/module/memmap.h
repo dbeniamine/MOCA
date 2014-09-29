@@ -10,21 +10,15 @@
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
-#ifndef __MEMMAP_STATE__
-#define __MEMMAP_STATE__
+#ifndef __MEMMAP__
+#define __MEMMAP__
 
-#define MEMMAP_DEFAULT_WAKEUP_INTERVAL 200
-#define MEMMAP_DEFAULT_SCHED_PRIO 99
+#include <linux/module.h>
+#include <linux/kernel.h>
 
-// PID of the main program to track
-static int MemMap_mainPid=0;
-// Wakeup period in ms
-static int MemMap_wakeupInterval=MEMMAP_DEFAULT_WAKEUP_INTERVAL;
-// Priority for FIFO scheduler
-static int MemMap_schedulerPriority=MEMMAP_DEFAULT_SCHED_PRIO;
 
 // Panic exit function
 void MemMap_Panic(const char *s);
 
-#endif //__MEMMAP_STATE__
+#endif //__MEMMAP__
 
