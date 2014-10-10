@@ -15,7 +15,6 @@
 #include "memmap_tlb.h"
 #include "memmap_threads.h"
 
-#define MEMMAP_DEFAULT_SCHED_PRIO 99
 
 /* Informations about the module */
 MODULE_LICENSE("GPL");
@@ -28,30 +27,17 @@ MODULE_DESCRIPTION("MemMap's kernel module tracks memory access");
 int MemMap_mainPid=0;
 // Wakeup period in ms (defined in memmap_tlb.c)
 extern int MemMap_wakeupInterval;
-// Priority for FIFO scheduler
-int MemMap_schedulerPriority=MEMMAP_DEFAULT_SCHED_PRIO;
 
 module_param(MemMap_mainPid, int, 0);
 module_param(MemMap_wakeupInterval,int,0);
 module_param(MemMap_schedulerPriority,int,0);
 
-static void MemMap_SetSchedulerPriority(void)
-{
-    printk(KERN_ALERT "MemMap setting its own priority to %d\n",
-            MemMap_schedulerPriority);
-    //TODO
-    printk(KERN_ALERT "MemMap priority not implemented yet\n");
-    return;
-}
 
 // Fuction called by insmod
 static int __init MemMap_Init(void)
 {
     printk(KERN_WARNING "MemMap started monitoring pid %d\n",
             MemMap_mainPid);
-    // Set scheduler priority
-    MemMap_SetSchedulerPriority();
-    // Prepare data for Threads
     MemMap_InitThreads();
     printk(KERN_WARNING "MemMap correctly intialized \n");
     //Send signal to son process

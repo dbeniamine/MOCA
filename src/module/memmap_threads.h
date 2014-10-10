@@ -16,6 +16,10 @@
 //#include <linux/atomic.h>
 #include <linux/smp.h> //for total_cpus
 
+#define MEMMAP_DEFAULT_SCHED_PRIO 99
+
+// Priority for FIFO scheduler
+extern int MemMap_schedulerPriority;
 
 // Initializes threads data structures
 void MemMap_InitThreads(void);

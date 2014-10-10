@@ -24,7 +24,18 @@ double * MemMap_threadClocks=NULL;
 // Thread task representation
 struct task_struct **MemMap_threadTasks=NULL;
 
+// Priority for FIFO scheduler
+int MemMap_schedulerPriority=MEMMAP_DEFAULT_SCHED_PRIO;
 
+
+static void MemMap_SetSchedulerPriority(struct task_struct *task)
+{
+    // TODO
+    struct sched_param param;
+    param.sched_priority=MemMap_schedulerPriority;
+    sched_setscheduler(task,SCHED_FIFO,&param);
+    return;
+}
 // Initializes threads data structures
 void MemMap_InitThreads(void)
 {
@@ -54,6 +65,8 @@ void MemMap_InitThreads(void)
                 MemMap_Panic("Kthread create failed");
             //Bind it on the ith proc
             kthread_bind(MemMap_threadTasks[i],i);
+            // Set priority
+            MemMap_SetSchedulerPriority(MemMap_threadTasks[i]);
             //And finally start it
             wake_up_process(MemMap_threadTasks[i]);
         }
