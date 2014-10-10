@@ -1,8 +1,5 @@
 #!/bin/bash
-interval=200
-prio=99
-args=""
-cmd=""
+
 usage()
 {
     echo "Usage : $0 [options] -c \"command\""
@@ -10,11 +7,12 @@ usage()
     execute the command given by the user"
     echo "-c    command     The command to be executed"
     echo "Options:"
-    echo "-w    interval    Set the wakeup interval for MemMap to interval ms"
+    echo "-w    interval    Set the wakeup interval for MemMap to interval ms,
+                        default: $interval"
     echo "-a    \"args\"    The arguments for command"
     echo "-h                Display this help and exit"
     echo "-p prio           Schedtool priority for the kernel module, the user
-                        program priorityy will be prio-1"
+                        program priority will be prio-1, default: $prio"
 }
 
 which schedtool > /dev/null
@@ -30,6 +28,11 @@ then
     echo "$0 must be run as root"
     exit 1
 fi
+
+interval=200
+prio=$(schedtool -r | grep FIFO | sed -e 's/.*prio_max \([0-9]*\)/\1/')
+args=""
+cmd=""
 
 while getopts "w:c:a:hp:" opt
 do
