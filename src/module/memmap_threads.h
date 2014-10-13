@@ -22,7 +22,7 @@
 extern int MemMap_schedulerPriority;
 
 // Initializes threads data structures
-void MemMap_InitThreads(void);
+int MemMap_InitThreads(void);
 // Kill all remaining kthreads, and remove their memory
 void MemMap_CleanThreads(void);
 

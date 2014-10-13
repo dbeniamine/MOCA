@@ -16,9 +16,17 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 
+// Monitored tasked
+extern struct pid **MemMap_pids;
 
 // Panic exit function
 void MemMap_Panic(const char *s);
+
+// Returns the current number of monitored pids
+int MemMap_GetNumPids(void);
+
+// Add t to the monitored pids
+int MemMap_AddPid(struct pid *p);
 
 #endif //__MEMMAP__
 

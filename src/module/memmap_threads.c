@@ -30,14 +30,13 @@ int MemMap_schedulerPriority=MEMMAP_DEFAULT_SCHED_PRIO;
 
 static void MemMap_SetSchedulerPriority(struct task_struct *task)
 {
-    // TODO
     struct sched_param param;
     param.sched_priority=MemMap_schedulerPriority;
     sched_setscheduler(task,SCHED_FIFO,&param);
     return;
 }
 // Initializes threads data structures
-void MemMap_InitThreads(void)
+int MemMap_InitThreads(void)
 {
     int i;
     MemMap_numThreads=num_online_cpus();
@@ -47,11 +46,17 @@ void MemMap_InitThreads(void)
     //Init threads data
     MemMap_threadClocks=kcalloc(MemMap_numThreads,sizeof(double),GFP_KERNEL);
     if(! MemMap_threadClocks)
+    {
         MemMap_Panic("Vector clocks alloc failed");
+        return -1;
+    }
 
     MemMap_threadTasks=kcalloc(MemMap_numThreads, sizeof(void *),GFP_KERNEL);
     if(! MemMap_threadTasks)
+    {
         MemMap_Panic("Thread tasks alloc failed");
+        return -1;
+    }
 
     // Create one monitor thread per CPU
     for(i=0;i< MemMap_numThreads;i++)
@@ -62,7 +67,10 @@ void MemMap_InitThreads(void)
             MemMap_threadTasks[i]=kthread_create(MemMap_MonitorTLBThread, NULL,
                     "MemMap tlb walker thread");
             if(!MemMap_threadTasks[i])
+            {
                 MemMap_Panic("Kthread create failed");
+                return -1;
+            }
             //Bind it on the ith proc
             kthread_bind(MemMap_threadTasks[i],i);
             // Set priority
@@ -72,6 +80,7 @@ void MemMap_InitThreads(void)
         }
 
     }
+    return 0;
 }
 
 // Kill all remaining kthreads, and remove their memory
@@ -86,7 +95,9 @@ void MemMap_CleanThreads(void)
             kthread_stop(MemMap_threadTasks[i]);
     }
     //Now we are safe: all threads are dead
-    kfree(MemMap_threadTasks);
-    kfree(MemMap_threadClocks);
+    if(MemMap_threadTasks)
+        kfree(MemMap_threadTasks);
+    if(MemMap_threadClocks)
+        kfree(MemMap_threadClocks);
 }
 

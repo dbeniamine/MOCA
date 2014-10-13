@@ -14,6 +14,9 @@
 #include "memmap.h"
 #include "memmap_tlb.h"
 #include "memmap_threads.h"
+#include <linux/spinlock.h>
+#include <linux/slab.h>
+#include <linux/sched.h>
 
 
 /* Informations about the module */
@@ -27,10 +30,72 @@ MODULE_DESCRIPTION("MemMap's kernel module tracks memory access");
 int MemMap_mainPid=0;
 // Wakeup period in ms (defined in memmap_tlb.c)
 extern int MemMap_wakeupInterval;
+// Monitored tasked
+struct pid **MemMap_pids;
+spinlock_t MemMap_pidsLock;
+// Current number of monitored pids
+static atomic_t MemMap_numPids=ATOMIC_INIT(0);
+// Maximum Number of monitored pids (aka current alloc size on MemMap_pids
+static atomic_t MemMap_maxPids=ATOMIC_INIT(8);
+
 
 module_param(MemMap_mainPid, int, 0);
 module_param(MemMap_wakeupInterval,int,0);
 module_param(MemMap_schedulerPriority,int,0);
+
+int MemMap_InitCommonData(void)
+{
+    // Monitored pids
+    int max=atomic_read(&MemMap_maxPids);
+    spin_lock_init(&MemMap_pidsLock);
+    MemMap_pids=kcalloc(max,sizeof(void *), GFP_KERNEL);
+    if( !MemMap_pids)
+    {
+        MemMap_Panic("Tasks Alloc failed");
+        return -1;
+    }
+    rcu_read_lock();
+    MemMap_pids[0]=find_vpid(MemMap_mainPid), PIDTYPE_PID;
+    rcu_read_unlock();
+    atomic_inc(&MemMap_numPids);
+    return 0;
+}
+
+// Current number of monitored pids
+int MemMap_GetNumTasks(void)
+{
+    return atomic_read(&MemMap_numPids);
+}
+
+// Add t to the monitored pids
+int MemMap_AddPid(struct pid *p)
+{
+    int max, nb;
+    spin_lock(&MemMap_pidsLock);
+    //Get number and max of pids
+    max=atomic_read(&MemMap_maxPids);
+    nb=atomic_read(&MemMap_numPids);
+    if(nb==max)
+    {
+        MemMap_Panic("Too many pids");
+        return -1;
+    }
+    //Add the task
+    MemMap_pids[nb]=p;
+    atomic_inc(&MemMap_numPids);
+    spin_unlock(&MemMap_pidsLock);
+    return 0;
+}
+
+void MemMap_CleanUp(void)
+{
+    /* MemMap_UnregisterProbes(); */
+    //Clean common stuff
+    if(MemMap_pids)
+        kfree(MemMap_pids);
+    // Clean all memory used by threads structure
+    MemMap_CleanThreads();
+}
 
 
 // Fuction called by insmod
@@ -38,7 +103,12 @@ static int __init MemMap_Init(void)
 {
     printk(KERN_WARNING "MemMap started monitoring pid %d\n",
             MemMap_mainPid);
-    MemMap_InitThreads();
+    if(!MemMap_InitCommonData())
+        return -1;
+    /* if(!MemMap_RegisterProbes()) */
+    /* return -2; */
+    if(!MemMap_InitThreads())
+        return -3;
     printk(KERN_WARNING "MemMap correctly intialized \n");
     //Send signal to son process
     return 0;
@@ -48,8 +118,7 @@ static int __init MemMap_Init(void)
 static void __exit MemMap_Exit(void)
 {
     printk(KERN_WARNING "MemMap exiting\n");
-    // Clean all memory used by threads structure
-    MemMap_CleanThreads();
+    MemMap_CleanUp();
     printk(KERN_WARNING "MemMap exited\n");
 }
 
@@ -57,8 +126,7 @@ static void __exit MemMap_Exit(void)
 void MemMap_Panic(const char *s)
 {
     printk(KERN_ALERT "MemMap panic:\n%s\n", s);
-    /* MemMap_Exit(); */
-    MemMap_CleanThreads();
+    MemMap_CleanUp();
 }
 
 module_init(MemMap_Init);
