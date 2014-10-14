@@ -14,6 +14,7 @@
 #include "memmap.h"
 #include "memmap_tlb.h"
 #include "memmap_threads.h"
+#include "memmap_probes.h"
 #include <linux/spinlock.h>
 #include <linux/slab.h>
 #include <linux/sched.h>
@@ -48,21 +49,32 @@ int MemMap_InitCommonData(void)
     // Monitored pids
     int max=atomic_read(&MemMap_maxPids);
     spin_lock_init(&MemMap_pidsLock);
+    printk(KERN_WARNING "MemMap before calloc max: %d\n", max);
     MemMap_pids=kcalloc(max,sizeof(void *), GFP_KERNEL);
+    printk(KERN_WARNING "MemMap after calloc pids: %p\n", MemMap_pids);
     if( !MemMap_pids)
     {
         MemMap_Panic("Tasks Alloc failed");
         return -1;
     }
+    printk(KERN_WARNING "MemMap before before lock \n");
     rcu_read_lock();
-    MemMap_pids[0]=find_vpid(MemMap_mainPid), PIDTYPE_PID;
+    printk(KERN_WARNING "MemMap in lock pid: %d\n", MemMap_mainPid);
+    MemMap_pids[0]=find_vpid(MemMap_mainPid);
+    if( !MemMap_pids[0])
+    {
+        MemMap_Panic("Main pid is NULL");
+        return -1;
+    }
     rcu_read_unlock();
+    printk(KERN_WARNING "MemMap out lock pids[0]: %p \n", MemMap_pids[0]);
     atomic_inc(&MemMap_numPids);
+    printk(KERN_WARNING "MemMap end init common data \n");
     return 0;
 }
 
 // Current number of monitored pids
-int MemMap_GetNumTasks(void)
+int MemMap_GetNumPids(void)
 {
     return atomic_read(&MemMap_numPids);
 }
@@ -103,12 +115,15 @@ static int __init MemMap_Init(void)
 {
     printk(KERN_WARNING "MemMap started monitoring pid %d\n",
             MemMap_mainPid);
-    if(!MemMap_InitCommonData())
+    if(MemMap_InitCommonData()!=0)
         return -1;
-    /* if(!MemMap_RegisterProbes()) */
-    /* return -2; */
-    if(!MemMap_InitThreads())
+    printk(KERN_WARNING "MemMap common data ready \n");
+    if(MemMap_RegisterProbes()!=0)
+        return -2;
+    printk(KERN_WARNING "MemMap probes ready \n");
+    if(MemMap_InitThreads()!=0)
         return -3;
+    printk(KERN_WARNING "MemMap threads ready \n");
     printk(KERN_WARNING "MemMap correctly intialized \n");
     //Send signal to son process
     return 0;

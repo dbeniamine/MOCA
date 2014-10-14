@@ -15,7 +15,7 @@
 #include <linux/sched.h>
 #include "memmap.h"
 
-int spcd_fork_handler(struct kretprobe_instance *ri, struct pt_regs *regs)
+int MemMap_ForkHandler(struct kretprobe_instance *ri, struct pt_regs *regs)
 {
 	int pid = regs_return_value(regs);
 	struct pid *pids;
@@ -40,12 +40,12 @@ int spcd_fork_handler(struct kretprobe_instance *ri, struct pt_regs *regs)
 }
 
 static struct kretprobe MemMap_ForkProbe = {
-	.handler = spcd_fork_handler,
+	.handler = MemMap_ForkHandler,
 	.kp.symbol_name = "do_fork",
 };
 
 
-void register_probes(void)
+void MemMap_RegisterProbes(void)
 {
 	int ret;
 	if ((ret=register_kretprobe(&MemMap_ForkProbe))){
@@ -54,7 +54,7 @@ void register_probes(void)
 }
 
 
-void unregister_probes(void)
+void MemMap_UnregisterProbes(void)
 {
 	unregister_kretprobe(&MemMap_ForkProbe);
 }
