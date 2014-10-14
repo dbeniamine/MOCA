@@ -13,6 +13,7 @@ usage()
     echo "-h                Display this help and exit"
     echo "-p prio           Schedtool priority for the kernel module, the user
                         program priority will be prio-1, default: $prio"
+    echo "-d dir       Path to the MemMap dir default $install_dir"
 }
 
 which schedtool > /dev/null
@@ -33,8 +34,9 @@ interval=200
 prio=$(schedtool -r | grep FIFO | sed -e 's/.*prio_max \([0-9]*\)/\1/')
 args=""
 cmd=""
+install_dir="~/install/MemMap"
 
-while getopts "w:c:a:hp:" opt
+while getopts "w:c:a:hp:d:" opt
 do
     case $opt in
         h)
@@ -52,6 +54,9 @@ do
             ;;
         p)
             prio=$OPTARG
+            ;;
+        d)
+            install_dir="$OPTARG"
             ;;
         *)
             usage
@@ -98,12 +103,14 @@ child &
 let user_prio=$(( $prio - 1 ))
 schedtool -F -p $user_prio $pid
 pid=$!
-cd src/module/
-make
+cd $install_dir/src/module/
+make clean && make
 abort_on_error $? "make fail"
-insmod ./MemMap.ko MemMap_mainPid=$pid MemMap_wakeupInterval=$interval \
+make install
+abort_on_error $? "Install fail"
+modprobe memmap MemMap_mainPid=$pid MemMap_wakeupInterval=$interval \
     MemMap_schedulerPriority=$prio
 abort_on_error $? "unable to load module"
 kill -s SIGUSR1 $pid
 wait $pid
-rmmod MemMap
+rmmod memmap
