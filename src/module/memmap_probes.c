@@ -17,44 +17,43 @@
 
 int MemMap_ForkHandler(struct kretprobe_instance *ri, struct pt_regs *regs)
 {
-	int pid = regs_return_value(regs);
-	struct pid *pids;
-	struct task_struct *task = NULL, *mainTask;
+    int pid = regs_return_value(regs);
+    struct pid *pids;
+    struct task_struct *task = NULL;
+    printk(KERN_WARNING "MemMap ForkHandler pid %d\n", pid);
+    rcu_read_lock();
+    pids = find_vpid(pid);
+    rcu_read_unlock();
+    printk(KERN_WARNING "MemMap ForkHandler pids %p\n", pids);
+    if (pids)
+    {
+        task = pid_task(pids, PIDTYPE_PID);
+        printk(KERN_WARNING "MemMap ForkHandler task %p\n", task);
+    }
 
-	rcu_read_lock();
-	pids = find_vpid(pid);
-	if (pids)
-		task = pid_task(pids, PIDTYPE_PID);
-    //Get the main task
-    mainTask=pid_task(MemMap_pids[0], PIDTYPE_PID);
-	rcu_read_unlock();
-
-	if (!task)
-		return 0;
-    //Todo: adapt here
-
-	if (mainTask->parent->pid == task->parent->pid)
+    if (task && MemMap_parentPid == task->parent->pid)
         MemMap_AddPid(pids);
+    printk(KERN_WARNING "MemMap ForkHandler ended\n");
 
-	return 0;
+    return 0;
 }
 
 static struct kretprobe MemMap_ForkProbe = {
-	.handler = MemMap_ForkHandler,
-	.kp.symbol_name = "do_fork",
+    .handler = MemMap_ForkHandler,
+    .kp.symbol_name = "do_fork",
 };
 
 
 void MemMap_RegisterProbes(void)
 {
-	int ret;
-	if ((ret=register_kretprobe(&MemMap_ForkProbe))){
+    int ret;
+    if ((ret=register_kretprobe(&MemMap_ForkProbe))){
         MemMap_Panic("Unable to register fork prove");
-	}
+    }
 }
 
 
 void MemMap_UnregisterProbes(void)
 {
-	unregister_kretprobe(&MemMap_ForkProbe);
+    unregister_kretprobe(&MemMap_ForkProbe);
 }

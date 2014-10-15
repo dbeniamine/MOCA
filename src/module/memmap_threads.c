@@ -32,8 +32,7 @@ static void MemMap_SetSchedulerPriority(struct task_struct *task)
 {
     struct sched_param param;
     param.sched_priority=MemMap_schedulerPriority;
-    sched_setscheduler(task,SCHED_FIFO,&param);
-    return;
+    /* sched_setscheduler(task,SCHED_FIFO,&param); */
 }
 // Initializes threads data structures
 int MemMap_InitThreads(void)
@@ -66,6 +65,7 @@ int MemMap_InitThreads(void)
             //Creating the thread
             MemMap_threadTasks[i]=kthread_create(MemMap_MonitorTLBThread, NULL,
                     "MemMap tlb walker thread");
+            printk("MemMap kthread %d create task %p\n", i, MemMap_threadTasks[i]);
             if(!MemMap_threadTasks[i])
             {
                 MemMap_Panic("Kthread create failed");
@@ -89,15 +89,21 @@ void MemMap_CleanThreads(void)
     int i;
     for(i=0;i<MemMap_numThreads;i++)
     {
-        printk(KERN_WARNING "Killing thread %d/%d\n", i, MemMap_numThreads);
         //Avoid suicidal call
-        if(current != MemMap_threadTasks[i])
+        if(MemMap_threadTasks[i] && current != MemMap_threadTasks[i])
+        {
+            printk(KERN_WARNING "Killing thread %d/%d task %p\n", i,
+                    MemMap_numThreads, MemMap_threadTasks[i]);
             kthread_stop(MemMap_threadTasks[i]);
+        }
     }
+    printk(KERN_WARNING "All threads are dead\n");
     //Now we are safe: all threads are dead
     if(MemMap_threadTasks)
         kfree(MemMap_threadTasks);
+    printk(KERN_WARNING "Thread tasks freed\n");
     if(MemMap_threadClocks)
         kfree(MemMap_threadClocks);
+    printk(KERN_WARNING "Thread clocks freed\n");
 }
 

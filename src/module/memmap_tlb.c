@@ -48,27 +48,35 @@ int MemMap_MonitorTLBThread(void * arg)
     int myId=get_cpu(),i;
     struct task_struct *task;
     //Main loop
+    int eachcpt;
     while(!kthread_should_stop())
     {
         int nbPids=MemMap_GetNumPids();
         //For each process
         for(i=0;i<nbPids;i++)
         {
+            printk(KERN_WARNING "MemMap Kthread %d iterating pid %d/%d\n",
+                    myId, i,nbPids);
+            eachcpt=0;
             // For each threads
-            do_each_pid_thread(MemMap_pids[i],PIDTYPE_PGID,task){
-
+            do_each_pid_thread(MemMap_pids[i],PIDTYPE_PID,task){
+                printk(KERN_WARNING "MemMap Kthread %d doeach %d",myId, eachcpt);
                 if(task->on_cpu==myId)
                 {
                     // Do a TLB walk for each task on our CPU
                     MemMap_TLBWalk(myId, MemMap_pids[i],task);
                 }
-            } while_each_pid_thread(MemMap_pids[i],PIDTYPE_PGID,task);
+                ++eachcpt;
+            } while_each_pid_thread(MemMap_pids[i],PIDTYPE_PID,task);
         }
         if(MemMap_NeedToFlush(myId))
             flush_data(myId);
         msleep(MemMap_wakeupInterval);
+        printk(KERN_WARNING "MemMap Kthread %d going to sleep for %d\n",
+                myId, MemMap_wakeupInterval);
     }
     flush_data(myId);
+    printk("MemMap thread %d finished\n", myId);
     return 0;
 }
 

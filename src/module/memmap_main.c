@@ -33,6 +33,7 @@ int MemMap_mainPid=0;
 extern int MemMap_wakeupInterval;
 // Monitored tasked
 struct pid **MemMap_pids;
+pid_t MemMap_parentPid;
 spinlock_t MemMap_pidsLock;
 // Current number of monitored pids
 static atomic_t MemMap_numPids=ATOMIC_INIT(0);
@@ -48,6 +49,8 @@ int MemMap_InitCommonData(void)
 {
     // Monitored pids
     int max=atomic_read(&MemMap_maxPids);
+    struct task_struct *mainTask;
+
     spin_lock_init(&MemMap_pidsLock);
     printk(KERN_WARNING "MemMap before calloc max: %d\n", max);
     MemMap_pids=kcalloc(max,sizeof(void *), GFP_KERNEL);
@@ -66,6 +69,13 @@ int MemMap_InitCommonData(void)
         MemMap_Panic("Main pid is NULL");
         return -1;
     }
+    mainTask=pid_task(MemMap_pids[0],PIDTYPE_PID);
+    if(! mainTask)
+    {
+        MemMap_Panic("Main task is NULL");
+        return -1;
+    }
+    MemMap_parentPid=mainTask->parent->pid;
     rcu_read_unlock();
     printk(KERN_WARNING "MemMap out lock pids[0]: %p \n", MemMap_pids[0]);
     atomic_inc(&MemMap_numPids);
@@ -84,6 +94,7 @@ int MemMap_AddPid(struct pid *p)
 {
     int max, nb;
     spin_lock(&MemMap_pidsLock);
+    printk(KERN_WARNING "MemMap Adding pid %p\n", p);
     //Get number and max of pids
     max=atomic_read(&MemMap_maxPids);
     nb=atomic_read(&MemMap_numPids);
@@ -96,12 +107,13 @@ int MemMap_AddPid(struct pid *p)
     MemMap_pids[nb]=p;
     atomic_inc(&MemMap_numPids);
     spin_unlock(&MemMap_pidsLock);
+    printk(KERN_WARNING "MemMap Added pid %p\n",p);
     return 0;
 }
 
 void MemMap_CleanUp(void)
 {
-    /* MemMap_UnregisterProbes(); */
+    MemMap_UnregisterProbes();
     //Clean common stuff
     if(MemMap_pids)
         kfree(MemMap_pids);

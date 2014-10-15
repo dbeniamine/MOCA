@@ -102,6 +102,7 @@ abort_on_error()
 child &
 let user_prio=$(( $prio - 1 ))
 schedtool -F -p $user_prio $pid
+schedtool -F -p $prio $$
 pid=$!
 cd $install_dir/src/module/
 make clean && make

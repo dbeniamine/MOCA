@@ -18,6 +18,7 @@
 
 // Monitored tasked
 extern struct pid **MemMap_pids;
+extern pid_t MemMap_parentPid;
 
 // Panic exit function
 void MemMap_Panic(const char *s);

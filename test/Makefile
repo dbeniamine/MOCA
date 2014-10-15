@@ -1,10 +1,11 @@
-INSTALL_DIR=~/Work/MemMap
-MEMMAP=sudo ../src/utils/MemMap.sh -d $(INSTALL_DIR)
+PRIO=20
 SIZE=20
 SEED=42
 ALGO=par_modulo
-THREADS=4
+THREADS=2
 MAT_ARG="-S $(SIZE) -s $(SEED) -a $(ALGO) -n $(THREADS)"
+INSTALL_DIR=/home/david/Work/MemMap
+MEMMAP=sudo ../src/utils/MemMap.sh -d $(INSTALL_DIR) -p $(PRIO)
 
 all: fork matrix
 
