@@ -11,31 +11,12 @@
  */
 
 #include <linux/kprobes.h>
-#include <linux/pid.h>
-#include <linux/sched.h>
 #include "memmap.h"
+#include "memmap_pid.h"
 
 int MemMap_ForkHandler(struct kretprobe_instance *ri, struct pt_regs *regs)
 {
-    int pid = regs_return_value(regs);
-    struct pid *pids;
-    struct task_struct *task = NULL;
-    printk(KERN_WARNING "MemMap ForkHandler pid %d\n", pid);
-    rcu_read_lock();
-    pids = find_vpid(pid);
-    rcu_read_unlock();
-    printk(KERN_WARNING "MemMap ForkHandler pids %p\n", pids);
-    if (pids)
-    {
-        task = pid_task(pids, PIDTYPE_PID);
-        printk(KERN_WARNING "MemMap ForkHandler task %p\n", task);
-    }
-
-    if (task && MemMap_parentPid == task->parent->pid)
-        MemMap_AddPid(pids);
-    printk(KERN_WARNING "MemMap ForkHandler ended\n");
-
-    return 0;
+    return MemMap_AddPidIfNeeded(regs_return_value(regs));
 }
 
 static struct kretprobe MemMap_ForkProbe = {

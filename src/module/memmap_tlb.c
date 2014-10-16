@@ -12,6 +12,7 @@
 #define __NO_VERSION__
 #include "memmap.h"
 #include "memmap_tlb.h"
+#include "memmap_pid.h"
 #include "memmap_threads.h"
 #include <linux/kthread.h>
 #include <linux/smp.h> //get_cpu()

@@ -1,5 +1,5 @@
 obj-m := memmap.o
-memmap-objs := memmap_main.o memmap_tlb.o memmap_threads.o memmap_probes.o
+memmap-objs := memmap_main.o memmap_tlb.o memmap_threads.o memmap_probes.o memmap_pid.o
 ccflags-m += -Wall -Werror
 
 all: module
@@ -11,6 +11,7 @@ module:
 
 clean:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
+	rm -f tags cscope*
 
 load: install
 	sudo modprobe memmap
