@@ -1,11 +1,14 @@
+# MemMap config
+INSTALL_DIR=/home/david/Work/MemMap
+LOG_FILE=$(INSTALL_DIR)/log
+MEMMAP=sudo ../src/utils/MemMap.sh -d $(INSTALL_DIR) -p $(PRIO) -f $(LOG_FILE)
+# Testing config
 PRIO=20
 SIZE=20
 SEED=42
 ALGO=par_modulo
 THREADS=2
-MAT_ARG="-S $(SIZE) -s $(SEED) -a $(ALGO) -n $(THREADS)"
-INSTALL_DIR=/home/david/Work/MemMap
-MEMMAP=sudo ../src/utils/MemMap.sh -d $(INSTALL_DIR) -p $(PRIO)
+MAT_ARG="-S $(SIZE) -s $(SEED) -a $(ALGO) -n $(THREADS) -v -V"
 
 all: fork matrix
 

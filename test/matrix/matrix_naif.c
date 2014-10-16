@@ -5,7 +5,7 @@
 #include <assert.h>
 #include <pthread.h>
 #include <math.h>
-#include "heapinfo.h"
+/* #include "heapinfo.h" */
 
 
 #define NAIF 0
@@ -64,7 +64,7 @@ void print()
 void do_transpose(void)
 {
     BT=(double *)malloc(sizeof(double)*sz*sz);
-    VALGRIND_NAME_STRUCT(BT, "Bt");
+    /* VALGRIND_NAME_STRUCT(BT, "Bt"); */
     if(!BT)
         exit(1);
     //Do the transpose
@@ -85,9 +85,9 @@ void init_matrix(long int seed)
     A=(double *)malloc(sizeof(double)*sz*sz);
     B=(double *)malloc(sizeof(double)*sz*sz);
     C=(double *)malloc(sizeof(double)*sz*sz);
-    VALGRIND_NAME_STRUCT(A, "A");
-    VALGRIND_NAME_STRUCT(B, "B");
-    VALGRIND_NAME_STRUCT(C, "C");
+    /* VALGRIND_NAME_STRUCT(A, "A"); */
+    /* VALGRIND_NAME_STRUCT(B, "B"); */
+    /* VALGRIND_NAME_STRUCT(C, "C"); */
     if(!A || !B || !C )
         exit(1);
     for(unsigned int i=0;i<sz;i++)
