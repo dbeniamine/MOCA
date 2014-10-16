@@ -5,15 +5,16 @@ usage()
     echo "Usage : $0 [options] -c \"command\""
     echo "Loads MemMap kernel module and configure it to monitor command, then
     execute the command given by the user"
-    echo "-c    command     The command to be executed"
+    echo "-c cmd            The command to be executed"
     echo "Options:"
     echo "-w    interval    Set the wakeup interval for MemMap to interval ms,
-                        default: $interval"
-    echo "-a    \"args\"    The arguments for command"
+    default: $interval"
+    echo "-a \"args\"       The arguments for command"
     echo "-h                Display this help and exit"
     echo "-p prio           Schedtool priority for the kernel module, the user
-                        program priority will be prio-1, default: $prio"
-    echo "-d dir       Path to the MemMap dir default $install_dir"
+    program priority will be prio-1, default: $prio"
+    echo "-d dir            Path to the MemMap dir default $install_dir"
+    echo "-f file           Log into file"
 }
 
 which schedtool > /dev/null
@@ -35,8 +36,9 @@ prio=$(schedtool -r | grep FIFO | sed -e 's/.*prio_max \([0-9]*\)/\1/')
 args=""
 cmd=""
 install_dir="~/install/MemMap"
+logfile=""
 
-while getopts "w:c:a:hp:d:" opt
+while getopts "w:c:a:hp:d:f:" opt
 do
     case $opt in
         h)
@@ -50,13 +52,16 @@ do
             args="$OPTARG"
             ;;
         c)
-            cmd=$OPTARG
+            cmd="$OPTARG"
             ;;
         p)
             prio=$OPTARG
             ;;
         d)
             install_dir="$OPTARG"
+            ;;
+        f)
+            logfile="$OPTARG"
             ;;
         *)
             usage
@@ -72,20 +77,19 @@ then
     exit 1
 fi
 
-start()
-{
-    exec $cmd $args
-}
-
 # Wait for the kernel module to start
 child()
 {
-    trap start SIGUSR1
-    while true
-    do
-        echo "Waiting for a signal from my parent"
-        sleep 3
-    done
+    echo "Child $BASHPID waiting for a signal from my parent" >> $$.log
+    kill -s SIGSTOP $BASHPID
+    echo "Child $BASHPID awake" >> $$.log
+    if [ -z "$logfile" ]
+    then
+        $cmd $args
+    else
+        $cmd $args > $logfile 2>&1
+    fi
+    exit $?
 }
 
 abort_on_error()
@@ -100,10 +104,10 @@ abort_on_error()
 }
 
 child &
+pid=$!
 let user_prio=$(( $prio - 1 ))
 schedtool -F -p $user_prio $pid
 schedtool -F -p $prio $$
-pid=$!
 cd $install_dir/src/module/
 make clean && make
 abort_on_error $? "make fail"
@@ -112,6 +116,7 @@ abort_on_error $? "Install fail"
 modprobe memmap MemMap_mainPid=$pid MemMap_wakeupInterval=$interval \
     MemMap_schedulerPriority=$prio
 abort_on_error $? "unable to load module"
-kill -s SIGUSR1 $pid
+kill -s SIGCONT $pid
+echo "Parent $BASHPID waiting for child $pid in script $$" >> $$.log
 wait $pid
 rmmod memmap
