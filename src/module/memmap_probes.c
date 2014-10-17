@@ -12,13 +12,15 @@
 
 #include <linux/kprobes.h>
 #include "memmap.h"
-#include "memmap_pid.h"
+#include "memmap_tasks.h"
 
 int MemMap_ForkHandler(struct kretprobe_instance *ri, struct pt_regs *regs)
 {
-    return MemMap_AddPidIfNeeded(regs_return_value(regs));
+    return MemMap_AddTaskIfNeeded(regs_return_value(regs));
 }
 
+//Note that the probes is on the do_fork function which is called also for
+//thread creation.
 static struct kretprobe MemMap_ForkProbe = {
     .handler = MemMap_ForkHandler,
     .kp.symbol_name = "do_fork",

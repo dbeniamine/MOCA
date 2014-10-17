@@ -9,18 +9,18 @@
  * Copyright (C) 2010 David Beniamine
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
-#ifndef __MEMMAP_PID__
-#define __MEMMAP_PID__
+#ifndef __MEMMAP_TASKS__
+#define __MEMMAP_TASKS__
 
 // Monitored process
-extern struct pid **MemMap_pids;
+extern struct task_struct **MemMap_tasks;
 
 int MemMap_InitProcessManagment(int maxprocs, int mainpid);
 void MemMap_CleanProcessData(void);
 
 // Add the process id if its parent is already monitored
-int MemMap_AddPidIfNeeded(int id);
+int MemMap_AddTaskIfNeeded(int id);
 
 // Current number of monitored pids
-int MemMap_GetNumPids(void);
-#endif //__MEMMAP_PID__
+int MemMap_GetNumTasks(void);
+#endif //__MEMMAP_TASKS__
