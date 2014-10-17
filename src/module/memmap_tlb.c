@@ -12,7 +12,7 @@
 #define __NO_VERSION__
 #include "memmap.h"
 #include "memmap_tlb.h"
-#include "memmap_pid.h"
+#include "memmap_tasks.h"
 #include "memmap_threads.h"
 #include <linux/kthread.h>
 #include <linux/smp.h> //get_cpu()
@@ -29,9 +29,9 @@ void flush_data(int id)
     printk(KERN_WARNING "Kthread %d flushing data \n", id);
 }
 //Walk through TLB and record all memory access
-void MemMap_TLBWalk(int myId, struct pid *pid, struct task_struct *task)
+void MemMap_TLBWalk(int myId, struct task_struct *task)
 {
-    printk(KERN_WARNING "Kthread %d walking on task %p process %p\n", myId, task, pid);
+    printk(KERN_WARNING "Kthread %d walking on task %p \n", myId, task);
 }
 // Return 1 iff too many data are recorded
 int MemMap_NeedToFlush(int id)
@@ -47,28 +47,21 @@ int MemMap_MonitorTLBThread(void * arg)
 {
     //Init tlb walk data
     int myId=get_cpu(),i;
-    struct task_struct *task;
     //Main loop
-    int eachcpt;
     while(!kthread_should_stop())
     {
-        int nbPids=MemMap_GetNumPids();
+        int nbTasks=MemMap_GetNumTasks();
         //For each process
-        for(i=0;i<nbPids;i++)
+        for(i=0;i<nbTasks;i++)
         {
-            printk(KERN_WARNING "MemMap Kthread %d iterating pid %d/%d\n",
-                    myId, i,nbPids);
-            eachcpt=0;
+            printk(KERN_WARNING "MemMap Kthread %d iterating task %d/%d\n",
+                    myId, i,nbTasks);
             // For each threads
-            do_each_pid_thread(MemMap_pids[i],PIDTYPE_PID,task){
-                printk(KERN_WARNING "MemMap Kthread %d doeach %d",myId, eachcpt);
-                if(task->on_cpu==myId)
-                {
-                    // Do a TLB walk for each task on our CPU
-                    MemMap_TLBWalk(myId, MemMap_pids[i],task);
-                }
-                ++eachcpt;
-            } while_each_pid_thread(MemMap_pids[i],PIDTYPE_PID,task);
+            if(MemMap_tasks[i]->on_cpu==myId)
+            {
+                // Do a TLB walk for each task on our CPU
+                MemMap_TLBWalk(myId, MemMap_tasks[i]);
+            }
         }
         if(MemMap_NeedToFlush(myId))
             flush_data(myId);
