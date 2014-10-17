@@ -3,8 +3,8 @@ INSTALL_DIR=/home/david/Work/MemMap
 LOG_FILE=$(INSTALL_DIR)/log
 MEMMAP=sudo ../src/utils/MemMap.sh -d $(INSTALL_DIR) -p $(PRIO) -f $(LOG_FILE)
 # Testing config
-PRIO=20
-SIZE=20
+PRIO=99
+SIZE=1000
 SEED=42
 ALGO=par_modulo
 THREADS=2
