@@ -15,6 +15,7 @@ usage()
     program priority will be prio-1, default: $prio"
     echo "-d dir            Path to the MemMap dir default $install_dir"
     echo "-f file           Log into file"
+    echo "-n maxtasks       Set the maximum of tasks instrument, default 128"
 }
 
 which schedtool > /dev/null
@@ -37,8 +38,9 @@ args=""
 cmd=""
 install_dir="~/install/MemMap"
 logfile=""
+maxprocess=""
 
-while getopts "w:c:a:hp:d:f:" opt
+while getopts "w:c:a:hp:d:f:n:" opt
 do
     case $opt in
         h)
@@ -63,6 +65,9 @@ do
         f)
             logfile="$OPTARG"
             ;;
+        n)
+            maxprocess="MemMap_maxProcess=$OPTARG"
+            ;;
         *)
             usage
             exit 1
@@ -80,9 +85,9 @@ fi
 # Wait for the kernel module to start
 child()
 {
-    echo "Child $BASHPID waiting for a signal from my parent" >> $$.log
+    echo "Child $BASHPID waiting for a signal from my parent"
     kill -s SIGSTOP $BASHPID
-    echo "Child $BASHPID awake" >> $$.log
+    echo "Child $BASHPID awake"
     if [ -z "$logfile" ]
     then
         $cmd $args
@@ -114,9 +119,9 @@ abort_on_error $? "make fail"
 make install
 abort_on_error $? "Install fail"
 modprobe memmap MemMap_mainPid=$pid MemMap_wakeupInterval=$interval \
-    MemMap_schedulerPriority=$prio
+    MemMap_schedulerPriority=$prio $maxprocess
 abort_on_error $? "unable to load module"
 kill -s SIGCONT $pid
-echo "Parent $BASHPID waiting for child $pid in script $$" >> $$.log
+echo "Parent $BASHPID waiting for child $pid in script $$"
 wait $pid
 rmmod memmap
