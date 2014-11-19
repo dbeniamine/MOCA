@@ -15,7 +15,7 @@
 #include <linux/slab.h>    // kcalloc /kfree
 #include "memmap.h"
 #include "memmap_threads.h"
-#include "memmap_tlb.h"
+#include "memmap_pgtbl.h"
 
 //Number of threads (one per CPU)
 int MemMap_numThreads=1;
@@ -27,12 +27,16 @@ struct task_struct **MemMap_threadTasks=NULL;
 // Priority for FIFO scheduler
 int MemMap_schedulerPriority=MEMMAP_DEFAULT_SCHED_PRIO;
 
+int MemMap_NumThreads(void)
+{
+    return MemMap_numThreads;
+}
 
 static void MemMap_SetSchedulerPriority(struct task_struct *task)
 {
     struct sched_param param;
     param.sched_priority=MemMap_schedulerPriority;
-    /* sched_setscheduler(task,SCHED_FIFO,&param); */
+    sched_setscheduler(task,SCHED_FIFO,&param);
 }
 // Initializes threads data structures
 int MemMap_InitThreads(void)
@@ -63,7 +67,7 @@ int MemMap_InitThreads(void)
         {
             printk(KERN_WARNING "Starting thread %d/%d\n", i, MemMap_numThreads);
             //Creating the thread
-            MemMap_threadTasks[i]=kthread_create(MemMap_MonitorTLBThread, NULL,
+            MemMap_threadTasks[i]=kthread_create(MemMap_MonitorThread, NULL,
                     "MemMap tlb walker thread");
             printk("MemMap kthread %d create task %p\n", i, MemMap_threadTasks[i]);
             if(!MemMap_threadTasks[i])
@@ -71,6 +75,7 @@ int MemMap_InitThreads(void)
                 MemMap_Panic("Kthread create failed");
                 return -1;
             }
+            get_task_struct(MemMap_threadTasks[i]);
             //Bind it on the ith proc
             kthread_bind(MemMap_threadTasks[i],i);
             // Set priority
@@ -95,6 +100,7 @@ void MemMap_CleanThreads(void)
             printk(KERN_WARNING "Killing thread %d/%d task %p\n", i,
                     MemMap_numThreads, MemMap_threadTasks[i]);
             kthread_stop(MemMap_threadTasks[i]);
+            put_task_struct(MemMap_threadTasks[i]);
         }
     }
     printk(KERN_WARNING "All threads are dead\n");

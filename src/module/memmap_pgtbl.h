@@ -18,6 +18,6 @@
 /* Main function for TLB walkthrough
  * Check accessed page every Memmap_wakeupsIinterval ms
  */
-int MemMap_MonitorTLBThread(void *);
+int MemMap_MonitorThread(void *);
 
 #endif //__MEMMAP_TLB__

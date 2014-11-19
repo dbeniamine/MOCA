@@ -1,5 +1,5 @@
 obj-m := memmap.o
-memmap-objs := memmap_main.o memmap_tlb.o memmap_threads.o memmap_probes.o memmap_tasks.o
+memmap-objs := memmap_main.o memmap_pgtbl.o memmap_threads.o memmap_probes.o memmap_tasks.o
 ccflags-m += -Wall -Werror
 
 all: module

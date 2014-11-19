@@ -12,7 +12,7 @@
 #define __NO_VERSION__
 #ifndef __MEMMAP__
 #define __MEMMAP__
-
+#define MAX(A,B) ((A)>(B) ? (A) : (B) )
 #include <linux/module.h>
 #include <linux/kernel.h>
 

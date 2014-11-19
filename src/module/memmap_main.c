@@ -12,7 +12,7 @@
 
 #include <linux/init.h>
 #include "memmap.h"
-#include "memmap_tlb.h"
+#include "memmap_pgtbl.h"
 #include "memmap_threads.h"
 #include "memmap_probes.h"
 #include "memmap_tasks.h"
@@ -37,14 +37,18 @@ module_param(MemMap_mainPid, int, 0);
 module_param(MemMap_wakeupInterval,int,0);
 module_param(MemMap_schedulerPriority,int,0);
 module_param(MemMap_maxProcess,int,0);
+module_param(MemMap_pinProc,int,0);
 
 void MemMap_CleanUp(void)
 {
+    printk(KERN_WARNING "MemMap Unregistering probes\n");
     MemMap_UnregisterProbes();
-    //Clean pid data
-    MemMap_CleanProcessData();
-    // Clean all memory used by threads structure
+    //Kill all threads
+    printk(KERN_WARNING "MemMap Killing threads\n");
     MemMap_CleanThreads();
+    //Clean memory
+    printk(KERN_WARNING "MemMap Removing shared data\n");
+    MemMap_CleanProcessData();
 }
 
 
@@ -56,12 +60,12 @@ static int __init MemMap_Init(void)
     if(MemMap_InitProcessManagment(MemMap_maxProcess,MemMap_mainPid)!=0)
         return -1;
     printk(KERN_WARNING "MemMap common data ready \n");
-    if(MemMap_RegisterProbes()!=0)
-        return -2;
-    printk(KERN_WARNING "MemMap probes ready \n");
     if(MemMap_InitThreads()!=0)
-        return -3;
+        return -2;
     printk(KERN_WARNING "MemMap threads ready \n");
+    if(MemMap_RegisterProbes()!=0)
+        return -3;
+    printk(KERN_WARNING "MemMap probes ready \n");
     printk(KERN_WARNING "MemMap correctly intialized \n");
     //Send signal to son process
     return 0;

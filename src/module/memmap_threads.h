@@ -20,11 +20,13 @@
 
 // Priority for FIFO scheduler
 extern int MemMap_schedulerPriority;
+extern int MemMap_pinProc;
 
 // Initializes threads data structures
 int MemMap_InitThreads(void);
 // Kill all remaining kthreads, and remove their memory
 void MemMap_CleanThreads(void);
+int MemMap_NumThreads(void);
 
 //TODO: addfunction to manage clock vectors
 #endif //__MEMMAP_THREADS__

@@ -16,6 +16,11 @@ usage()
     echo "-d dir            Path to the MemMap dir default $install_dir"
     echo "-f file           Log into file"
     echo "-n maxtasks       Set the maximum of tasks instrument, default 128"
+    echo "-m                Pin thread manually. If you use this option, $0
+                            will assume that you have pinned the thread (aka
+                            each thread can run on only one proc). By default
+                            $0 pin the threads automatically in a round robin
+                            way by creation ordre"
 }
 
 which schedtool > /dev/null
@@ -32,15 +37,10 @@ then
     exit 1
 fi
 
-interval=200
 prio=$(schedtool -r | grep FIFO | sed -e 's/.*prio_max \([0-9]*\)/\1/')
-args=""
-cmd=""
 install_dir="~/install/MemMap"
-logfile=""
-maxprocess=""
 
-while getopts "w:c:a:hp:d:f:n:" opt
+while getopts "w:c:a:hp:d:f:n:m" opt
 do
     case $opt in
         h)
@@ -48,7 +48,7 @@ do
             exit 0
             ;;
         w)
-            interval=$OPTARG
+            memmap_interval="MemMap_wakeupInterval=$OPTARG"
             ;;
         a)
             args="$OPTARG"
@@ -66,7 +66,10 @@ do
             logfile="$OPTARG"
             ;;
         n)
-            maxprocess="MemMap_maxProcess=$OPTARG"
+            memmap_maxprocess="MemMap_maxProcess=$OPTARG"
+            ;;
+        m)
+            memmap_pin="MemMap_pinProc=0"
             ;;
         *)
             usage
@@ -118,8 +121,8 @@ make clean && make
 abort_on_error $? "make fail"
 make install
 abort_on_error $? "Install fail"
-modprobe memmap MemMap_mainPid=$pid MemMap_wakeupInterval=$interval \
-    MemMap_schedulerPriority=$prio $maxprocess
+modprobe memmap MemMap_mainPid=$pid MemMap_schedulerPriority=$prio \
+    $memmap_interval $memmap_maxprocess $memmap_pin
 abort_on_error $? "unable to load module"
 kill -s SIGCONT $pid
 echo "Parent $BASHPID waiting for child $pid in script $$"

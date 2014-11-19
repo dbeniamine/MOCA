@@ -1,7 +1,7 @@
 # MemMap config
 INSTALL_DIR=/home/david/Work/MemMap
 LOG_FILE=$(INSTALL_DIR)/log
-MEMMAP=sudo ../src/utils/MemMap.sh -d $(INSTALL_DIR) -p $(PRIO) -f $(LOG_FILE)
+MEMMAP=sudo ../src/utils/MemMap -d $(INSTALL_DIR) -p $(PRIO) -f $(LOG_FILE)
 # Testing config
 PRIO=99
 SIZE=1000
