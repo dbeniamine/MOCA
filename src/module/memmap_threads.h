@@ -26,7 +26,8 @@ extern int MemMap_pinProc;
 int MemMap_InitThreads(void);
 // Kill all remaining kthreads, and remove their memory
 void MemMap_CleanThreads(void);
-int MemMap_NumThreads(void);
+void MemMap_UpdateClock(int id);
+void MemMap_GetClocks(unsigned long long **dst);
 
 //TODO: addfunction to manage clock vectors
 #endif //__MEMMAP_THREADS__

@@ -12,7 +12,7 @@
 
 #include <linux/init.h>
 #include "memmap.h"
-#include "memmap_pgtbl.h"
+#include "memmap_page.h"
 #include "memmap_threads.h"
 #include "memmap_probes.h"
 #include "memmap_tasks.h"
@@ -37,7 +37,9 @@ module_param(MemMap_mainPid, int, 0);
 module_param(MemMap_wakeupInterval,int,0);
 module_param(MemMap_schedulerPriority,int,0);
 module_param(MemMap_maxProcess,int,0);
-module_param(MemMap_pinProc,int,0);
+
+//Number of threads (one per CPU)
+int MemMap_numThreads=1;
 
 void MemMap_CleanUp(void)
 {
@@ -57,6 +59,7 @@ static int __init MemMap_Init(void)
 {
     printk(KERN_WARNING "MemMap started monitoring pid %d\n",
             MemMap_mainPid);
+    MemMap_numThreads=num_online_cpus();
     if(MemMap_InitProcessManagment(MemMap_maxProcess,MemMap_mainPid)!=0)
         return -1;
     printk(KERN_WARNING "MemMap common data ready \n");
@@ -84,6 +87,11 @@ void MemMap_Panic(const char *s)
 {
     printk(KERN_ALERT "MemMap panic:\n%s\n", s);
     MemMap_CleanUp();
+}
+
+int MemMap_NumThreads(void)
+{
+    return MemMap_numThreads;
 }
 
 module_init(MemMap_Init);

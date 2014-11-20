@@ -12,8 +12,6 @@
 #ifndef __MEMMAP_TASKS__
 #define __MEMMAP_TASKS__
 
-// Monitored process
-extern struct task_struct ***MemMap_tasks;
 
 int MemMap_InitProcessManagment(int maxprocs, int mainpid);
 void MemMap_CleanProcessData(void);
@@ -21,8 +19,8 @@ void MemMap_CleanProcessData(void);
 // Add the process id if its parent is already monitored
 int MemMap_AddTaskIfNeeded(int id);
 
-// Current number of monitored on a cpu
-int MemMap_GetNumTasks(int cpu);
+// Current number of monitored tasks
+int MemMap_GetNumTasks(void);
 //Is the process pid monitored by memmap ?
-int MemMap_IsMonitoredPid(int pid);
+//int MemMap_IsMonitoredPid(int pid);
 #endif //__MEMMAP_TASKS__

@@ -19,6 +19,7 @@
 
 // Panic exit function
 void MemMap_Panic(const char *s);
+int MemMap_NumThreads(void);
 
 #endif //__MEMMAP__
 

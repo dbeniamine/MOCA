@@ -15,21 +15,32 @@
 #include <linux/slab.h>    // kcalloc /kfree
 #include "memmap.h"
 #include "memmap_threads.h"
-#include "memmap_pgtbl.h"
+#include "memmap_page.h"
 
-//Number of threads (one per CPU)
-int MemMap_numThreads=1;
 // Vector clock
-double * MemMap_threadClocks=NULL;
+unsigned long long * MemMap_threadClocks=NULL;
 // Thread task representation
 struct task_struct **MemMap_threadTasks=NULL;
 
 // Priority for FIFO scheduler
 int MemMap_schedulerPriority=MEMMAP_DEFAULT_SCHED_PRIO;
 
-int MemMap_NumThreads(void)
+// There are no locks for the clocks as they cannot be written in parrallel
+// (only the ktrhead id is allowed to write the clock id). Moreover we do not
+// care about read/write conflicts because in the worst case we loose a bit of
+// precision which doesn't matters, and using locks would be slow.
+void MemMap_UpdateClock(int id)
 {
-    return MemMap_numThreads;
+    if(current->on_cpu==id)
+        MemMap_threadClocks[id]++;
+}
+void MemMap_GetClocks(unsigned long long **dst)
+{
+    int i;
+    for(i=0;i<MemMap_NumThreads();i++)
+    {
+        *dst[i]=MemMap_threadClocks[i];
+    }
 }
 
 static void MemMap_SetSchedulerPriority(struct task_struct *task)
@@ -42,19 +53,19 @@ static void MemMap_SetSchedulerPriority(struct task_struct *task)
 int MemMap_InitThreads(void)
 {
     int i;
-    MemMap_numThreads=num_online_cpus();
     printk(KERN_WARNING "MemMap initializing %d threads\n",
-            MemMap_numThreads);
+            MemMap_NumThreads());
 
     //Init threads data
-    MemMap_threadClocks=kcalloc(MemMap_numThreads,sizeof(double),GFP_KERNEL);
+    MemMap_threadClocks=kcalloc(MemMap_NumThreads(),sizeof(unsigned long long),GFP_KERNEL);
     if(! MemMap_threadClocks)
     {
-        MemMap_Panic("Vector clocks alloc failed");
+        MemMap_Panic("MemMap Vector clocks alloc failed");
         return -1;
     }
 
-    MemMap_threadTasks=kcalloc(MemMap_numThreads, sizeof(void *),GFP_KERNEL);
+
+    MemMap_threadTasks=kcalloc(MemMap_NumThreads(), sizeof(void *),GFP_KERNEL);
     if(! MemMap_threadTasks)
     {
         MemMap_Panic("Thread tasks alloc failed");
@@ -62,10 +73,10 @@ int MemMap_InitThreads(void)
     }
 
     // Create one monitor thread per CPU
-    for(i=0;i< MemMap_numThreads;i++)
+    for(i=0;i< MemMap_NumThreads();i++)
     {
         {
-            printk(KERN_WARNING "Starting thread %d/%d\n", i, MemMap_numThreads);
+            printk(KERN_WARNING "Starting thread %d/%d\n", i, MemMap_NumThreads());
             //Creating the thread
             MemMap_threadTasks[i]=kthread_create(MemMap_MonitorThread, NULL,
                     "MemMap tlb walker thread");
@@ -92,13 +103,13 @@ int MemMap_InitThreads(void)
 void MemMap_CleanThreads(void)
 {
     int i;
-    for(i=0;i<MemMap_numThreads;i++)
+    for(i=0;i<MemMap_NumThreads();i++)
     {
         //Avoid suicidal call
         if(MemMap_threadTasks[i] && current != MemMap_threadTasks[i])
         {
             printk(KERN_WARNING "Killing thread %d/%d task %p\n", i,
-                    MemMap_numThreads, MemMap_threadTasks[i]);
+                    MemMap_NumThreads(), MemMap_threadTasks[i]);
             kthread_stop(MemMap_threadTasks[i]);
             put_task_struct(MemMap_threadTasks[i]);
         }

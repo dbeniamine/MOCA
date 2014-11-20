@@ -10,8 +10,8 @@
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
-#ifndef __MEMMAP_TLB__
-#define __MEMMAP_TLB__
+#ifndef __MEMMAP_PAGE__
+#define __MEMMAP_PAGE__
 
 #define MEMMAP_DEFAULT_WAKEUP_INTERVAL 200
 
@@ -20,4 +20,4 @@
  */
 int MemMap_MonitorThread(void *);
 
-#endif //__MEMMAP_TLB__
+#endif //__MEMMAP_PAGE__
