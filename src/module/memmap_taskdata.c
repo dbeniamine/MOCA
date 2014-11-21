@@ -28,8 +28,8 @@ typedef struct
     void *addr;
     int type;
     int count;
-    int cpu; //cpu on witch addr have been accessed
     int next_ind;
+    int cpu;
 }chunk_entry;
 
 typedef struct
@@ -89,7 +89,7 @@ struct task_struct *MemMap_GetTaskFromData(task_data data)
     return data->task;
 }
 
-void MemMap_AddToChunk(task_data data, void *addr,int cpu, int chunkid)
+void MemMap_AddToChunk(task_data data, void *addr, int cpu,int chunkid)
 {
     unsigned long h=hash_ptr(addr,MEMMAP_TDATA_HASH_BITS);
     chunk *ch=&(data->chunks[chunkid]);
@@ -120,8 +120,8 @@ void MemMap_AddToChunk(task_data data, void *addr,int cpu, int chunkid)
     }
     //Insertion in the table
     ch->table[ch->nbentry].addr=addr;
-    ch->table[ch->nbentry].cpu=cpu;
     ch->table[ch->nbentry].next_ind=-1;
+    ch->table[ch->nbentry].cpu=cpu;
     ch->table[ch->nbentry].type=MEMMAP_ACCESS_NONE;
     ch->table[ch->nbentry].count=0;
     ++ch->nbentry;
@@ -153,6 +153,15 @@ int MemMap_UpdateAdressData(task_data data,void *addr, int type,int count)
     ch->table[ind].type&=type;
     ch->table[ind].count+=count;
     return 0;
+}
+
+int MemMap_CurrentChunk(task_data data)
+{
+    return data->cur;
+}
+int MemMap_PreviousChunk(task_data data)
+{
+    return data->prev;
 }
 
 // Set current chunk as prev and clear current
