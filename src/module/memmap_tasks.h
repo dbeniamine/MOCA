@@ -11,6 +11,7 @@
  */
 #ifndef __MEMMAP_TASKS__
 #define __MEMMAP_TASKS__
+#include "memmap_taskdata.h"
 
 
 int MemMap_InitProcessManagment(int maxprocs, int mainpid);
@@ -23,4 +24,5 @@ int MemMap_AddTaskIfNeeded(int id);
 int MemMap_GetNumTasks(void);
 //Is the process pid monitored by memmap ?
 //int MemMap_IsMonitoredPid(int pid);
+task_data MemMap_GetData(struct task_struct *t);
 #endif //__MEMMAP_TASKS__

@@ -32,14 +32,14 @@ int MemMap_schedulerPriority=MEMMAP_DEFAULT_SCHED_PRIO;
 void MemMap_UpdateClock(int id)
 {
     if(current->on_cpu==id)
-        MemMap_threadClocks[id]++;
+        ++MemMap_threadClocks[id];
 }
-void MemMap_GetClocks(unsigned long long **dst)
+void MemMap_GetClocks(unsigned long long *dst)
 {
     int i;
     for(i=0;i<MemMap_NumThreads();i++)
     {
-        *dst[i]=MemMap_threadClocks[i];
+        dst[i]=MemMap_threadClocks[i];
     }
 }
 

@@ -96,8 +96,8 @@ int MemMap_MonitorThread(void * arg)
     {
         int nbTasks=MemMap_GetNumTasks();
         //Freed in memmap_taskdata.h during flush or clear
-        clocks=kcalloc(MemMap_NumThreads(),sizeof(unsigned long long),GFP_KERNEL);
-        MemMap_GetClocks(&clocks);
+        clocks=kcalloc(MemMap_NumThreads(),sizeof(unsigned long long),GFP_ATOMIC);
+        MemMap_GetClocks(clocks);
         for(i=0;i<nbTasks;i++)
         {
             printk(KERN_WARNING "MemMap Kthread %d iterating task %d/%d\n",

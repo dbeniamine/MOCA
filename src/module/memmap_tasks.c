@@ -21,14 +21,13 @@
 #define MEMMAP_DEFAULT_MAX_PROCESS 32
 
 // The first bits are not random enough, 14 bits should be enough for pids
-#define MEMMAP_PID_HASH_BITS 14UL
-#define MEMMAP_HASH_SIZE (1UL<<MEMMAP_PID_HASH_BITS)
-
+#define MEMMAP_TASK_HASH_BITS 14UL
+#define MEMMAP_HASH_SIZE (1UL<<MEMMAP_TASK_HASH_BITS)
 
 // Monitored process
 task_data *MemMap_tasksData;
 int MemMap_tasksMap[MEMMAP_HASH_SIZE];
-int MemMap_initPid=-1;
+struct task_struct *MemMap_initTask=NULL;
 
 // Current number of monitored pids
 int MemMap_numTasks=0;
@@ -37,12 +36,13 @@ int MemMap_maxTasks=MEMMAP_DEFAULT_MAX_PROCESS;
 
 spinlock_t MemMap_tasksLock;
 
-int MemMap_AddTask(struct task_struct *t, int id);
+int MemMap_AddTask(struct task_struct *t);
 
 int MemMap_InitProcessManagment(int maxprocs, int id)
 {
     // Monitored pids
     int max,i;
+    struct pid *pid;
     spin_lock_init(&MemMap_tasksLock);
     // Max allowed procs
     if(maxprocs > MEMMAP_DEFAULT_MAX_PROCESS)
@@ -67,9 +67,21 @@ int MemMap_InitProcessManagment(int maxprocs, int id)
 
     // Clear the hasmap
     for(i=0;i< MEMMAP_HASH_SIZE;++i)
-        MemMap_tasksMap[i]=0;
+        MemMap_tasksMap[i]=-1;
 
-    MemMap_initPid=id;
+    rcu_read_lock();
+    pid=find_vpid(id);
+
+    if(!pid)
+    {
+        // Skip internal process
+        rcu_read_unlock();
+        MemMap_Panic("MemMap unable to find pid for init task");
+        return 1;
+    }
+    MemMap_initTask=pid_task(pid, PIDTYPE_PID);
+    rcu_read_unlock();
+
     return 0;
 
 }
@@ -95,8 +107,7 @@ void MemMap_CleanProcessData(void)
 int MemMap_AddTaskIfNeeded(int id)
 {
     struct pid *pid;
-    struct task_struct *task;
-    int ppid, tmpid;
+    struct task_struct *task, *ptask, *tmptask=NULL;
     u32 h;
     // Get iternal pid representation
     rcu_read_lock();
@@ -113,17 +124,18 @@ int MemMap_AddTaskIfNeeded(int id)
     rcu_read_unlock();
 
 
-    ppid=task->real_parent->pid;
+    ptask=task->real_parent;
     //The task is a direct child of the init task
-    if(ppid == MemMap_initPid)
-        return MemMap_AddTask(task,id);
+    if(ptask == MemMap_initTask)
+        return MemMap_AddTask(task);
     //Check if the parent is known
-    h=hash_32(ppid, MEMMAP_PID_HASH_BITS);
+    h=hash_ptr(ptask, MEMMAP_TASK_HASH_BITS);
     spin_lock(&MemMap_tasksLock);
-    tmpid=MemMap_tasksMap[h];
+    if(MemMap_tasksMap[h]!=-1)
+        tmptask=MemMap_GetTaskFromData(MemMap_tasksData[MemMap_tasksMap[h]]);
     spin_unlock(&MemMap_tasksLock);
-    if (tmpid==ppid)
-        return MemMap_AddTask(task,id);
+    if (tmptask==ptask)
+        return MemMap_AddTask(task);
     return 0;
 }
 
@@ -137,24 +149,26 @@ int MemMap_GetNumTasks(void)
     return nb;
 }
 
-int MemMap_IsMonitoredPid(int pid)
+task_data MemMap_GetData(struct task_struct *t)
 {
-    u32 h= hash_32(pid,MEMMAP_PID_HASH_BITS);
-    int ret;
+    task_data ret=NULL;
+    u32 h=hash_ptr(t,MEMMAP_TASK_HASH_BITS);
     spin_lock(&MemMap_tasksLock);
-    ret=MemMap_tasksMap[h]==pid;
+    if(MemMap_tasksMap[h]!=-1)
+        ret=MemMap_tasksData[MemMap_tasksMap[h]];
     spin_unlock(&MemMap_tasksLock);
     return ret;
 }
 
+
 // Add t to the monitored pids
-int MemMap_AddTask(struct task_struct *t, int id)
+int MemMap_AddTask(struct task_struct *t)
 {
     task_data data;
     u32 h;
-    printk(KERN_WARNING "MemMap Adding task %d %p\n",id,t );
+    printk(KERN_WARNING "MemMap Adding task %p\n",t );
 
-    h= hash_32(id,MEMMAP_PID_HASH_BITS);
+    h= hash_ptr(t,MEMMAP_TASK_HASH_BITS);
 
     //Create the task data
     data=MemMap_InitData(t);
@@ -170,19 +184,19 @@ int MemMap_AddTask(struct task_struct *t, int id)
         return -1;
     }
     //Check if the task must be added
-    if(MemMap_tasksMap[h]!=0)
+    if(MemMap_tasksMap[h]!=-1)
     {
         spin_unlock(&MemMap_tasksLock);
         MemMap_ClearData(data);
         MemMap_Panic("MemMap Hash conflict");
         return -1;
     }
-    MemMap_tasksMap[h]=id;
+    MemMap_tasksMap[h]=MemMap_numTasks;
     MemMap_tasksData[MemMap_numTasks]=data;
     ++MemMap_numTasks;
     spin_unlock(&MemMap_tasksLock);
 
-    printk(KERN_WARNING "MemMap Added task %d %p\n",id, t);
+    printk(KERN_WARNING "MemMap Added task %p\n",t);
     return 0;
 }
 

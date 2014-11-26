@@ -29,14 +29,24 @@ void MemMap_ClearData(task_data data);
 
 struct task_struct *MemMap_GetTaskFromData(task_data data);
 
-//Macros to select chunk in the following functions
-void MemMap_AddToChunk(task_data data, void *addr,int cpu, int chunkid);
+/* Add data to chunk chunkid
+ * returns 0 on success
+ *         1 iff addr wad already in chunk
+ *        -1 if chunkid is not a valid chunk
+ */
+int MemMap_AddToChunk(task_data data, void *addr,int cpu, int chunkid);
+/* Check if add is in chunkid
+ * Returns  0 if addr is in chunk
+ *          1 if not
+ *         -1 if chunkid is not a valid chunk
+ */
 int MemMap_IsInChunk(task_data data, void *addr, int chunkid);
 // Return the chunkids of the current or previous chunks
 int MemMap_CurrentChunk(task_data data);
 int MemMap_PreviousChunk(task_data data);
 
-int MemMap_UpdateAdressData(task_data data,void *Addr, int type,int count);
+int MemMap_UpdateAdressData(task_data data,void *Addr, int type,int count,
+        int chunkid);
 
 // Start working on the next chunks
 // If required, flush data
