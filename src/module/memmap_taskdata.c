@@ -211,16 +211,6 @@ int MemMap_NextChunks(task_data data, unsigned long long *clocks)
     pte_t *pte;
     printk(KERN_WARNING "MemMap Goto next chunks%p, %d, %d\n", data, data->cur, data->prev);
     data->chunks[data->cur]->clocks=clocks;
-    // Mark absent all pte in previous chunk, should be done somewhere else
-    if(MEMMAP_VALID_CHUNKID(data->prev))
-    {
-        for(i=0;i<data->chunks[data->prev]->nbentry;++i)
-        {
-            pte=(pte_t *)(data->chunks[data->prev]->table[i].addr);
-            if(pte_present(*pte) && !pte_none(*pte))
-                *pte=pte_clear_flags(*pte,_PAGE_PRESENT);
-        }
-    }
     data->cur=(data->cur+1)%MEMMAP_NB_CHUNKS;
     data->prev=(data->prev+1)%MEMMAP_NB_CHUNKS;
     if(data->cur==0)

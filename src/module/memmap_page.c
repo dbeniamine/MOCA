@@ -24,33 +24,7 @@
 // Wakeup period in ms
 int MemMap_wakeupInterval=MEMMAP_DEFAULT_WAKEUP_INTERVAL;
 
-/* pte_t *MemMap_PageWalk(void *addr, struct mm_struct *mm) */
-/* { */
-/*     long address=(long)addr; */
-/*     pgd_t *pgd=pgd_offset(mm,address); */
-/*     pmd_t *pmd; */
-/*     pud_t *pud; */
-/*     pte_t *pte; */
-/*     if (!pgd_none(*pgd) && !pgd_bad(*pgd)) */
-/*     { */
-/*         pud=pud_offset(pgd,address); */
-/*         if(!pud_none(*pud) && !pud_bad(*pud)) */
-/*         { */
-/*             pmd = pmd_offset(pud, address); */
-/*             if (!pmd_none(*pmd) && !pmd_bad(*pmd)) */
-/*             { */
-/*                 pte = pte_offset_map(pmd, address); */
-/*                 if (!pte_none(*pte) && pte_present(*pte)) */
-/*                 { */
-/*                     return pte; */
-/*                 } */
-/*             } */
-/*         } */
-/*     } */
-/*     return NULL; */
-/* } */
-
-//Walk through TLB and record all memory access
+// Walk through the current chunk
 void MemMap_MonitorPage(int myId,task_data data, unsigned long long *clocks)
 {
     int i=0;
@@ -72,7 +46,7 @@ void MemMap_MonitorPage(int myId,task_data data, unsigned long long *clocks)
         ++i;
     }
     // Goto to next chunk
-    /* MemMap_NextChunks(data,clocks); */
+    MemMap_NextChunks(data,clocks);
     MemMap_unLockData(data);
 }
 
