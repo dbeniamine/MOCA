@@ -118,7 +118,7 @@ int MemMap_AddTaskIfNeeded(unsigned long int id)
     {
         // Skip internal process
         rcu_read_unlock();
-        printk(KERN_WARNING "MemMap process skiped %d NULL\n", id);
+        printk(KERN_WARNING "MemMap process skiped %lu NULL\n", id);
         return 0;
     }
     task=pid_task(pid, PIDTYPE_PID);
