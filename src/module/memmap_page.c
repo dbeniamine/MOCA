@@ -59,7 +59,7 @@ void MemMap_MonitorPage(int myId,task_data data, unsigned long long *clocks)
     /* int type; */
     int count;
     pte_t *pte;
-        struct task_struct *t=MemMap_GetTaskFromData(data);
+    struct task_struct *t=MemMap_GetTaskFromData(data);
     printk(KERN_WARNING "Kthread %d walking on task %p with sched prio %d inverted %d\n",
             myId, t, t->prio, MEMMAP_DEFAULT_SCHED_PRIO-t->prio);
     MemMap_LockData(data);
@@ -70,7 +70,7 @@ void MemMap_MonitorPage(int myId,task_data data, unsigned long long *clocks)
                 addr,pte, pte_page(*pte),(void *)__pa(pte_page(*pte)));
         //TODO perfctr for count
         count=1;
-	    *pte = pte_clear_flags(*pte, _PAGE_PRESENT);
+        *pte = pte_clear_flags(*pte, _PAGE_PRESENT);
         // Set R/W status + nb access
         // TODO
     }
@@ -100,11 +100,12 @@ int MemMap_MonitorThread(void * arg)
         MemMap_GetClocks(clocks);
         for(i=0;i<nbTasks;i++)
         {
-            printk(KERN_WARNING "MemMap Kthread %d iterating task %d/%d\n",
+            printk(KERN_WARNING "MemMap Kthread %d iterating taskdata %d/%d\n",
                     myId, i,nbTasks);
             data=MemMap_tasksData[i];
             task=MemMap_GetTaskFromData(data);
-            if(task->on_cpu==myId && task->sched_info.last_arrival > lastwake)
+            printk(KERN_WARNING "Kthread %d testing task %p\n", myId, task);
+            if(task && task->on_cpu==myId && task->sched_info.last_arrival > lastwake)
             {
                 lastwake=MAX(lastwake,task->sched_info.last_arrival);
                 printk(KERN_WARNING "KThread %d found task %p running on cpu %d\n",

@@ -18,7 +18,7 @@ int MemMap_InitProcessManagment(int maxprocs, int mainpid);
 void MemMap_CleanProcessData(void);
 
 // Add the process id if its parent is already monitored
-int MemMap_AddTaskIfNeeded(int id);
+int MemMap_AddTaskIfNeeded(unsigned long int id);
 
 // Current number of monitored tasks
 int MemMap_GetNumTasks(void);

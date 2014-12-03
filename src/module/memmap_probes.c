@@ -14,10 +14,13 @@
 #include "memmap.h"
 #include "memmap_tasks.h"
 #include "memmap_taskdata.h"
+#include "memmap_probes.h"
 
 int MemMap_ForkHandler(struct kretprobe_instance *ri, struct pt_regs *regs)
 {
-    return MemMap_AddTaskIfNeeded(regs_return_value(regs));
+    printk("MemMap in fork handler pid %lu \n",regs_return_value(regs));
+    MemMap_AddTaskIfNeeded(regs_return_value(regs));
+    return 0;
 }
 
 void MemMap_PteFaultHandler(struct mm_struct *mm,
@@ -37,6 +40,7 @@ void MemMap_PteFaultHandler(struct mm_struct *mm,
     jprobe_return();
 }
 
+
 //Note that the probes is on the do_fork function which is called also for
 //thread creation.
 static struct kretprobe MemMap_ForkProbe = {
@@ -44,18 +48,20 @@ static struct kretprobe MemMap_ForkProbe = {
     .kp.symbol_name = "do_fork",
 };
 
+//BUG: since linux 3.3 (I think) handle_pte_fault is not available in
+///proc/kallsyms
 static struct jprobe MemMap_PteFaultjprobe = {
     .entry = MemMap_PteFaultHandler,
     .kp.symbol_name = "handle_pte_fault",
 };
-
-void MemMap_RegisterProbes(void)
+int MemMap_RegisterProbes(void)
 {
     int ret;
     if ((ret=register_kretprobe(&MemMap_ForkProbe)))
         MemMap_Panic("Unable to register fork probe");
     if ((ret=register_jprobe(&MemMap_PteFaultjprobe)))
         MemMap_Panic("Unable to register pte fault probe");
+    return ret;
 }
 
 

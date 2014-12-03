@@ -20,6 +20,5 @@ unload:
 	sudo rmmod memmap
 
 install: module
-	sudo mkdir -p /lib/modules/$(shell uname -r)/extra/memmap/
-	sudo mv ./memmap.ko /lib/modules/$(shell uname -r)/extra/memmap/
-	sudo depmod -a
+	sudo make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules_install
+	sudo depmod -A

@@ -17,6 +17,7 @@
 #include "memmap.h"
 #include "memmap_threads.h"
 #include "memmap_taskdata.h"
+#include "memmap_tasks.h"
 
 #define MEMMAP_DEFAULT_MAX_PROCESS 32
 
@@ -104,7 +105,7 @@ void MemMap_CleanProcessData(void)
 }
 
 // Add pid to the monitored process if pid is a monitored process
-int MemMap_AddTaskIfNeeded(int id)
+int MemMap_AddTaskIfNeeded(unsigned long int id)
 {
     struct pid *pid;
     struct task_struct *task, *ptask, *tmptask=NULL;
@@ -122,6 +123,8 @@ int MemMap_AddTaskIfNeeded(int id)
     }
     task=pid_task(pid, PIDTYPE_PID);
     rcu_read_unlock();
+    if(!task)
+        MemMap_Panic("Unable to add find task from pid\n");
 
 
     ptask=task->real_parent;
