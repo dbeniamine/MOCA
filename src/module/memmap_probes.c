@@ -18,7 +18,7 @@
 
 int MemMap_ForkHandler(struct kretprobe_instance *ri, struct pt_regs *regs)
 {
-    printk("MemMap in fork handler pid %lu \n",regs_return_value(regs));
+    MEMMAP_DEBUG_PRINT("MemMap in fork handler pid %lu \n",regs_return_value(regs));
     MemMap_AddTaskIfNeeded(regs_return_value(regs));
     return 0;
 }

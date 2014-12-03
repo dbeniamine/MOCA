@@ -93,13 +93,13 @@ void MemMap_CleanProcessData(void)
     //Tell the kernel we don't need the tasks anymore
     if(MemMap_tasksData)
     {
-        printk(KERN_WARNING "MemMap Cleaning data\n");
+        MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Cleaning data\n");
         nbTasks=MemMap_GetNumTasks();
         for(i=0;i<nbTasks;++i)
         {
             MemMap_ClearData(MemMap_tasksData[i]);
         }
-        printk(KERN_WARNING "MemMap Cleaning all data\n");
+        MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Cleaning all data\n");
         kfree(MemMap_tasksData);
     }
 }
@@ -118,7 +118,7 @@ int MemMap_AddTaskIfNeeded(unsigned long int id)
     {
         // Skip internal process
         rcu_read_unlock();
-        printk(KERN_WARNING "MemMap process skiped %lu NULL\n", id);
+        MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap process skiped %lu NULL\n", id);
         return 0;
     }
     task=pid_task(pid, PIDTYPE_PID);
@@ -169,7 +169,7 @@ int MemMap_AddTask(struct task_struct *t)
 {
     task_data data;
     u32 h;
-    printk(KERN_WARNING "MemMap Adding task %p\n",t );
+    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Adding task %p\n",t );
 
     h= hash_ptr(t,MEMMAP_TASK_HASH_BITS);
 
@@ -199,7 +199,7 @@ int MemMap_AddTask(struct task_struct *t)
     ++MemMap_numTasks;
     spin_unlock(&MemMap_tasksLock);
 
-    printk(KERN_WARNING "MemMap Added task %p\n",t);
+    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Added task %p\n",t);
     return 0;
 }
 

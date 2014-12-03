@@ -21,8 +21,6 @@
 #include <linux/hash.h>
 #include <linux/sched.h>
 #include <linux/spinlock.h>
-#include <asm/page.h>
-#include <asm/pgtable.h>
 #include "memmap.h"
 #include "memmap_taskdata.h"
 
@@ -59,8 +57,8 @@ task_data MemMap_InitData(struct task_struct *t)
     int i,j;
     //We must not wait here !
     task_data data=kmalloc(sizeof(struct _task_data),GFP_ATOMIC);
-    printk(KERN_WARNING "MemMap Trying to malloc size %lu\n", sizeof(struct _task_data));
-    printk(KERN_WARNING "MemMap Initialising data for task %p\n",t);
+    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Trying to malloc size %lu\n", sizeof(struct _task_data));
+    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Initialising data for task %p\n",t);
     if(!data)
     {
         MemMap_Panic("MemMap unable to allocate data ");
@@ -68,7 +66,7 @@ task_data MemMap_InitData(struct task_struct *t)
     }
     for(i=0;i<MEMMAP_NB_CHUNKS;i++)
     {
-        printk(KERN_WARNING "MemMap Initialising data chunk %d for task %p\n",i, t);
+        MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Initialising data chunk %d for task %p\n",i, t);
         data->chunks[i]=kmalloc(sizeof(chunk),GFP_ATOMIC);
         if(!data->chunks[i])
         {
@@ -85,10 +83,10 @@ task_data MemMap_InitData(struct task_struct *t)
     data->cur=0;
     data->prev=-1;
     get_task_struct(data->task);
-    printk(KERN_WARNING "MemMap Initialising data chunks for task %p\n",t);
-    printk(KERN_WARNING "MemMap Initialising data lock for task %p\n",t);
+    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Initialising data chunks for task %p\n",t);
+    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Initialising data lock for task %p\n",t);
     spin_lock_init(&data->lock);
-    printk(KERN_WARNING "MemMap Data ready for task %p\n",t);
+    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Data ready for task %p\n",t);
     return data;
 }
 
@@ -115,7 +113,7 @@ int MemMap_AddToChunk(task_data data, void *addr, int cpu,int chunkid)
     unsigned long h=hash_ptr(addr,MEMMAP_TDATA_HASH_BITS);
     chunk *ch;
     int ind;
-    printk(KERN_WARNING "MemMap hashmap addin %p to chunk %d cpu %d\n", addr, chunkid, cpu);
+    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap hashmap addin %p to chunk %d cpu %d\n", addr, chunkid, cpu);
     if(!MEMMAP_VALID_CHUNKID(chunkid))
         return -1;
     ch=data->chunks[chunkid];
@@ -133,19 +131,19 @@ int MemMap_AddToChunk(task_data data, void *addr, int cpu,int chunkid)
     {
         //Conflict detected
         ind=ch->hashs[h];
-        printk(KERN_WARNING "MemMap hashmap collision detected inserting %p hash %lu, ind %d\n", addr, h, ind);
+        MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap hashmap collision detected inserting %p hash %lu, ind %d\n", addr, h, ind);
         //Find a good spot
         while(ch->table[ind].addr!=addr && ch->table[ind].next_ind!=-1)
             ind=ch->table[ind].next_ind;
         //Addr already in the table
         if(ch->table[ind].addr==addr)
         {
-            printk(KERN_WARNING "MemMap addr already in chunk %p\n", addr);
+            MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap addr already in chunk %p\n", addr);
             return 0;
         }
         ch->table[ind].next_ind=ch->nbentry;
     }
-    printk(KERN_WARNING "MemMap inserting %p ind %d/%lu\n",
+    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap inserting %p ind %d/%lu\n",
             addr,ch->nbentry,MEMMAP_TDATA_TABLE_SIZE);
     //Insertion in the table
     ch->table[ch->nbentry].addr=addr;
@@ -154,7 +152,7 @@ int MemMap_AddToChunk(task_data data, void *addr, int cpu,int chunkid)
     ch->table[ch->nbentry].type=MEMMAP_ACCESS_NONE;
     ch->table[ch->nbentry].count=0;
     ++ch->nbentry;
-    printk(KERN_WARNING "MemMap inserted %p\n", addr);
+    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap inserted %p\n", addr);
     return 0;
 }
 
@@ -174,24 +172,17 @@ int MemMap_IsInChunk(task_data data, void *addr, int chunkid)
     return (ch->table[ind].addr==addr);
 }
 
-int MemMap_UpdateAdressData(task_data data,void *addr, int type,int count,
+int MemMap_UpdateAdressData(task_data data,int pos, int type,int count,
         int chunkid)
 {
-    unsigned long h=hash_ptr(addr,MEMMAP_TDATA_HASH_BITS);
     chunk *ch;
-    int ind;
     if(!MEMMAP_VALID_CHUNKID(chunkid))
         return -1;
     ch=data->chunks[chunkid];
-    ind=ch->hashs[h];
-    if(ind==-1)
+    if(pos<0 || pos > ch->nbentry)
         return 1;
-    while(ch->table[ind].addr!=addr && ch->table[ind].next_ind!=-1)
-        ind=ch->table[ind].next_ind;
-    if (ch->table[ind].addr!=addr)
-        return 1;
-    ch->table[ind].type&=type;
-    ch->table[ind].count+=count;
+    ch->table[pos].type|=type;
+    ch->table[pos].count+=count;
     return 0;
 }
 
@@ -207,15 +198,13 @@ int MemMap_PreviousChunk(task_data data)
 // Set current chunk as prev and clear current
 int MemMap_NextChunks(task_data data, unsigned long long *clocks)
 {
-    int i;
-    pte_t *pte;
-    printk(KERN_WARNING "MemMap Goto next chunks%p, %d, %d\n", data, data->cur, data->prev);
+    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Goto next chunks%p, %d, %d\n", data, data->cur, data->prev);
     data->chunks[data->cur]->clocks=clocks;
     data->cur=(data->cur+1)%MEMMAP_NB_CHUNKS;
     data->prev=(data->prev+1)%MEMMAP_NB_CHUNKS;
     if(data->cur==0)
     {
-        printk(KERN_WARNING "MemMap Flushin chunks\n");
+        MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Flushin chunks\n");
         MemMap_FlushData(data);
         return 1;
     }
@@ -228,15 +217,15 @@ void *MemMap_AddrInChunkPos(task_data data,int pos, int chunkid)
     void *addr;
     if(!MEMMAP_VALID_CHUNKID(chunkid))
         return NULL;
-    printk(KERN_WARNING "MemMap Looking for next addr in ch %d, pos %d/%u-%lu\n",
+    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Looking for next addr in ch %d, pos %d/%u-%lu\n",
             chunkid, pos, data->chunks[chunkid]->nbentry, MEMMAP_TDATA_TABLE_SIZE);
     if(pos < 0 ||pos >= data->chunks[chunkid]->nbentry)
     {
-        printk(KERN_WARNING "Nothing available\n");
+        MEMMAP_DEBUG_PRINT(KERN_WARNING "Nothing available\n");
         return NULL;
     }
     addr=data->chunks[chunkid]->table[pos].addr;
-    printk(KERN_WARNING "found adress %p\n", addr);
+    MEMMAP_DEBUG_PRINT(KERN_WARNING "found adress %p\n", addr);
     return addr;
 }
 
@@ -250,7 +239,7 @@ void MemMap_unLockData(task_data data)
 }
 void MemMap_FlushData(task_data data)
 {
-    printk(KERN_WARNING "MemMap_FlushData not implemented yet\n");
+    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap_FlushData not implemented yet\n");
     //TODO
     //print all chunks
     //Clean all chunks but last

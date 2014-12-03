@@ -12,7 +12,16 @@
 #define __NO_VERSION__
 #ifndef __MEMMAP__
 #define __MEMMAP__
+
+#define MEMMAP_DEBUG
+#ifdef MEMMAP_DEBUG
+#define MEMMAP_DEBUG_PRINT(...) printk(__VA_ARGS__)
+#else
+#define MEMMAP_DEBUG_PRINT(...)
+#endif //MEMMAP_DEBUG
 #define MAX(A,B) ((A)>(B) ? (A) : (B) )
+
+
 #include <linux/module.h>
 #include <linux/kernel.h>
 

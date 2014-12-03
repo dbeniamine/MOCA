@@ -53,7 +53,7 @@ static void MemMap_SetSchedulerPriority(struct task_struct *task)
 int MemMap_InitThreads(void)
 {
     int i;
-    printk(KERN_WARNING "MemMap initializing %d threads\n",
+    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap initializing %d threads\n",
             MemMap_NumThreads());
 
     //Init threads data
@@ -76,11 +76,11 @@ int MemMap_InitThreads(void)
     for(i=0;i< MemMap_NumThreads();i++)
     {
         {
-            printk(KERN_WARNING "Starting thread %d/%d\n", i, MemMap_NumThreads());
+            MEMMAP_DEBUG_PRINT(KERN_WARNING "Starting thread %d/%d\n", i, MemMap_NumThreads());
             //Creating the thread
             MemMap_threadTasks[i]=kthread_create(MemMap_MonitorThread, NULL,
                     "MemMap tlb walker thread");
-            printk("MemMap kthread %d create task %p\n", i, MemMap_threadTasks[i]);
+            MEMMAP_DEBUG_PRINT("MemMap kthread %d create task %p\n", i, MemMap_threadTasks[i]);
             if(!MemMap_threadTasks[i])
             {
                 MemMap_Panic("Kthread create failed");
@@ -108,19 +108,19 @@ void MemMap_CleanThreads(void)
         //Avoid suicidal call
         if(MemMap_threadTasks[i] && current != MemMap_threadTasks[i])
         {
-            printk(KERN_WARNING "Killing thread %d/%d task %p\n", i,
+            MEMMAP_DEBUG_PRINT(KERN_WARNING "Killing thread %d/%d task %p\n", i,
                     MemMap_NumThreads(), MemMap_threadTasks[i]);
             kthread_stop(MemMap_threadTasks[i]);
             put_task_struct(MemMap_threadTasks[i]);
         }
     }
-    printk(KERN_WARNING "All threads are dead\n");
+    MEMMAP_DEBUG_PRINT(KERN_WARNING "All threads are dead\n");
     //Now we are safe: all threads are dead
     if(MemMap_threadTasks)
         kfree(MemMap_threadTasks);
-    printk(KERN_WARNING "Thread tasks freed\n");
+    MEMMAP_DEBUG_PRINT(KERN_WARNING "Thread tasks freed\n");
     if(MemMap_threadClocks)
         kfree(MemMap_threadClocks);
-    printk(KERN_WARNING "Thread clocks freed\n");
+    MEMMAP_DEBUG_PRINT(KERN_WARNING "Thread clocks freed\n");
 }
 
