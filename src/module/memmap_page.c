@@ -24,58 +24,55 @@
 // Wakeup period in ms
 int MemMap_wakeupInterval=MEMMAP_DEFAULT_WAKEUP_INTERVAL;
 
-pte_t *MemMap_PageWalk(void *addr, struct mm_struct *mm)
-{
-
-    long address=(long)addr;
-    pgd_t *pgd=pgd_offset(mm,address);
-    pmd_t *pmd;
-    pud_t *pud;
-    pte_t *pte;
-    if (!pgd_none(*pgd) && !pgd_bad(*pgd))
-    {
-        pud=pud_offset(pgd,address);
-        if(!pud_none(*pud) && !pud_bad(*pud))
-        {
-            pmd = pmd_offset(pud, address);
-            if (!pmd_none(*pmd) && !pmd_bad(*pmd))
-            {
-                pte = pte_offset_map(pmd, address);
-                if (!pte_none(*pte) && pte_present(*pte))
-                {
-                    return pte;
-                }
-            }
-        }
-    }
-    return NULL;
-}
+/* pte_t *MemMap_PageWalk(void *addr, struct mm_struct *mm) */
+/* { */
+/*     long address=(long)addr; */
+/*     pgd_t *pgd=pgd_offset(mm,address); */
+/*     pmd_t *pmd; */
+/*     pud_t *pud; */
+/*     pte_t *pte; */
+/*     if (!pgd_none(*pgd) && !pgd_bad(*pgd)) */
+/*     { */
+/*         pud=pud_offset(pgd,address); */
+/*         if(!pud_none(*pud) && !pud_bad(*pud)) */
+/*         { */
+/*             pmd = pmd_offset(pud, address); */
+/*             if (!pmd_none(*pmd) && !pmd_bad(*pmd)) */
+/*             { */
+/*                 pte = pte_offset_map(pmd, address); */
+/*                 if (!pte_none(*pte) && pte_present(*pte)) */
+/*                 { */
+/*                     return pte; */
+/*                 } */
+/*             } */
+/*         } */
+/*     } */
+/*     return NULL; */
+/* } */
 
 //Walk through TLB and record all memory access
 void MemMap_MonitorPage(int myId,task_data data, unsigned long long *clocks)
 {
-    void*addr;
     int i=0;
     /* int type; */
-    int count;
     pte_t *pte;
     struct task_struct *t=MemMap_GetTaskFromData(data);
     printk(KERN_WARNING "Kthread %d walking on task %p with sched prio %d inverted %d\n",
             myId, t, t->prio, MEMMAP_DEFAULT_SCHED_PRIO-t->prio);
     MemMap_LockData(data);
-    while((addr=MemMap_NextAddrInChunk(data,&i,MemMap_CurrentChunk(data)))!=NULL)
+    while((pte=(pte_t *)MemMap_AddrInChunkPos(data,i,MemMap_CurrentChunk(data)))!=NULL)
     {
-        pte=MemMap_PageWalk(addr, MemMap_GetTaskFromData(data)->mm);
-        printk(KERN_WARNING "MemMAp pagewalk addr %p  pte %p page %p page addr %p\n",
-                addr,pte, pte_page(*pte),(void *)__pa(pte_page(*pte)));
+        /* pte=MemMap_PageWalk(addr, MemMap_GetTaskFromData(data)->mm); */
+        printk(KERN_WARNING "MemMAp pagewalk pte %p ind %d\n", pte, i);
         //TODO perfctr for count
-        count=1;
         *pte = pte_clear_flags(*pte, _PAGE_PRESENT);
+        printk(KERN_WARNING "MemMAp FLAGS CLEARED pte %p\n", pte);
         // Set R/W status + nb access
         // TODO
+        ++i;
     }
     // Goto to next chunk
-    MemMap_NextChunks(data,clocks);
+    /* MemMap_NextChunks(data,clocks); */
     MemMap_unLockData(data);
 }
 

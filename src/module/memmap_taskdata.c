@@ -38,7 +38,7 @@ typedef struct
 typedef struct
 {
     chunk_entry table[MEMMAP_TDATA_TABLE_SIZE];
-    int nbentry;
+    unsigned int nbentry;
     int hashs[MEMMAP_TDATA_HASH_SIZE];
     unsigned long long *clocks;
 }chunk;
@@ -115,6 +115,7 @@ int MemMap_AddToChunk(task_data data, void *addr, int cpu,int chunkid)
     unsigned long h=hash_ptr(addr,MEMMAP_TDATA_HASH_BITS);
     chunk *ch;
     int ind;
+    printk(KERN_WARNING "MemMap hashmap addin %p to chunk %d cpu %d\n", addr, chunkid, cpu);
     if(!MEMMAP_VALID_CHUNKID(chunkid))
         return -1;
     ch=data->chunks[chunkid];
@@ -131,17 +132,21 @@ int MemMap_AddToChunk(task_data data, void *addr, int cpu,int chunkid)
     else
     {
         //Conflict detected
-        printk(KERN_WARNING "MemMap hashmap collision detected inserting %p\n",
-                addr);
-        //Find a good spot
         ind=ch->hashs[h];
+        printk(KERN_WARNING "MemMap hashmap collision detected inserting %p hash %lu, ind %d\n", addr, h, ind);
+        //Find a good spot
         while(ch->table[ind].addr!=addr && ch->table[ind].next_ind!=-1)
             ind=ch->table[ind].next_ind;
         //Addr already in the table
         if(ch->table[ind].addr==addr)
-            return 1;
+        {
+            printk(KERN_WARNING "MemMap addr already in chunk %p\n", addr);
+            return 0;
+        }
         ch->table[ind].next_ind=ch->nbentry;
     }
+    printk(KERN_WARNING "MemMap inserting %p ind %d/%lu\n",
+            addr,ch->nbentry,MEMMAP_TDATA_TABLE_SIZE);
     //Insertion in the table
     ch->table[ch->nbentry].addr=addr;
     ch->table[ch->nbentry].next_ind=-1;
@@ -149,6 +154,7 @@ int MemMap_AddToChunk(task_data data, void *addr, int cpu,int chunkid)
     ch->table[ch->nbentry].type=MEMMAP_ACCESS_NONE;
     ch->table[ch->nbentry].count=0;
     ++ch->nbentry;
+    printk(KERN_WARNING "MemMap inserted %p\n", addr);
     return 0;
 }
 
@@ -158,11 +164,11 @@ int MemMap_IsInChunk(task_data data, void *addr, int chunkid)
     chunk *ch;
     int ind;
     if(!MEMMAP_VALID_CHUNKID(chunkid))
-        return -1;
+        return 0;
     ch=data->chunks[chunkid];
     ind=ch->hashs[h];
     if(ind==-1)
-        return 1;
+        return 0;
     while(ch->table[ind].addr!=addr && ch->table[ind].next_ind!=-1)
         ind=ch->table[ind].next_ind;
     return (ch->table[ind].addr==addr);
@@ -205,7 +211,7 @@ int MemMap_NextChunks(task_data data, unsigned long long *clocks)
     pte_t *pte;
     printk(KERN_WARNING "MemMap Goto next chunks%p, %d, %d\n", data, data->cur, data->prev);
     data->chunks[data->cur]->clocks=clocks;
-    // Mark absent all pte in previous chunk
+    // Mark absent all pte in previous chunk, should be done somewhere else
     if(MEMMAP_VALID_CHUNKID(data->prev))
     {
         for(i=0;i<data->chunks[data->prev]->nbentry;++i)
@@ -215,9 +221,9 @@ int MemMap_NextChunks(task_data data, unsigned long long *clocks)
                 *pte=pte_clear_flags(*pte,_PAGE_PRESENT);
         }
     }
-    ++data->cur;
-    ++data->prev;
-    if(data->cur==MEMMAP_NB_CHUNKS)
+    data->cur=(data->cur+1)%MEMMAP_NB_CHUNKS;
+    data->prev=(data->prev+1)%MEMMAP_NB_CHUNKS;
+    if(data->cur==0)
     {
         printk(KERN_WARNING "MemMap Flushin chunks\n");
         MemMap_FlushData(data);
@@ -227,20 +233,19 @@ int MemMap_NextChunks(task_data data, unsigned long long *clocks)
 }
 
 
-void *MemMap_NextAddrInChunk(task_data data,int *pos, int chunkid)
+void *MemMap_AddrInChunkPos(task_data data,int pos, int chunkid)
 {
     void *addr;
     if(!MEMMAP_VALID_CHUNKID(chunkid))
         return NULL;
-    printk(KERN_WARNING "MemMap Looking for next addr in ch %d, pos %d/%d\n", chunkid, *pos,
-            data->chunks[chunkid]->nbentry);
-    if(*pos >= data->chunks[chunkid]->nbentry)
+    printk(KERN_WARNING "MemMap Looking for next addr in ch %d, pos %d/%u-%lu\n",
+            chunkid, pos, data->chunks[chunkid]->nbentry, MEMMAP_TDATA_TABLE_SIZE);
+    if(pos < 0 ||pos >= data->chunks[chunkid]->nbentry)
     {
         printk(KERN_WARNING "Nothing available\n");
         return NULL;
     }
-    addr=data->chunks[chunkid]->table[*pos].addr;
-    ++*pos;
+    addr=data->chunks[chunkid]->table[pos].addr;
     printk(KERN_WARNING "found adress %p\n", addr);
     return addr;
 }
@@ -257,6 +262,6 @@ void MemMap_FlushData(task_data data)
 {
     printk(KERN_WARNING "MemMap_FlushData not implemented yet\n");
     //TODO
-    data->cur=0;
-    data->prev=-1;
+    //print all chunks
+    //Clean all chunks but last
 }

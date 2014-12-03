@@ -55,14 +55,10 @@ int MemMap_NextChunks(task_data data, unsigned long long *clocks);
 
 
 
-// This is an easy accessor to walk on each entry of a table:
-// usage:
-//  int pos=0
-//  void *addr
-//  while((addr=MemMap_NextAddrInChunk(myData, &pos, mychunkid))!=NULL)
-//      do_stuff(addr);
-//
-void *MemMap_NextAddrInChunk(task_data data,int *pos, int chunkid);
+/* This function returns the pos th add in the data's chunk number chunkid
+ * returns NULL if pos is invalid ( < 0 || >= nbentry in chunk)
+ */
+void *MemMap_AddrInChunkPos(task_data data,int pos, int chunkid);
 
 // None of the function above are atomic, however the following calls allows
 // you to ensure mutual exclusion when it is required
