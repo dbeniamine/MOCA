@@ -30,14 +30,14 @@ void MemMap_MonitorPage(int myId,task_data data, unsigned long long *clocks)
     int i=0;
     int type=MEMMAP_ACCESS_NONE, count;
     pte_t *pte;
-    MEMMAP_DEBUG_PRINT(KERN_WARNING "Kthread %d walking on data %p , task %p\n",
+    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Kthread %d walking on data %p , task %p\n",
             myId, data, MemMap_GetTaskFromData(data));
     MemMap_LockData(data);
     while((pte=(pte_t *)MemMap_AddrInChunkPos(data,i,MemMap_CurrentChunk(data)))!=NULL)
     {
-        MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMAp pagewalk pte %p ind %d\n", pte, i);
+        MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap pagewalk pte %p ind %d\n", pte, i);
         *pte = pte_clear_flags(*pte, _PAGE_PRESENT);
-        MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMAp FLAGS CLEARED pte %p\n", pte);
+        MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap FLAGS CLEARED pte %p\n", pte);
         // Set R/W status
         if(pte_young(*pte))
             type|=MEMMAP_ACCESS_R;

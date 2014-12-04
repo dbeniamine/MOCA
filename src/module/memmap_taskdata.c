@@ -47,9 +47,11 @@ typedef struct _task_data
     chunk *chunks[MEMMAP_NB_CHUNKS];
     int cur;
     int prev;
+    int needToCleanLastChunk;
     spinlock_t lock;
 }*task_data;
 
+// Use by flush function to keep track of the last chunk
 void MemMap_FlushData(task_data data);
 
 task_data MemMap_InitData(struct task_struct *t)
@@ -57,7 +59,6 @@ task_data MemMap_InitData(struct task_struct *t)
     int i,j;
     //We must not wait here !
     task_data data=kmalloc(sizeof(struct _task_data),GFP_ATOMIC);
-    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Trying to malloc size %lu\n", sizeof(struct _task_data));
     MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Initialising data for task %p\n",t);
     if(!data)
     {
@@ -74,14 +75,22 @@ task_data MemMap_InitData(struct task_struct *t)
             return NULL;
         }
         data->chunks[i]->nbentry=0;
-        for(j=0;j<MEMMAP_TDATA_HASH_SIZE;j++)
-            data->chunks[i]->hashs[j]=-1;
+        for(j=0;j<MEMMAP_TDATA_TABLE_SIZE;j++)
+        {
+            data->chunks[i]->table[j].addr=NULL;
+            data->chunks[i]->table[j].count=0;
+            data->chunks[i]->table[j].next_ind=-1;
+            data->chunks[i]->table[j].type=MEMMAP_ACCESS_NONE;
+            if(j<MEMMAP_TDATA_HASH_SIZE)
+                data->chunks[i]->hashs[j]=-1;
+        }
 
 
     }
     data->task=t;
     data->cur=0;
     data->prev=-1;
+    data->needToCleanLastChunk=0;
     get_task_struct(data->task);
     MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Initialising data chunks for task %p\n",t);
     MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Initialising data lock for task %p\n",t);
@@ -172,8 +181,7 @@ int MemMap_IsInChunk(task_data data, void *addr, int chunkid)
     return (ch->table[ind].addr==addr);
 }
 
-int MemMap_UpdateAdressData(task_data data,int pos, int type,int count,
-        int chunkid)
+int MemMap_UpdateData(task_data data,int pos, int type,int count, int chunkid)
 {
     chunk *ch;
     if(!MEMMAP_VALID_CHUNKID(chunkid))
@@ -198,6 +206,8 @@ int MemMap_PreviousChunk(task_data data)
 // Set current chunk as prev and clear current
 int MemMap_NextChunks(task_data data, unsigned long long *clocks)
 {
+    int chunkid, ind;
+    unsigned long h;
     MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Goto next chunks%p, %d, %d\n", data, data->cur, data->prev);
     data->chunks[data->cur]->clocks=clocks;
     data->cur=(data->cur+1)%MEMMAP_NB_CHUNKS;
@@ -207,6 +217,20 @@ int MemMap_NextChunks(task_data data, unsigned long long *clocks)
         MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Flushin chunks\n");
         MemMap_FlushData(data);
         return 1;
+    }
+    if(data->needToCleanLastChunk)
+    {
+        data->needToCleanLastChunk=0;
+        chunkid=MEMMAP_NB_CHUNKS-1;
+        for(ind=0; ind < data->chunks[chunkid]->nbentry;++ind)
+        {
+            h=hash_ptr(data->chunks[chunkid]->table[ind].addr,MEMMAP_TDATA_HASH_BITS);
+            data->chunks[chunkid]->hashs[h]=-1;
+            data->chunks[chunkid]->table[ind].addr=NULL;
+            data->chunks[chunkid]->table[ind].count=0;
+            data->chunks[chunkid]->table[ind].next_ind=-1;
+            data->chunks[chunkid]->table[ind].type=MEMMAP_ACCESS_NONE;
+        }
     }
     return 0;
 }
@@ -237,10 +261,39 @@ void MemMap_unLockData(task_data data)
 {
     spin_unlock(&data->lock);
 }
+
+void MemMap_PrintEntry(chunk_entry e)
+{
+    //TODO
+}
+
 void MemMap_FlushData(task_data data)
 {
+    int chunkid, ind;
+    unsigned long h;
+
     MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap_FlushData not implemented yet\n");
-    //TODO
-    //print all chunks
-    //Clean all chunks but last
+    for(chunkid=0; chunkid < MEMMAP_NB_CHUNKS-1;++chunkid)
+    {
+        //TODO: print clocks nbentry
+        for(ind=0; ind < data->chunks[chunkid]->nbentry;++ind)
+        {
+            MemMap_PrintEntry(data->chunks[chunkid]->table[ind]);
+            h=hash_ptr(data->chunks[chunkid]->table[ind].addr,MEMMAP_TDATA_HASH_BITS);
+            data->chunks[chunkid]->hashs[h]=-1;
+            data->chunks[chunkid]->table[ind].addr=NULL;
+            data->chunks[chunkid]->table[ind].count=0;
+            data->chunks[chunkid]->table[ind].next_ind=-1;
+            data->chunks[chunkid]->table[ind].type=MEMMAP_ACCESS_NONE;
+        }
+    }
+    // Here chunkid==MEMMAP_NB_CHUNKS-1==data->prev
+    // We keep that last chunk in memory for the moment, we will have to clean
+    // it during the next call to Nextchunks
+    data->needToCleanLastChunk=1;
+    //TODO: print clocks nbentry
+    for(ind=0; ind < data->chunks[chunkid]->nbentry;++ind)
+    {
+        MemMap_PrintEntry(data->chunks[chunkid]->table[ind]);
+    }
 }
