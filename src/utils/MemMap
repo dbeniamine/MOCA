@@ -97,7 +97,9 @@ child()
     else
         $cmd $args > $logfile 2>&1
     fi
-    exit $?
+    ret=$?
+    echo "$cmd ended code $ret"
+    exit $ret
 }
 
 abort_on_error()
@@ -119,9 +121,9 @@ schedtool -F -p $prio $$
 cd $install_dir/src/module/
 make clean && make
 abort_on_error $? "make fail"
-make install
-abort_on_error $? "Install fail"
-modprobe memmap MemMap_mainPid=$pid MemMap_schedulerPriority=$prio \
+# make install
+# abort_on_error $? "Install fail"
+insmod memmap.ko MemMap_mainPid=$pid MemMap_schedulerPriority=$prio \
     $memmap_interval $memmap_maxprocess $memmap_pin
 abort_on_error $? "unable to load module"
 kill -s SIGCONT $pid

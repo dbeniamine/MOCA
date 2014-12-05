@@ -13,7 +13,7 @@
 #ifndef __MEMMAP_PAGE__
 #define __MEMMAP_PAGE__
 
-#define MEMMAP_DEFAULT_WAKEUP_INTERVAL 200
+#define MEMMAP_DEFAULT_WAKEUP_INTERVAL 50
 
 /* Main function for TLB walkthrough
  * Check accessed page every Memmap_wakeupsIinterval ms

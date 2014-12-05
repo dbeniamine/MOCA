@@ -35,9 +35,13 @@ void MemMap_MonitorPage(int myId,task_data data, unsigned long long *clocks)
     MemMap_LockData(data);
     while((pte=(pte_t *)MemMap_AddrInChunkPos(data,i,MemMap_CurrentChunk(data)))!=NULL)
     {
-        MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap pagewalk pte %p ind %d\n", pte, i);
-        *pte = pte_clear_flags(*pte, _PAGE_PRESENT);
-        MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap FLAGS CLEARED pte %p\n", pte);
+        MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap pagewalk pte %p ind %d cpu %d data %p\n",
+                pte, i, myId, data);
+        if(!pte_none(*pte) && pte_present(*pte) && !pte_special(*pte) )
+        {
+            *pte = pte_clear_flags(*pte, _PAGE_PRESENT);
+            MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap FLAGS CLEARED pte %p\n", pte);
+        }
         // Set R/W status
         if(pte_young(*pte))
             type|=MEMMAP_ACCESS_R;
@@ -51,6 +55,8 @@ void MemMap_MonitorPage(int myId,task_data data, unsigned long long *clocks)
     // Goto to next chunk
     MemMap_NextChunks(data,clocks);
     MemMap_unLockData(data);
+    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap pagewalk pte cpu %d data %p end\n",
+            myId,data);
 }
 
 

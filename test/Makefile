@@ -4,7 +4,7 @@ LOG_FILE=$(INSTALL_DIR)/log
 MEMMAP=sudo ../src/utils/MemMap -d $(INSTALL_DIR) -p $(PRIO) -f $(LOG_FILE)
 # Testing config
 PRIO=99
-SIZE=50
+SIZE=300
 SEED=42
 ALGO=par_modulo
 THREADS=2

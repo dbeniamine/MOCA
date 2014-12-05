@@ -48,6 +48,7 @@ typedef struct _task_data
     int cur;
     int prev;
     int needToCleanLastChunk;
+    int inUse;
     spinlock_t lock;
 }*task_data;
 
@@ -59,7 +60,7 @@ task_data MemMap_InitData(struct task_struct *t)
     int i,j;
     //We must not wait here !
     task_data data=kmalloc(sizeof(struct _task_data),GFP_ATOMIC);
-    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Initialising data for task %p\n",t);
+    /* MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Initialising data for task %p\n",t); */
     if(!data)
     {
         MemMap_Panic("MemMap unable to allocate data ");
@@ -67,7 +68,7 @@ task_data MemMap_InitData(struct task_struct *t)
     }
     for(i=0;i<MEMMAP_NB_CHUNKS;i++)
     {
-        MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Initialising data chunk %d for task %p\n",i, t);
+        /* MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Initialising data chunk %d for task %p\n",i, t); */
         data->chunks[i]=kmalloc(sizeof(chunk),GFP_ATOMIC);
         if(!data->chunks[i])
         {
@@ -91,11 +92,12 @@ task_data MemMap_InitData(struct task_struct *t)
     data->cur=0;
     data->prev=-1;
     data->needToCleanLastChunk=0;
+    data->inUse=0;
     get_task_struct(data->task);
-    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Initialising data chunks for task %p\n",t);
-    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Initialising data lock for task %p\n",t);
+    /* MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Initialising data chunks for task %p\n",t); */
+    /* MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Initialising data lock for task %p\n",t); */
     spin_lock_init(&data->lock);
-    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Data ready for task %p\n",t);
+    /* MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Data ready for task %p\n",t); */
     return data;
 }
 
@@ -122,10 +124,11 @@ int MemMap_AddToChunk(task_data data, void *addr, int cpu,int chunkid)
     unsigned long h=hash_ptr(addr,MEMMAP_TDATA_HASH_BITS);
     chunk *ch;
     int ind;
-    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap hashmap addin %p to chunk %d cpu %d\n", addr, chunkid, cpu);
     if(!MEMMAP_VALID_CHUNKID(chunkid))
         return -1;
     ch=data->chunks[chunkid];
+    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap hashmap adding %p to chunk %d %p data %p cpu %d\n",
+            addr, chunkid, ch,data, cpu);
     if(ch->nbentry>=MEMMAP_TDATA_TABLE_SIZE)
     {
         MemMap_Panic("MemMap have too many adresses in chunk");
@@ -148,6 +151,7 @@ int MemMap_AddToChunk(task_data data, void *addr, int cpu,int chunkid)
         if(ch->table[ind].addr==addr)
         {
             MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap addr already in chunk %p\n", addr);
+            ++ch->table[ind].count;
             return 0;
         }
         ch->table[ind].next_ind=ch->nbentry;
@@ -220,6 +224,7 @@ int MemMap_NextChunks(task_data data, unsigned long long *clocks)
     }
     if(data->needToCleanLastChunk)
     {
+        MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Cleaning last chunk\n");
         data->needToCleanLastChunk=0;
         chunkid=MEMMAP_NB_CHUNKS-1;
         for(ind=0; ind < data->chunks[chunkid]->nbentry;++ind)
@@ -255,10 +260,22 @@ void *MemMap_AddrInChunkPos(task_data data,int pos, int chunkid)
 
 void MemMap_LockData(task_data data)
 {
-    spin_lock(&data->lock);
+    /* int use=1; */
+    /* do */
+    /* { */
+        spin_lock(&data->lock);
+        /* use=data->inUse; */
+        /* if(!use) */
+        /*     data->inUse=1; */
+        /* spin_unlock(&data->lock); */
+        /* if(use) */
+        /*     yield(); */
+    /* }while(use); */
 }
 void MemMap_unLockData(task_data data)
 {
+    /* spin_lock(&data->lock); */
+    /* data->inUse=0; */
     spin_unlock(&data->lock);
 }
 
