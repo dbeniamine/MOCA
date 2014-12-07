@@ -167,6 +167,7 @@ task_data MemMap_GetData(struct task_struct *t)
 // Add t to the monitored pids
 int MemMap_AddTask(struct task_struct *t)
 {
+    static int nextId=0;
     task_data data;
     u32 h;
     MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Adding task %p\n",t );
@@ -174,7 +175,7 @@ int MemMap_AddTask(struct task_struct *t)
     h= hash_ptr(t,MEMMAP_TASK_HASH_BITS);
 
     //Create the task data
-    data=MemMap_InitData(t);
+    data=MemMap_InitData(t, nextId);
     if(!data)
         return -1;
     //Get number and max of pids

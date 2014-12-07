@@ -12,11 +12,6 @@
 #ifndef __MEMMAP_TASK_DATA__
 #define __MEMMAP_TASK_DATA__
 
-#define MEMMAP_ACCESS_NONE 0b0
-#define MEMMAP_ACCESS_R 0b1
-#define MEMMAP_ACCESS_W 0b10
-#define MEMMAP_ACCESS_RW (MEMMAP_ACCESS_R & MEMMAP_ACCESS_W)
-
 typedef struct _task_data *task_data;
 
 extern task_data *MemMap_tasksData;
@@ -24,7 +19,7 @@ extern task_data *MemMap_tasksData;
 // Current number of monitored tasks
 extern int MemMap_GetNumTasks(void);
 
-task_data MemMap_InitData(struct task_struct *t);
+task_data MemMap_InitData(struct task_struct *t, int id);
 void MemMap_ClearData(task_data data);
 
 struct task_struct *MemMap_GetTaskFromData(task_data data);
@@ -53,17 +48,17 @@ int MemMap_PreviousChunk(task_data data);
  * Update the posth entry of the chunk chunkid
  * Add count access and update the type
  */
-int MemMap_UpdateData(task_data data,int pos, int type,int count,
-        int chunkid);
+int MemMap_UpdateData(task_data data,int pos, int countR, int countW, int chunkid,
+        int cpu);
 
 /*
  * Start working on the next chunks
  * If required, flush data
  * returns 1 if data were flushed, 0 else
  */
-int MemMap_NextChunks(task_data data, unsigned long long *clocks);
+int MemMap_NextChunks(task_data data);
 
-/* 
+/*
  * This function returns the pos th add in the data's chunk number chunkid
  * returns NULL if pos is invalid ( < 0 || >= nbentry in chunk)
  */

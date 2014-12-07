@@ -14,7 +14,8 @@ usage()
     echo "-p prio           Schedtool priority for the kernel module, the user
     program priority will be prio-1, default: $prio"
     echo "-d dir            Path to the MemMap dir default $install_dir"
-    echo "-f file           Log into file"
+    echo "-f file           Log cmd into file"
+    echo "-l file           Log module output into file"
     echo "-n maxtasks       Set the maximum of tasks instrument, default 128"
     echo "-m                Pin thread manually. If you use this option, $0
                             will assume that you have pinned the thread (aka
@@ -39,8 +40,9 @@ fi
 
 prio=$(schedtool -r | grep FIFO | sed -e 's/.*prio_max \([0-9]*\)/\1/')
 install_dir="~/install/MemMap"
+kernLogFile="MemMap.log"
 
-while getopts "w:c:a:hp:d:f:n:m" opt
+while getopts "w:c:a:hp:d:f:n:ml:" opt
 do
     case $opt in
         h)
@@ -64,6 +66,9 @@ do
             ;;
         f)
             logfile="$OPTARG"
+            ;;
+        l)
+            kernLogFile="$OPTARG"
             ;;
         n)
             memmap_maxprocess="MemMap_maxProcess=$OPTARG"
@@ -95,7 +100,7 @@ child()
     then
         $cmd $args
     else
-        $cmd $args > $logfile 2>&1
+        $cmd $args > $logfile 2> $logfile.err
     fi
     ret=$?
     echo "$cmd ended code $ret"
@@ -113,11 +118,11 @@ abort_on_error()
     fi
 }
 
+let user_prio=$(( $prio - 1 ))
 child &
 pid=$!
-let user_prio=$(( $prio - 1 ))
-schedtool -F -p $user_prio $pid
 schedtool -F -p $prio $$
+schedtool -F -p $user_prio $pid
 cd $install_dir/src/module/
 make clean && make
 abort_on_error $? "make fail"
@@ -130,3 +135,5 @@ kill -s SIGCONT $pid
 echo "Parent $BASHPID waiting for child $pid in script $$"
 wait $pid
 rmmod memmap
+# Do the log
+#cat /var/log/messages | grep "==MemMap" > $kernLogFile

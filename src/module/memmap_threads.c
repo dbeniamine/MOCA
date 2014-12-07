@@ -75,25 +75,23 @@ int MemMap_InitThreads(void)
     // Create one monitor thread per CPU
     for(i=0;i< MemMap_NumThreads();i++)
     {
+        MEMMAP_DEBUG_PRINT(KERN_WARNING "Starting thread %d/%d\n", i, MemMap_NumThreads());
+        //Creating the thread
+        MemMap_threadTasks[i]=kthread_create(MemMap_MonitorThread, NULL,
+                "MemMap tlb walker thread");
+        MEMMAP_DEBUG_PRINT("MemMap kthread %d create task %p\n", i, MemMap_threadTasks[i]);
+        if(!MemMap_threadTasks[i])
         {
-            MEMMAP_DEBUG_PRINT(KERN_WARNING "Starting thread %d/%d\n", i, MemMap_NumThreads());
-            //Creating the thread
-            MemMap_threadTasks[i]=kthread_create(MemMap_MonitorThread, NULL,
-                    "MemMap tlb walker thread");
-            MEMMAP_DEBUG_PRINT("MemMap kthread %d create task %p\n", i, MemMap_threadTasks[i]);
-            if(!MemMap_threadTasks[i])
-            {
-                MemMap_Panic("Kthread create failed");
-                return -1;
-            }
-            get_task_struct(MemMap_threadTasks[i]);
-            //Bind it on the ith proc
-            kthread_bind(MemMap_threadTasks[i],i);
-            // Set priority
-            MemMap_SetSchedulerPriority(MemMap_threadTasks[i]);
-            //And finally start it
-            wake_up_process(MemMap_threadTasks[i]);
+            MemMap_Panic("Kthread create failed");
+            return -1;
         }
+        get_task_struct(MemMap_threadTasks[i]);
+        //Bind it on the ith proc
+        kthread_bind(MemMap_threadTasks[i],i);
+        // Set priority
+        MemMap_SetSchedulerPriority(MemMap_threadTasks[i]);
+        //And finally start it
+        wake_up_process(MemMap_threadTasks[i]);
 
     }
     return 0;

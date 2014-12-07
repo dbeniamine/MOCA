@@ -25,10 +25,10 @@
 int MemMap_wakeupInterval=MEMMAP_DEFAULT_WAKEUP_INTERVAL;
 
 // Walk through the current chunk
-void MemMap_MonitorPage(int myId,task_data data, unsigned long long *clocks)
+void MemMap_MonitorPage(int myId,task_data data)
 {
     int i=0;
-    int type=MEMMAP_ACCESS_NONE, count;
+    int countR=0, countW=0;
     pte_t *pte;
     MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Kthread %d walking on data %p , task %p\n",
             myId, data, MemMap_GetTaskFromData(data));
@@ -43,17 +43,16 @@ void MemMap_MonitorPage(int myId,task_data data, unsigned long long *clocks)
             MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap FLAGS CLEARED pte %p\n", pte);
         }
         // Set R/W status
-        if(pte_young(*pte))
-            type|=MEMMAP_ACCESS_R;
-        if(pte_dirty(*pte))
-            type|=MEMMAP_ACCESS_W;
         //TODO: count perfctr
-        count=1;
-        MemMap_UpdateData(data,i,type,count, MemMap_CurrentChunk(data));
+        if(pte_young(*pte))
+            ++countR;
+        if(pte_dirty(*pte))
+            ++countW;
+        MemMap_UpdateData(data,i,countR,countW, MemMap_CurrentChunk(data),myId);
         ++i;
     }
     // Goto to next chunk
-    MemMap_NextChunks(data,clocks);
+    MemMap_NextChunks(data);
     MemMap_unLockData(data);
     MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap pagewalk pte cpu %d data %p end\n",
             myId,data);
@@ -70,14 +69,11 @@ int MemMap_MonitorThread(void * arg)
     //Init tlb walk data
     int myId=get_cpu(),i;
     unsigned long long lastwake=0;
-    unsigned long long *clocks;
 
     while(!kthread_should_stop())
     {
         int nbTasks=MemMap_GetNumTasks();
         //Freed in memmap_taskdata.h during flush or clear
-        clocks=kcalloc(MemMap_NumThreads(),sizeof(unsigned long long),GFP_ATOMIC);
-        MemMap_GetClocks(clocks);
         for(i=0;i<nbTasks;i++)
         {
             MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Kthread %d iterating taskdata %d/%d\n",
@@ -90,7 +86,7 @@ int MemMap_MonitorThread(void * arg)
                 lastwake=MAX(lastwake,task->sched_info.last_arrival);
                 MEMMAP_DEBUG_PRINT(KERN_WARNING "KThread %d found task %p running on cpu %d\n",
                         myId, task, task->on_cpu);
-                MemMap_MonitorPage(myId,data,clocks);
+                MemMap_MonitorPage(myId,data);
             }
         }
         MemMap_UpdateClock(myId);

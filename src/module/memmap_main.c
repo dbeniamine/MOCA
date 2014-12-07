@@ -16,7 +16,6 @@
 #include "memmap_threads.h"
 #include "memmap_probes.h"
 #include "memmap_tasks.h"
-/* #include <linux/sched.h> */
 
 
 /* Informations about the module */
@@ -60,6 +59,7 @@ static int __init MemMap_Init(void)
     printk(KERN_WARNING "MemMap started monitoring pid %d\n",
             MemMap_mainPid);
     MemMap_numThreads=num_online_cpus();
+    //Remove previous MemMap entries
     if(MemMap_InitProcessManagment(MemMap_maxProcess,MemMap_mainPid)!=0)
         return -1;
     printk(KERN_WARNING "MemMap common data ready \n");
