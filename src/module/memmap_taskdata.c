@@ -14,8 +14,11 @@
 #define MEMMAP_TDATA_HASH_SIZE (1UL<<MEMMAP_TDATA_HASH_BITS)
 #define MEMMAP_TDATA_TABLE_SIZE 2*MEMMAP_TDATA_HASH_SIZE
 #define MEMMAP_NB_CHUNKS 2//2*10
+#define MEMMAP_BUF_SIZE 2048
 
 #define MEMMAP_VALID_CHUNKID(c) ( (c) >= 0 && (c) < MEMMAP_NB_CHUNKS )
+//TODO: fix that dynamically
+#define MEMMAP_PAGE_SIZE 4096
 
 #include <linux/slab.h>
 #include <linux/hash.h>
@@ -23,6 +26,7 @@
 #include <linux/spinlock.h>
 #include "memmap.h"
 #include "memmap_taskdata.h"
+#include "memmap_tasks.h"
 #include "memmap_threads.h"
 
 typedef struct
@@ -51,6 +55,7 @@ typedef struct _task_data
     int cur;
     int prev;
     int internalId;
+    int nbflush;
     spinlock_t lock;
 }*task_data;
 
@@ -105,6 +110,7 @@ task_data MemMap_InitData(struct task_struct *t,int id)
     MemMap_GetClocks(data->chunks[0]->startClocks);
     data->prev=-1;
     data->internalId=id;
+    data->nbflush=0;
     get_task_struct(data->task);
     /* MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Initialising data chunks for task %p\n",t); */
     /* MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Initialising data lock for task %p\n",t); */
@@ -240,7 +246,7 @@ int MemMap_NextChunks(task_data data)
         return 1;
     }
     else
-    MemMap_GetClocks(data->chunks[data->cur]->startClocks);
+        MemMap_GetClocks(data->chunks[data->cur]->startClocks);
     return 0;
 }
 
@@ -271,21 +277,82 @@ void MemMap_unLockData(task_data data)
     spin_unlock(&data->lock);
 }
 
+void MemMap_PrintClocks(unsigned long long *clocks, char *buf)
+{
+    size_t size=MEMMAP_BUF_SIZE;
+    int i,pos;
+    if(!buf)
+        return;
+    buf[0]='{';
+    pos=0;
+    for(i=0;i<MemMap_NumThreads();++i)
+    {
+        ++pos;
+        size-=pos;
+        pos+=snprintf(buf+pos, size, "%llu", clocks[i]);
+        if(size==0)
+            return;
+        buf[pos]=',';
+    }
+    buf[pos]='}';
+    if(size>1)
+        pos++;
+    buf[pos]='\0';
+}
+
+void MemMap_CpuMask(int cpu, char *buf)
+{
+    int i=0,pos=8*sizeof(int)-1, ok=0;
+    if(!buf)
+        return;
+    while(pos>=0)
+    {
+        ok|=cpu&(1<<pos);
+        if(ok)
+        {
+            buf[i]=(cpu&(1<<pos))?'1':'0';
+            ++i;
+        }
+        --pos;
+    }
+    buf[i]='\0';
+}
 
 void MemMap_FlushData(task_data data)
 {
     int chunkid, ind;
     unsigned long h;
+    char *clk,*clk1, *CPUMASK;
+    clk=kmalloc(MEMMAP_BUF_SIZE,GFP_ATOMIC);
+    clk1=kmalloc(MEMMAP_BUF_SIZE,GFP_ATOMIC);
+    CPUMASK=kmalloc(MEMMAP_BUF_SIZE,GFP_ATOMIC);
+    if(!clk1 || !clk || !CPUMASK)
+        printk(KERN_WARNING "MemMap unable to allocate buffers in flush data\n");
 
     MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap_FlushData not implemented yet\n");
+    printk(KERN_INFO "==MemMap Taskdata %d %p\n", data->internalId,data->task);
     for(chunkid=0; chunkid < MEMMAP_NB_CHUNKS;++chunkid)
     {
+        MemMap_PrintClocks(data->chunks[chunkid]->startClocks,clk);
+        MemMap_PrintClocks(data->chunks[chunkid]->endClocks,clk1);
+        MemMap_CpuMask(data->chunks[chunkid]->cpu, CPUMASK);
+        //Chunk chunkdid clock clock nbentry cpumask taskid
+        printk(KERN_INFO "==MemMap Chunk %d %s %s %d 0b%s %d\n",
+                chunkid+data->nbflush*MEMMAP_NB_CHUNKS,clk,clk1,
+                data->chunks[chunkid]->nbentry,CPUMASK, data->internalId
+              );
         //TODO: print clocks nbentry
-        //taskid Chunk clocks nbentries cpumask
         for(ind=0; ind < data->chunks[chunkid]->nbentry;++ind)
         {
-            //Access clock0 clock1 addr pagesize cpumask countread countwrite taskid
-            /* MemMap_PrintEntry(data->chunks[chunkid]->table[ind]); */
+            //Access clock0 clock1 addr pagesize cpumask countread countwrite chunkid taskid
+            MemMap_CpuMask(data->chunks[chunkid]->table[ind].cpu, CPUMASK);
+            printk(KERN_INFO "==MemMap Access %s %s 0x%p 0x%x 0b%s %d %d %d %d\n",
+                    clk,clk1,data->chunks[chunkid]->table[ind].addr,
+                    MEMMAP_PAGE_SIZE,CPUMASK,
+                    data->chunks[chunkid]->table[ind].countR,
+                    data->chunks[chunkid]->table[ind].countW,
+                    chunkid+data->nbflush*MEMMAP_NB_CHUNKS, data->internalId
+                  );
             //Re init data
             h=hash_ptr(data->chunks[chunkid]->table[ind].addr,MEMMAP_TDATA_HASH_BITS);
             data->chunks[chunkid]->hashs[h]=-1;
@@ -297,5 +364,12 @@ void MemMap_FlushData(task_data data)
         data->chunks[chunkid]->cpu=0;
         data->chunks[chunkid]->nbentry=0;
     }
+    data->nbflush=0;
     MemMap_GetClocks(data->chunks[0]->startClocks);
+    if(clk)
+        kfree(clk);
+    if(clk1)
+        kfree(clk1);
+    if(CPUMASK)
+        kfree(CPUMASK);
 }

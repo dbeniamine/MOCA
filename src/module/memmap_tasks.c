@@ -204,4 +204,8 @@ int MemMap_AddTask(struct task_struct *t)
     return 0;
 }
 
+int MemMap_MaxTasks(void)
+{
+    return MemMap_maxTasks;
+}
 

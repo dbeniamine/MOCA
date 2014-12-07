@@ -136,4 +136,4 @@ echo "Parent $BASHPID waiting for child $pid in script $$"
 wait $pid
 rmmod memmap
 # Do the log
-#cat /var/log/messages | grep "==MemMap" > $kernLogFile
+cat /var/log/messages | grep "==MemMap" > $kernLogFile
