@@ -93,9 +93,9 @@ fi
 # Wait for the kernel module to start
 child()
 {
-    echo "Child $BASHPID waiting for a signal from my parent"
+    #echo "Child $BASHPID waiting for a signal from my parent"
     kill -s SIGSTOP $BASHPID
-    echo "Child $BASHPID awake"
+    #echo "Child $BASHPID awake"
     if [ -z "$logfile" ]
     then
         $cmd $args
@@ -132,8 +132,13 @@ insmod memmap.ko MemMap_mainPid=$pid MemMap_schedulerPriority=$prio \
     $memmap_interval $memmap_maxprocess $memmap_pin
 abort_on_error $? "unable to load module"
 kill -s SIGCONT $pid
-echo "Parent $BASHPID waiting for child $pid in script $$"
+#echo "Parent $BASHPID waiting for child $pid in script $$"
 wait $pid
 rmmod memmap
+cd -
 # Do the log
-cat /var/log/messages | grep "==MemMap" > $kernLogFile
+sedarg=$(sudo grep "MemMap started" -RnH /var/log/messages  | tail -n 1 | \
+    cut -d ':' -f 2)
+sedarg+="d"
+sed "1,$sedarg" /var/log/messages | grep "==MemMap" | \
+    sed 's/.*==MemMap\(.*\)$/\1/' > $kernLogFile

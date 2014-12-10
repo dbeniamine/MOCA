@@ -19,7 +19,7 @@ extern task_data *MemMap_tasksData;
 // Current number of monitored tasks
 extern int MemMap_GetNumTasks(void);
 
-task_data MemMap_InitData(struct task_struct *t, int id);
+task_data MemMap_InitData(struct task_struct *t);
 void MemMap_ClearData(task_data data);
 
 struct task_struct *MemMap_GetTaskFromData(task_data data);

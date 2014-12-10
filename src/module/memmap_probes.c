@@ -15,6 +15,7 @@
 #include "memmap_tasks.h"
 #include "memmap_taskdata.h"
 #include "memmap_probes.h"
+#include "memmap_threads.h"
 
 int MemMap_ForkHandler(struct kretprobe_instance *ri, struct pt_regs *regs)
 {
@@ -33,20 +34,15 @@ void MemMap_PteFaultHandler(struct mm_struct *mm,
         jprobe_return();
     // Add pte to current chunk
     MemMap_LockData(data);
-    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap pte fault %p data %p\n",pte, data);
+    MEMMAP_DEBUG_PRINT("MemMap pte fault %p data %p\n",pte, data);
     MemMap_AddToChunk(data,(void *)pte,get_cpu(),MemMap_CurrentChunk(data));
-    //Do false pagefault if needed
-    /* if(MemMap_IsInChunk(data,(void *)pte,MemMap_PreviousChunk(data))) */
-    /* { */
-    /* MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap pte %p in prev chunk for data %p\n", */
-            /* pte, data); */
     if (!pte_none(*pte) && !pte_present(*pte) && !pte_special(*pte))
     {
         *pte = pte_set_flags(*pte, _PAGE_PRESENT);
-        MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap fixing fake pagefault\n");
+        MEMMAP_DEBUG_PRINT("MemMap fixing fake pagefault\n");
     }
-    /* } */
     MemMap_unLockData(data);
+    MemMap_UpdateClock(get_cpu());
     jprobe_return();
 }
 

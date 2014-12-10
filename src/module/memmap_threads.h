@@ -25,7 +25,9 @@ extern int MemMap_pinProc;
 // Initializes threads data structures
 int MemMap_InitThreads(void);
 // Kill all remaining kthreads, and remove their memory
+void MemMap_StopThreads(void);
 void MemMap_CleanThreads(void);
+//Clocks managment
 void MemMap_UpdateClock(int id);
 void MemMap_GetClocks(unsigned long long *dst);
 

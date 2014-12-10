@@ -31,8 +31,8 @@ int MemMap_schedulerPriority=MEMMAP_DEFAULT_SCHED_PRIO;
 // precision which doesn't matters, and using locks would be slow.
 void MemMap_UpdateClock(int id)
 {
-    if(current->on_cpu==id)
-        ++MemMap_threadClocks[id];
+    MEMMAP_DEBUG_PRINT("MemMap updating clocks[%d]\n", id);
+    ++MemMap_threadClocks[id];
 }
 void MemMap_GetClocks(unsigned long long *dst)
 {
@@ -53,7 +53,7 @@ static void MemMap_SetSchedulerPriority(struct task_struct *task)
 int MemMap_InitThreads(void)
 {
     int i;
-    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap initializing %d threads\n",
+    MEMMAP_DEBUG_PRINT("MemMap initializing %d threads\n",
             MemMap_NumThreads());
 
     //Init threads data
@@ -75,7 +75,7 @@ int MemMap_InitThreads(void)
     // Create one monitor thread per CPU
     for(i=0;i< MemMap_NumThreads();i++)
     {
-        MEMMAP_DEBUG_PRINT(KERN_WARNING "Starting thread %d/%d\n", i, MemMap_NumThreads());
+        MEMMAP_DEBUG_PRINT("Starting thread %d/%d\n", i, MemMap_NumThreads());
         //Creating the thread
         MemMap_threadTasks[i]=kthread_create(MemMap_MonitorThread, NULL,
                 "MemMap tlb walker thread");
@@ -97,8 +97,7 @@ int MemMap_InitThreads(void)
     return 0;
 }
 
-// Kill all remaining kthreads, and remove their memory
-void MemMap_CleanThreads(void)
+void MemMap_StopThreads(void)
 {
     int i;
     for(i=0;i<MemMap_NumThreads();i++)
@@ -106,19 +105,22 @@ void MemMap_CleanThreads(void)
         //Avoid suicidal call
         if(MemMap_threadTasks[i] && current != MemMap_threadTasks[i])
         {
-            MEMMAP_DEBUG_PRINT(KERN_WARNING "Killing thread %d/%d task %p\n", i,
+            MEMMAP_DEBUG_PRINT("Killing thread %d/%d task %p\n", i,
                     MemMap_NumThreads(), MemMap_threadTasks[i]);
             kthread_stop(MemMap_threadTasks[i]);
             put_task_struct(MemMap_threadTasks[i]);
         }
     }
-    MEMMAP_DEBUG_PRINT(KERN_WARNING "All threads are dead\n");
-    //Now we are safe: all threads are dead
+    MEMMAP_DEBUG_PRINT("All threads are dead\n");
+}
+void MemMap_CleanThreads(void)
+{
+    //StopThreads should have been called before
     if(MemMap_threadTasks)
         kfree(MemMap_threadTasks);
-    MEMMAP_DEBUG_PRINT(KERN_WARNING "Thread tasks freed\n");
+    MEMMAP_DEBUG_PRINT("Thread tasks freed\n");
     if(MemMap_threadClocks)
         kfree(MemMap_threadClocks);
-    MEMMAP_DEBUG_PRINT(KERN_WARNING "Thread clocks freed\n");
+    MEMMAP_DEBUG_PRINT("Thread clocks freed\n");
 }
 

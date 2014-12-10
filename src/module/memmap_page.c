@@ -27,8 +27,7 @@ int MemMap_wakeupInterval=MEMMAP_DEFAULT_WAKEUP_INTERVAL;
 // Walk through the current chunk
 void MemMap_MonitorPage(int myId,task_data data)
 {
-    int i=0;
-    int countR=0, countW=0;
+    int i=0,countR, countW;
     pte_t *pte;
     MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Kthread %d walking on data %p , task %p\n",
             myId, data, MemMap_GetTaskFromData(data));
@@ -45,9 +44,9 @@ void MemMap_MonitorPage(int myId,task_data data)
         // Set R/W status
         //TODO: count perfctr
         if(pte_young(*pte))
-            ++countR;
+            countR=1;
         if(pte_dirty(*pte))
-            ++countW;
+            countW=1;
         MemMap_UpdateData(data,i,countR,countW, MemMap_CurrentChunk(data),myId);
         ++i;
     }
@@ -81,7 +80,12 @@ int MemMap_MonitorThread(void * arg)
             data=MemMap_tasksData[i];
             task=MemMap_GetTaskFromData(data);
             MEMMAP_DEBUG_PRINT(KERN_WARNING "Kthread %d testing task %p\n", myId, task);
-            if(task && task->on_cpu==myId && task->sched_info.last_arrival > lastwake)
+            if(!pid_alive(task))
+            {
+                MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap task %d %p is dead\n", i, task);
+                //TODO manage task end
+            }
+            else if(task && task->on_cpu==myId && task->sched_info.last_arrival > lastwake)
             {
                 lastwake=MAX(lastwake,task->sched_info.last_arrival);
                 MEMMAP_DEBUG_PRINT(KERN_WARNING "KThread %d found task %p running on cpu %d\n",
@@ -90,9 +94,9 @@ int MemMap_MonitorThread(void * arg)
             }
         }
         MemMap_UpdateClock(myId);
-        msleep(MemMap_wakeupInterval);
         MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Kthread %d going to sleep for %d\n",
                 myId, MemMap_wakeupInterval);
+        msleep(MemMap_wakeupInterval);
     }
     MEMMAP_DEBUG_PRINT("MemMap thread %d finished\n", myId);
     return 0;

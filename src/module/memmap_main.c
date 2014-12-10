@@ -42,34 +42,35 @@ int MemMap_numThreads=1;
 
 void MemMap_CleanUp(void)
 {
-    printk(KERN_WARNING "MemMap Unregistering probes\n");
+    MEMMAP_DEBUG_PRINT("MemMap Unregistering probes\n");
     MemMap_UnregisterProbes();
     //Kill all threads
-    printk(KERN_WARNING "MemMap Killing threads\n");
-    MemMap_CleanThreads();
+    MEMMAP_DEBUG_PRINT("MemMap Killing threads\n");
+    MemMap_StopThreads();
     //Clean memory
-    printk(KERN_WARNING "MemMap Removing shared data\n");
+    MEMMAP_DEBUG_PRINT("MemMap Removing shared data\n");
     MemMap_CleanProcessData();
+    MemMap_CleanThreads();
 }
 
 
 // Fuction called by insmod
 static int __init MemMap_Init(void)
 {
-    printk(KERN_WARNING "MemMap started monitoring pid %d\n",
+    printk(KERN_NOTICE "MemMap started monitoring pid %d\n",
             MemMap_mainPid);
     MemMap_numThreads=num_online_cpus();
     //Remove previous MemMap entries
     if(MemMap_InitProcessManagment(MemMap_maxProcess,MemMap_mainPid)!=0)
         return -1;
-    printk(KERN_WARNING "MemMap common data ready \n");
+    MEMMAP_DEBUG_PRINT("MemMap common data ready \n");
     if(MemMap_InitThreads()!=0)
         return -2;
-    printk(KERN_WARNING "MemMap threads ready \n");
+    MEMMAP_DEBUG_PRINT("MemMap threads ready \n");
     if(MemMap_RegisterProbes()!=0)
         return -3;
-    printk(KERN_WARNING "MemMap probes ready \n");
-    printk(KERN_WARNING "MemMap correctly intialized \n");
+    MEMMAP_DEBUG_PRINT("MemMap probes ready \n");
+    printk(KERN_NOTICE "MemMap correctly intialized \n");
     //Send signal to son process
     return 0;
 }
@@ -77,9 +78,9 @@ static int __init MemMap_Init(void)
 // function called by rmmod
 static void __exit MemMap_Exit(void)
 {
-    printk(KERN_WARNING "MemMap exiting\n");
+    printk(KERN_NOTICE "MemMap exiting\n");
     MemMap_CleanUp();
-    printk(KERN_WARNING "MemMap exited\n");
+    printk(KERN_NOTICE "MemMap exited\n");
 }
 
 // Panic exit function

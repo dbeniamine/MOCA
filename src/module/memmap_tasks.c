@@ -93,13 +93,13 @@ void MemMap_CleanProcessData(void)
     //Tell the kernel we don't need the tasks anymore
     if(MemMap_tasksData)
     {
-        MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Cleaning data\n");
+        MEMMAP_DEBUG_PRINT("MemMap Cleaning data\n");
         nbTasks=MemMap_GetNumTasks();
         for(i=0;i<nbTasks;++i)
         {
             MemMap_ClearData(MemMap_tasksData[i]);
         }
-        MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Cleaning all data\n");
+        MEMMAP_DEBUG_PRINT("MemMap Cleaning all data\n");
         kfree(MemMap_tasksData);
     }
 }
@@ -118,7 +118,7 @@ int MemMap_AddTaskIfNeeded(unsigned long int id)
     {
         // Skip internal process
         rcu_read_unlock();
-        MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap process skiped %lu NULL\n", id);
+        MEMMAP_DEBUG_PRINT("MemMap process skiped %lu NULL\n", id);
         return 0;
     }
     task=pid_task(pid, PIDTYPE_PID);
@@ -167,15 +167,14 @@ task_data MemMap_GetData(struct task_struct *t)
 // Add t to the monitored pids
 int MemMap_AddTask(struct task_struct *t)
 {
-    static int nextId=0;
     task_data data;
     u32 h;
-    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Adding task %p\n",t );
+    MEMMAP_DEBUG_PRINT("MemMap Adding task %p\n",t );
 
     h= hash_ptr(t,MEMMAP_TASK_HASH_BITS);
 
     //Create the task data
-    data=MemMap_InitData(t, nextId);
+    data=MemMap_InitData(t);
     if(!data)
         return -1;
     //Get number and max of pids
@@ -200,7 +199,7 @@ int MemMap_AddTask(struct task_struct *t)
     ++MemMap_numTasks;
     spin_unlock(&MemMap_tasksLock);
 
-    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Added task %p\n",t);
+    MEMMAP_DEBUG_PRINT("MemMap Added task %p\n",t);
     return 0;
 }
 
