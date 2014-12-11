@@ -13,7 +13,7 @@
 #ifndef __MEMMAP__
 #define __MEMMAP__
 
-/* #define MEMMAP_DEBUG */
+#define MEMMAP_DEBUG
 #ifdef MEMMAP_DEBUG
 #define MEMMAP_DEBUG_PRINT(...) printk(KERN_DEBUG __VA_ARGS__)
 #else
