@@ -16,23 +16,23 @@
 #include <linux/slab.h>
 #include "memmap.h"
 #include "memmap_threads.h"
-#include "memmap_taskdata.h"
 #include "memmap_tasks.h"
 
-#define MEMMAP_DEFAULT_MAX_PROCESS 32
 
 // The first bits are not random enough, 14 bits should be enough for pids
-#define MEMMAP_TASK_HASH_BITS 14UL
-#define MEMMAP_HASH_SIZE (1UL<<MEMMAP_TASK_HASH_BITS)
+unsigned long MemMap_tasksHashBits=14UL;
+int MemMap_tasksTableFactor=2;
 
 // Monitored process
-task_data *MemMap_tasksData;
-int MemMap_tasksMap[MEMMAP_HASH_SIZE];
+hash_map MemMap_tasksMap;
+
 struct task_struct *MemMap_initTask=NULL;
 
 // Current number of monitored pids
 int MemMap_numTasks=0;
 // Maximum Number of monitored pids (aka current alloc size on MemMap_tasks
+// TODO: remove that: deprecated
+#define MEMMAP_DEFAULT_MAX_PROCESS 32
 int MemMap_maxTasks=MEMMAP_DEFAULT_MAX_PROCESS;
 
 spinlock_t MemMap_tasksLock;
@@ -42,7 +42,7 @@ int MemMap_AddTask(struct task_struct *t);
 int MemMap_InitProcessManagment(int maxprocs, int id)
 {
     // Monitored pids
-    int max,i;
+    int max;
     struct pid *pid;
     spin_lock_init(&MemMap_tasksLock);
     // Max allowed procs
@@ -59,16 +59,8 @@ int MemMap_InitProcessManagment(int maxprocs, int id)
     spin_unlock(&MemMap_tasksLock);
 
 
-    MemMap_tasksData=kcalloc(max,sizeof(void *), GFP_KERNEL);
-    if( !MemMap_tasksData)
-    {
-        MemMap_Panic("Tasks Alloc failed");
-        return -1;
-    }
-
-    // Clear the hasmap
-    for(i=0;i< MEMMAP_HASH_SIZE;++i)
-        MemMap_tasksMap[i]=-1;
+    MemMap_tasksMap=MemMap_InitHashMap(MemMap_tasksHashBits,
+            MemMap_tasksTableFactor, sizeof(struct _memmap_task));
 
     rcu_read_lock();
     pid=find_vpid(id);
@@ -91,16 +83,17 @@ void MemMap_CleanProcessData(void)
 {
     int i, nbTasks;
     //Tell the kernel we don't need the tasks anymore
-    if(MemMap_tasksData)
+    if(MemMap_tasksMap)
     {
         MEMMAP_DEBUG_PRINT("MemMap Cleaning data\n");
         nbTasks=MemMap_GetNumTasks();
         for(i=0;i<nbTasks;++i)
         {
-            MemMap_ClearData(MemMap_tasksData[i]);
+            MemMap_ClearData(((memmap_task)
+                        MemMap_EntryAtPos(MemMap_tasksMap, (unsigned)i))->data);
         }
         MEMMAP_DEBUG_PRINT("MemMap Cleaning all data\n");
-        kfree(MemMap_tasksData);
+        MemMap_FreeMap(MemMap_tasksMap);
     }
 }
 
@@ -108,8 +101,8 @@ void MemMap_CleanProcessData(void)
 int MemMap_AddTaskIfNeeded(unsigned long int id)
 {
     struct pid *pid;
+    int pos;
     struct task_struct *task, *ptask, *tmptask=NULL;
-    u32 h;
     // Get iternal pid representation
     rcu_read_lock();
     pid=find_vpid(id);
@@ -131,11 +124,10 @@ int MemMap_AddTaskIfNeeded(unsigned long int id)
     //The task is a direct child of the init task
     if(ptask == MemMap_initTask)
         return MemMap_AddTask(task);
-    //Check if the parent is known
-    h=hash_ptr(ptask, MEMMAP_TASK_HASH_BITS);
     spin_lock(&MemMap_tasksLock);
-    if(MemMap_tasksMap[h]!=-1)
-        tmptask=MemMap_GetTaskFromData(MemMap_tasksData[MemMap_tasksMap[h]]);
+    if((pos=MemMap_PosInMap(MemMap_tasksMap ,ptask))!=-1)
+        tmptask=(struct task_struct *)((memmap_task)(MemMap_EntryAtPos(MemMap_tasksMap,pos))->key);
+    //Check if the parent is known
     spin_unlock(&MemMap_tasksLock);
     if (tmptask==ptask)
         return MemMap_AddTask(task);
@@ -154,11 +146,11 @@ int MemMap_GetNumTasks(void)
 
 task_data MemMap_GetData(struct task_struct *t)
 {
+    int pos;
     task_data ret=NULL;
-    u32 h=hash_ptr(t,MEMMAP_TASK_HASH_BITS);
     spin_lock(&MemMap_tasksLock);
-    if(MemMap_tasksMap[h]!=-1)
-        ret=MemMap_tasksData[MemMap_tasksMap[h]];
+    if((pos=MemMap_PosInMap(MemMap_tasksMap ,t))!=-1)
+        ret=((memmap_task)MemMap_EntryAtPos(MemMap_tasksMap,pos))->data;
     spin_unlock(&MemMap_tasksLock);
     return ret;
 }
@@ -168,10 +160,10 @@ task_data MemMap_GetData(struct task_struct *t)
 int MemMap_AddTask(struct task_struct *t)
 {
     task_data data;
-    u32 h;
+    memmap_task tsk;
+    int status;
     MEMMAP_DEBUG_PRINT("MemMap Adding task %p\n",t );
 
-    h= hash_ptr(t,MEMMAP_TASK_HASH_BITS);
 
     //Create the task data
     data=MemMap_InitData(t);
@@ -179,32 +171,39 @@ int MemMap_AddTask(struct task_struct *t)
         return -1;
     //Get number and max of pids
     spin_lock(&MemMap_tasksLock);
-    if(MemMap_numTasks>=MemMap_maxTasks)
-    {
-        spin_unlock(&MemMap_tasksLock);
-        MemMap_ClearData(data);
-        MemMap_Panic("Too many pids");
-        return -1;
-    }
-    //Check if the task must be added
-    if(MemMap_tasksMap[h]!=-1)
-    {
-        spin_unlock(&MemMap_tasksLock);
-        MemMap_ClearData(data);
-        MemMap_Panic("MemMap Hash conflict");
-        return -1;
-    }
-    MemMap_tasksMap[h]=MemMap_numTasks;
-    MemMap_tasksData[MemMap_numTasks]=data;
-    ++MemMap_numTasks;
-    spin_unlock(&MemMap_tasksLock);
 
-    MEMMAP_DEBUG_PRINT("MemMap Added task %p\n",t);
+    tsk=(memmap_task)MemMap_AddToMap(MemMap_tasksMap,t,&status);
+    switch(status)
+    {
+        case MEMMAP_HASHMAP_FULL:
+            spin_unlock(&MemMap_tasksLock);
+            MemMap_ClearData(data);
+            MemMap_Panic("Too many pids");
+            break;
+        case MEMMAP_HASHMAP_ERROR:
+            spin_unlock(&MemMap_tasksLock);
+            MemMap_ClearData(data);
+            MemMap_Panic("MemMap unhandeled hashmap error");
+            break;
+        case  MEMMAP_HASHMAP_ALREADY_IN_MAP:
+            spin_unlock(&MemMap_tasksLock);
+            MemMap_ClearData(data);
+            MemMap_Panic("MemMap Adding an alreadt exixsting task");
+            break;
+        default:
+            //normal add
+            tsk->data=data;
+            ++MemMap_numTasks;
+            spin_unlock(&MemMap_tasksLock);
+            MEMMAP_DEBUG_PRINT("MemMap Added task %p\n",t);
+            break;
+    }
     return 0;
 }
 
 int MemMap_MaxTasks(void)
 {
+    //TODO remove deprecated
     return MemMap_maxTasks;
 }
 

@@ -13,6 +13,7 @@
 #include "memmap.h"
 #include "memmap_page.h"
 #include "memmap_taskdata.h"
+#include "memmap_tasks.h"
 #include "memmap_threads.h"
 #include <linux/kthread.h>
 #include <linux/smp.h> //get_cpu()
@@ -77,7 +78,7 @@ int MemMap_MonitorThread(void * arg)
         {
             MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Kthread %d iterating taskdata %d/%d\n",
                     myId, i,nbTasks);
-            data=MemMap_tasksData[i];
+            data=((memmap_task)MemMap_EntryAtPos(MemMap_tasksMap,i))->data;
             task=MemMap_GetTaskFromData(data);
             MEMMAP_DEBUG_PRINT(KERN_WARNING "Kthread %d testing task %p\n", myId, task);
             if(!pid_alive(task))

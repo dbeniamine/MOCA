@@ -14,8 +14,6 @@
 
 typedef struct _task_data *task_data;
 
-extern task_data *MemMap_tasksData;
-
 // Current number of monitored tasks
 extern int MemMap_GetNumTasks(void);
 

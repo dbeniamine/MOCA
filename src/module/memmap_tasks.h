@@ -12,7 +12,15 @@
 #ifndef __MEMMAP_TASKS__
 #define __MEMMAP_TASKS__
 #include "memmap_taskdata.h"
-
+#include "memmap_hashmap.h"
+// Monitored process
+typedef struct _memmap_task
+{
+    void *key; //struct task*
+    int next;
+    task_data data;
+}*memmap_task;
+extern hash_map MemMap_tasksMap;
 
 int MemMap_InitProcessManagment(int maxprocs, int mainpid);
 void MemMap_CleanProcessData(void);
