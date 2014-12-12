@@ -23,31 +23,25 @@ void MemMap_ClearData(task_data data);
 struct task_struct *MemMap_GetTaskFromData(task_data data);
 
 /*
- * Add data to chunk chunkid
+ * Add data to current chunk
  * returns 0 on success
  *         1 iff addr wad already in chunk
- *        -1 if chunkid is not a valid chunk
+ *        -1 if current chunk is unusable (flush required)
  */
-int MemMap_AddToChunk(task_data data, void *addr,int cpu, int chunkid);
+int MemMap_AddToChunk(task_data data, void *addr,int cpu);
 
 /*
  * Check if add is in chunkid
  * Returns  0 if addr is in chunk
  *          1 if not
- *         -1 if chunkid is not a valid chunk
  */
-int MemMap_IsInChunk(task_data data, void *addr, int chunkid);
-
-// Return the chunkids of the current or previous chunks
-int MemMap_CurrentChunk(task_data data);
-int MemMap_PreviousChunk(task_data data);
+/* int MemMap_IsInChunk(task_data data, void *addr); */
 
 /*
- * Update the posth entry of the chunk chunkid
+ * Update the posth entry of the current chunk
  * Add count access and update the type
  */
-int MemMap_UpdateData(task_data data,int pos, int countR, int countW, int chunkid,
-        int cpu);
+int MemMap_UpdateData(task_data data,int pos, int countR, int countW, int cpu);
 
 /*
  * Start working on the next chunks
@@ -57,15 +51,9 @@ int MemMap_UpdateData(task_data data,int pos, int countR, int countW, int chunki
 int MemMap_NextChunks(task_data data);
 
 /*
- * This function returns the pos th add in the data's chunk number chunkid
+ * This function returns the pos th add in the data's current chunk
  * returns NULL if pos is invalid ( < 0 || >= nbentry in chunk)
  */
-void *MemMap_AddrInChunkPos(task_data data,int pos, int chunkid);
+void *MemMap_AddrInChunkPos(task_data data,int pos);
 
-/*
- * None of the function above are atomic, however the following calls allows
- * you to ensure mutual exclusion when it is required
- */
-void MemMap_LockData(task_data data);
-void MemMap_unLockData(task_data data);
 #endif //__MEMMAP_TASK_DATA__

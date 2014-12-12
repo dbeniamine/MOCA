@@ -112,7 +112,7 @@ int MemMap_GetNumTasks(void)
 {
     int nb=0;
     spin_lock(&MemMap_tasksLock);
-    MemMap_NbElementInMap(MemMap_tasksMap);
+    nb=MemMap_NbElementInMap(MemMap_tasksMap);
     spin_unlock(&MemMap_tasksLock);
     return nb;
 }

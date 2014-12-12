@@ -32,8 +32,7 @@ void MemMap_MonitorPage(int myId,task_data data)
     pte_t *pte;
     MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Kthread %d walking on data %p , task %p\n",
             myId, data, MemMap_GetTaskFromData(data));
-    MemMap_LockData(data);
-    while((pte=(pte_t *)MemMap_AddrInChunkPos(data,i,MemMap_CurrentChunk(data)))!=NULL)
+    while((pte=(pte_t *)MemMap_AddrInChunkPos(data,i))!=NULL)
     {
         MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap pagewalk pte %p ind %d cpu %d data %p\n",
                 pte, i, myId, data);
@@ -48,12 +47,11 @@ void MemMap_MonitorPage(int myId,task_data data)
             countR=1;
         if(pte_dirty(*pte))
             countW=1;
-        MemMap_UpdateData(data,i,countR,countW, MemMap_CurrentChunk(data),myId);
+        MemMap_UpdateData(data,i,countR,countW,myId);
         ++i;
     }
     // Goto to next chunk
     MemMap_NextChunks(data);
-    MemMap_unLockData(data);
     MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap pagewalk pte cpu %d data %p end\n",
             myId,data);
 }
@@ -73,6 +71,8 @@ int MemMap_MonitorThread(void * arg)
     while(!kthread_should_stop())
     {
         int nbTasks=MemMap_GetNumTasks();
+        MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Kthread %d found  %d tasks\n",
+                myId, nbTasks);
         //Freed in memmap_taskdata.h during flush or clear
         for(i=0;i<nbTasks;i++)
         {

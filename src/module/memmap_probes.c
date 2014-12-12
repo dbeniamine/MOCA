@@ -33,15 +33,13 @@ void MemMap_PteFaultHandler(struct mm_struct *mm,
     if(!data || MemMap_GetTaskFromData(data)!=mm->owner)
         jprobe_return();
     // Add pte to current chunk
-    MemMap_LockData(data);
     MEMMAP_DEBUG_PRINT("MemMap pte fault %p data %p\n",pte, data);
-    MemMap_AddToChunk(data,(void *)pte,get_cpu(),MemMap_CurrentChunk(data));
+    MemMap_AddToChunk(data,(void *)pte,get_cpu());
     if (!pte_none(*pte) && !pte_present(*pte) && !pte_special(*pte))
     {
         *pte = pte_set_flags(*pte, _PAGE_PRESENT);
         MEMMAP_DEBUG_PRINT("MemMap fixing fake pagefault\n");
     }
-    MemMap_unLockData(data);
     MemMap_UpdateClock(get_cpu());
     jprobe_return();
 }

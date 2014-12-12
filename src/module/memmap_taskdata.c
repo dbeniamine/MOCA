@@ -15,7 +15,6 @@ int MemMap_taskDataHashBits=14;
 int MemMap_taskDataTableFactor=2;
 int MemMap_nbChunks=20;
 
-#define MEMMAP_VALID_CHUNKID(c) ( (c) >= 0 && (c) < MemMap_nbChunks )
 //TODO: fix that dynamically
 #define MEMMAP_PAGE_SIZE 4096
 
@@ -43,6 +42,8 @@ typedef struct
     unsigned long long *startClocks;
     unsigned long long *endClocks;
     int cpu;
+    int used;
+    spinlock_t lock;
 }chunk;
 
 typedef struct _task_data
@@ -50,15 +51,21 @@ typedef struct _task_data
     struct task_struct *task;
     chunk **chunks;
     int cur;
-    int prev;
     int internalId;
     int nbflush;
     spinlock_t lock;
 }*task_data;
 
-// Use by flush function to keep track of the last chunk
-void MemMap_FlushData(task_data data);
 int MemMap_nextTaskId=0;
+
+int MemMap_CurrentChunk(task_data data)
+{
+    int ret=-1;
+    spin_lock(&data->lock);
+    ret=data->cur;
+    spin_unlock(&data->lock);
+    return ret;
+}
 
 task_data MemMap_InitData(struct task_struct *t)
 {
@@ -97,13 +104,14 @@ task_data MemMap_InitData(struct task_struct *t)
             return NULL;
         }
         data->chunks[i]->cpu=0;
+        data->chunks[i]->used=0;
         data->chunks[i]->map=MemMap_InitHashMap(MemMap_taskDataHashBits,
                 MemMap_taskDataTableFactor, sizeof(struct _chunk_entry));
+        spin_lock_init(&data->chunks[i]->lock);
     }
     data->task=t;
     data->cur=0;
     MemMap_GetClocks(data->chunks[0]->startClocks);
-    data->prev=-1;
     data->internalId=MemMap_nextTaskId++;
     data->nbflush=0;
     get_task_struct(data->task);
@@ -119,8 +127,8 @@ void MemMap_ClearData(task_data data)
     int i;
     if(!data)
         return;
-    //Todo: think about that
-    MemMap_FlushData(data);
+    //TODO: Wait until all data are flushed
+    //MemMap_FlushData(data);
     put_task_struct(data->task);
     for(i=0;i<MemMap_nbChunks;i++)
     {
@@ -138,23 +146,30 @@ struct task_struct *MemMap_GetTaskFromData(task_data data)
     return data->task;
 }
 
-int MemMap_AddToChunk(task_data data, void *addr, int cpu,int chunkid)
+int MemMap_AddToChunk(task_data data, void *addr, int cpu)
 {
-    int status;
+    int status, cur;
     chunk_entry e;
-    if(!MEMMAP_VALID_CHUNKID(chunkid))
+    cur=MemMap_CurrentChunk(data);
+    spin_lock(&data->chunks[cur]->lock);
+    if(data->chunks[cur]->used)
+    {
+        spin_unlock(&data->chunks[cur]->lock);
         return -1;
+    }
     MEMMAP_DEBUG_PRINT("MemMap hashmap adding %p to chunk %d %p data %p cpu %d\n",
-            addr, chunkid, data->chunks[chunkid],data, cpu);
-    e=(chunk_entry)MemMap_AddToMap(data->chunks[chunkid]->map,addr, &status);
+            addr, cur, data->chunks[cur],data, cpu);
+    e=(chunk_entry)MemMap_AddToMap(data->chunks[cur]->map,addr, &status);
     switch(status)
     {
         case MEMMAP_HASHMAP_FULL :
             MemMap_Panic("MemMap hashmap full");
+            spin_unlock(&data->chunks[cur]->lock);
             return -1;
             break;
         case MEMMAP_HASHMAP_ERROR :
             MemMap_Panic("MemMap hashmap error");
+            spin_unlock(&data->chunks[cur]->lock);
             return -1;
             break;
         case MEMMAP_HASHMAP_ALREADY_IN_MAP :
@@ -170,55 +185,61 @@ int MemMap_AddToChunk(task_data data, void *addr, int cpu,int chunkid)
             e->countW=0;
             break;
     }
-    data->chunks[chunkid]->cpu|=1<<cpu;
+    data->chunks[cur]->cpu|=1<<cpu;
+    spin_unlock(&data->chunks[cur]->lock);
     MEMMAP_DEBUG_PRINT("MemMap inserted %p\n", addr);
     return 0;
 }
 
-int MemMap_IsInChunk(task_data data, void *addr, int chunkid)
-{
-    if(!MEMMAP_VALID_CHUNKID(chunkid))
-        return 0;
-    return (MemMap_PosInMap(data->chunks[chunkid]->map,addr))!=-1;
-}
+/* int MemMap_IsInChunk(task_data data, void *addr) */
+/* { */
+/*     return (MemMap_PosInMap(data->chunks[data->cur]->map,addr))!=-1; */
+/* } */
 
-int MemMap_UpdateData(task_data data,int pos, int countR, int countW, int chunkid, int cpu)
+int MemMap_UpdateData(task_data data,int pos, int countR, int countW, int cpu)
 {
     chunk_entry e;
-    if(!MEMMAP_VALID_CHUNKID(chunkid))
+    int cur=MemMap_CurrentChunk(data);
+    spin_lock(&data->chunks[cur]->lock);
+    if(data->chunks[cur]->used)
+    {
+        spin_unlock(&data->chunks[cur]->lock);
         return -1;
-    e=(chunk_entry )MemMap_EntryAtPos(data->chunks[chunkid]->map,
+    }
+    e=(chunk_entry )MemMap_EntryAtPos(data->chunks[cur]->map,
             pos);
     if(!e)
+    {
+        spin_unlock(&data->chunks[cur]->lock);
         return 1;
+    }
 
     e->countR+=countR;
     e->countW+=countW;
     e->cpu|=1<<cpu;
+    spin_unlock(&data->chunks[cur]->lock);
     return 0;
 }
 
-int MemMap_CurrentChunk(task_data data)
-{
-    return data->cur;
-}
-int MemMap_PreviousChunk(task_data data)
-{
-    return data->prev;
-}
-
-// Set current chunk as prev and clear current
 int MemMap_NextChunks(task_data data)
 {
-    MEMMAP_DEBUG_PRINT("MemMap Goto next chunks %p, %d, %d\n", data, data->cur, data->prev);
-    MemMap_GetClocks(data->chunks[data->cur]->endClocks);
-    data->prev=data->cur;
-    data->cur=(data->cur+1)%MemMap_nbChunks;
-    MEMMAP_DEBUG_PRINT("MemMap Goto chunks  %p %d, %d/%d\n", data, data->cur, data->prev, MemMap_nbChunks);
-    if(data->cur==0)
+    int cur;
+    MEMMAP_DEBUG_PRINT("MemMap Goto next chunks %p, %d\n", data, data->cur);
+    //Global lock
+    spin_lock(&data->lock);
+    cur=data->cur;
+    spin_lock(&data->chunks[cur]->lock);
+    MemMap_GetClocks(data->chunks[cur]->endClocks);
+    data->chunks[cur]->used=1;
+    data->cur=(cur+1)%MemMap_nbChunks;
+    spin_unlock(&data->chunks[cur]->lock);
+    spin_unlock(&data->lock);
+    MEMMAP_DEBUG_PRINT("MemMap Goto chunks  %p %d, %d\n", data, data->cur,
+            MemMap_nbChunks);
+    if(data->chunks[data->cur]->used)
     {
-        MEMMAP_DEBUG_PRINT("MemMap Flushin chunks\n");
-        MemMap_FlushData(data);
+        printk(KERN_ALERT "MemMap no more chunks, stopping trace for task %d\n You can fix that by relaunching MemMap either with a higher number of chunks\n or by decreasing the logging daemon wakeupinterval\n",
+                data->internalId);
         return 1;
     }
     else
@@ -227,28 +248,25 @@ int MemMap_NextChunks(task_data data)
 }
 
 
-void *MemMap_AddrInChunkPos(task_data data,int pos, int chunkid)
+void *MemMap_AddrInChunkPos(task_data data,int pos)
 {
     chunk_entry e;
-    if(!MEMMAP_VALID_CHUNKID(chunkid))
+    int cur=MemMap_CurrentChunk(data);
+    spin_lock(&data->chunks[cur]->lock);
+    if(data->chunks[cur]->used)
+    {
+        spin_unlock(&data->chunks[cur]->lock);
         return NULL;
+    }
     MEMMAP_DEBUG_PRINT("MemMap Looking for next addr in ch %d, pos %d/%u\n",
-            chunkid, pos, MemMap_NbElementInMap(data->chunks[chunkid]->map));
-    e=(chunk_entry)MemMap_EntryAtPos(data->chunks[chunkid]->map,
+            cur, pos, MemMap_NbElementInMap(data->chunks[cur]->map));
+    e=(chunk_entry)MemMap_EntryAtPos(data->chunks[cur]->map,
             pos);
+    spin_unlock(&data->chunks[cur]->lock);
     if(!e)
         return NULL;
     MEMMAP_DEBUG_PRINT("found adress %p\n", e->key);
     return e->key;
-}
-
-void MemMap_LockData(task_data data)
-{
-    spin_lock(&data->lock);
-}
-void MemMap_unLockData(task_data data)
-{
-    spin_unlock(&data->lock);
 }
 
 void MemMap_PrintClocks(unsigned long long *clocks, char *buf)
