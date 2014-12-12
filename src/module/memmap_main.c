@@ -27,15 +27,18 @@ MODULE_DESCRIPTION("MemMap's kernel module tracks memory access");
 
 // PID of the main program to track
 int MemMap_mainPid=0;
-// Maximum number of process (pertinent only if the user set the module param)
-int MemMap_maxProcess=0;
 // Wakeup period in ms (defined in memmap_tlb.c)
 extern int MemMap_wakeupInterval;
+extern int MemMap_taskDataHashBits;
+extern int MemMap_taskDataTableFactor;
+extern int MemMap_nbChunks;
 
 module_param(MemMap_mainPid, int, 0);
 module_param(MemMap_wakeupInterval,int,0);
 module_param(MemMap_schedulerPriority,int,0);
-module_param(MemMap_maxProcess,int,0);
+module_param(MemMap_taskDataHashBits,int,0);
+module_param(MemMap_taskDataTableFactor,int,0);
+module_param(MemMap_nbChunks,int,0);
 
 //Number of threads (one per CPU)
 int MemMap_numThreads=1;
@@ -61,7 +64,7 @@ static int __init MemMap_Init(void)
             MemMap_mainPid);
     MemMap_numThreads=num_online_cpus();
     //Remove previous MemMap entries
-    if(MemMap_InitProcessManagment(MemMap_maxProcess,MemMap_mainPid)!=0)
+    if(MemMap_InitProcessManagment(MemMap_mainPid)!=0)
         return -1;
     MEMMAP_DEBUG_PRINT("MemMap common data ready \n");
     if(MemMap_InitThreads()!=0)

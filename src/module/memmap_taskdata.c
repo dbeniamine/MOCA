@@ -10,12 +10,12 @@
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
-#define MEMMAP_NB_CHUNKS (2*10)
 #define MEMMAP_BUF_SIZE 2048
-unsigned long MemMap_TaskDataHashBits=14UL;
-int MemMap_TaskDataTableFactor=2;
+int MemMap_taskDataHashBits=14;
+int MemMap_taskDataTableFactor=2;
+int MemMap_nbChunks=20;
 
-#define MEMMAP_VALID_CHUNKID(c) ( (c) >= 0 && (c) < MEMMAP_NB_CHUNKS )
+#define MEMMAP_VALID_CHUNKID(c) ( (c) >= 0 && (c) < MemMap_nbChunks )
 //TODO: fix that dynamically
 #define MEMMAP_PAGE_SIZE 4096
 
@@ -48,7 +48,7 @@ typedef struct
 typedef struct _task_data
 {
     struct task_struct *task;
-    chunk *chunks[MEMMAP_NB_CHUNKS];
+    chunk **chunks;
     int cur;
     int prev;
     int internalId;
@@ -71,7 +71,14 @@ task_data MemMap_InitData(struct task_struct *t)
         MemMap_Panic("MemMap unable to allocate data ");
         return NULL;
     }
-    for(i=0;i<MEMMAP_NB_CHUNKS;i++)
+    data->chunks=kmalloc(sizeof(chunk)*MemMap_nbChunks,GFP_ATOMIC);
+    if(!data->chunks)
+    {
+        kfree(data);
+        MemMap_Panic("MemMap unable to allocate chunks");
+        return NULL;
+    }
+    for(i=0;i<MemMap_nbChunks;i++)
     {
         /* MEMMAP_DEBUG_PRINT("MemMap Initialising data chunk %d for task %p\n",i, t); */
         data->chunks[i]=kmalloc(sizeof(chunk),GFP_ATOMIC);
@@ -90,8 +97,8 @@ task_data MemMap_InitData(struct task_struct *t)
             return NULL;
         }
         data->chunks[i]->cpu=0;
-        data->chunks[i]->map=MemMap_InitHashMap(MemMap_TaskDataHashBits,
-                MemMap_TaskDataTableFactor, sizeof(struct _chunk_entry));
+        data->chunks[i]->map=MemMap_InitHashMap(MemMap_taskDataHashBits,
+                MemMap_taskDataTableFactor, sizeof(struct _chunk_entry));
     }
     data->task=t;
     data->cur=0;
@@ -115,7 +122,7 @@ void MemMap_ClearData(task_data data)
     //Todo: think about that
     MemMap_FlushData(data);
     put_task_struct(data->task);
-    for(i=0;i<MEMMAP_NB_CHUNKS;i++)
+    for(i=0;i<MemMap_nbChunks;i++)
     {
         MemMap_FreeMap(data->chunks[i]->map);
         kfree(data->chunks[i]->endClocks);
@@ -206,8 +213,8 @@ int MemMap_NextChunks(task_data data)
     MEMMAP_DEBUG_PRINT("MemMap Goto next chunks %p, %d, %d\n", data, data->cur, data->prev);
     MemMap_GetClocks(data->chunks[data->cur]->endClocks);
     data->prev=data->cur;
-    data->cur=(data->cur+1)%MEMMAP_NB_CHUNKS;
-    MEMMAP_DEBUG_PRINT("MemMap Goto chunks  %p %d, %d/%d\n", data, data->cur, data->prev, MEMMAP_NB_CHUNKS);
+    data->cur=(data->cur+1)%MemMap_nbChunks;
+    MEMMAP_DEBUG_PRINT("MemMap Goto chunks  %p %d, %d/%d\n", data, data->cur, data->prev, MemMap_nbChunks);
     if(data->cur==0)
     {
         MEMMAP_DEBUG_PRINT("MemMap Flushin chunks\n");
@@ -302,7 +309,7 @@ void MemMap_FlushData(task_data data)
         printk(KERN_WARNING "MemMap unable to allocate buffers in flush data\n");
 
     MemMap_Printk("==MemMap Taskdata %d %p %p\n", data->internalId,data->task, data);
-    for(chunkid=0; chunkid < MEMMAP_NB_CHUNKS;++chunkid)
+    for(chunkid=0; chunkid < MemMap_nbChunks;++chunkid)
     {
         if((nelt=MemMap_NbElementInMap(data->chunks[chunkid]->map)))
         {
@@ -311,7 +318,7 @@ void MemMap_FlushData(task_data data)
             MemMap_CpuMask(data->chunks[chunkid]->cpu, CPUMASK);
             //Chunk chunkdid clock clock nbentry cpumask taskid
             MemMap_Printk("==MemMap Chunk %d %s %s %d 0b%s %d\n",
-                    chunkid+data->nbflush*MEMMAP_NB_CHUNKS,clk,clk1,
+                    chunkid+data->nbflush*MemMap_nbChunks,clk,clk1,
                     nelt,CPUMASK, data->internalId
                     );
             ind=0;
@@ -321,7 +328,7 @@ void MemMap_FlushData(task_data data)
                 MemMap_CpuMask(e->cpu, CPUMASK);
                 MemMap_Printk("==MemMap Access %s %s 0x%p 0x%x 0b%s %d %d %d %d\n",
                         clk,clk1,e->key, MEMMAP_PAGE_SIZE,CPUMASK, e->countR,
-                        e->countW, chunkid+data->nbflush*MEMMAP_NB_CHUNKS,
+                        e->countW, chunkid+data->nbflush*MemMap_nbChunks,
                         data->internalId
                         );
                 //Re init data

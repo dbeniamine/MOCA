@@ -25,46 +25,20 @@ int MemMap_tasksTableFactor=2;
 
 // Monitored process
 hash_map MemMap_tasksMap;
-
 struct task_struct *MemMap_initTask=NULL;
-
-// Current number of monitored pids
-int MemMap_numTasks=0;
-// Maximum Number of monitored pids (aka current alloc size on MemMap_tasks
-// TODO: remove that: deprecated
-#define MEMMAP_DEFAULT_MAX_PROCESS 32
-int MemMap_maxTasks=MEMMAP_DEFAULT_MAX_PROCESS;
-
 spinlock_t MemMap_tasksLock;
 
 int MemMap_AddTask(struct task_struct *t);
 
-int MemMap_InitProcessManagment(int maxprocs, int id)
+int MemMap_InitProcessManagment(int id)
 {
     // Monitored pids
-    int max;
     struct pid *pid;
     spin_lock_init(&MemMap_tasksLock);
-    // Max allowed procs
-    if(maxprocs > MEMMAP_DEFAULT_MAX_PROCESS)
-    {
-        max=maxprocs;
-    }
-    else
-    {
-        max=MEMMAP_DEFAULT_MAX_PROCESS;
-    }
-    spin_lock(&MemMap_tasksLock);
-    MemMap_maxTasks=max;
-    spin_unlock(&MemMap_tasksLock);
-
-
     MemMap_tasksMap=MemMap_InitHashMap(MemMap_tasksHashBits,
             MemMap_tasksTableFactor, sizeof(struct _memmap_task));
-
     rcu_read_lock();
     pid=find_vpid(id);
-
     if(!pid)
     {
         // Skip internal process
@@ -74,7 +48,6 @@ int MemMap_InitProcessManagment(int maxprocs, int id)
     }
     MemMap_initTask=pid_task(pid, PIDTYPE_PID);
     rcu_read_unlock();
-
     return 0;
 
 }
@@ -137,9 +110,9 @@ int MemMap_AddTaskIfNeeded(unsigned long int id)
 // Current number of monitored pids
 int MemMap_GetNumTasks(void)
 {
-    int nb;
+    int nb=0;
     spin_lock(&MemMap_tasksLock);
-    nb=MemMap_numTasks;
+    MemMap_NbElementInMap(MemMap_tasksMap);
     spin_unlock(&MemMap_tasksLock);
     return nb;
 }
@@ -169,7 +142,6 @@ int MemMap_AddTask(struct task_struct *t)
     data=MemMap_InitData(t);
     if(!data)
         return -1;
-    //Get number and max of pids
     spin_lock(&MemMap_tasksLock);
 
     tsk=(memmap_task)MemMap_AddToMap(MemMap_tasksMap,t,&status);
@@ -193,17 +165,9 @@ int MemMap_AddTask(struct task_struct *t)
         default:
             //normal add
             tsk->data=data;
-            ++MemMap_numTasks;
             spin_unlock(&MemMap_tasksLock);
             MEMMAP_DEBUG_PRINT("MemMap Added task %p\n",t);
             break;
     }
     return 0;
 }
-
-int MemMap_MaxTasks(void)
-{
-    //TODO remove deprecated
-    return MemMap_maxTasks;
-}
-

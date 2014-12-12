@@ -16,12 +16,18 @@ usage()
     echo "-d dir            Path to the MemMap dir default $install_dir"
     echo "-f file           Log cmd into file"
     echo "-l file           Log module output into file"
-    echo "-n maxtasks       Set the maximum of tasks instrument, default 128"
-    echo "-m                Pin thread manually. If you use this option, $0
-                            will assume that you have pinned the thread (aka
-                            each thread can run on only one proc). By default
-                            $0 pin the threads automatically in a round robin
-                            way by creation ordre"
+    echo "-b numbits        Set the number of bits used for the chunk hashmaps we
+                            can store up to Factor*2^numbits different adress in one
+                            chunk"
+    echo "-F factor         This settings allow you to increase the maximum
+                            number of adress per chunks without changing the
+                            number of bits used for the hashmap"
+    echo "-C nbChunks       Set the number of chunks to keep in memory.
+                            We can increase this number to avoid loosing data,
+                            however the more chunks we keep, the more memory
+                            we use ... If you don't see a message in your log
+                            telling you that you may have lost some data, you
+                            really shouldn't touch this parameter"
 }
 
 which schedtool > /dev/null
@@ -42,7 +48,7 @@ prio=$(schedtool -r | grep FIFO | sed -e 's/.*prio_max \([0-9]*\)/\1/')
 install_dir="~/install/MemMap"
 kernLogFile="MemMap.log"
 
-while getopts "w:c:a:hp:d:f:n:ml:" opt
+while getopts "w:c:a:hp:d:f:l:F:b:C:" opt
 do
     case $opt in
         h)
@@ -70,11 +76,14 @@ do
         l)
             kernLogFile="$OPTARG"
             ;;
-        n)
-            memmap_maxprocess="MemMap_maxProcess=$OPTARG"
+        b)
+            memmap_bits="MemMap_taskDataHashBits=$OPTARG"
             ;;
-        m)
-            memmap_pin="MemMap_pinProc=0"
+        F)
+            memmap_factor="MemMap_taskDataTableFactor=$OPTARG"
+            ;;
+        C)
+            memmap_chunks="MemMap_nbChunks=$OPTARG"
             ;;
         *)
             usage
@@ -129,7 +138,7 @@ abort_on_error $? "make fail"
 # make install
 # abort_on_error $? "Install fail"
 insmod memmap.ko MemMap_mainPid=$pid MemMap_schedulerPriority=$prio \
-    $memmap_interval $memmap_maxprocess $memmap_pin
+    $memmap_interval $memmap_bits $memmap_factor $memmap_chunks
 abort_on_error $? "unable to load module"
 kill -s SIGCONT $pid
 #echo "Parent $BASHPID waiting for child $pid in script $$"

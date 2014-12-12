@@ -22,7 +22,7 @@ typedef struct _memmap_task
 }*memmap_task;
 extern hash_map MemMap_tasksMap;
 
-int MemMap_InitProcessManagment(int maxprocs, int mainpid);
+int MemMap_InitProcessManagment(int mainpid);
 void MemMap_CleanProcessData(void);
 
 // Add the process id if its parent is already monitored
@@ -32,6 +32,4 @@ int MemMap_AddTaskIfNeeded(unsigned long int id);
 int MemMap_GetNumTasks(void);
 //Is the process pid monitored by memmap ?
 task_data MemMap_GetData(struct task_struct *t);
-// Return the max number of monitored tasks
-int MemMap_MaxTasks(void);
 #endif //__MEMMAP_TASKS__
