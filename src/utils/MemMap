@@ -17,17 +17,17 @@ usage()
     echo "-f file           Log cmd into file"
     echo "-l file           Log module output into file"
     echo "-b numbits        Set the number of bits used for the chunk hashmaps we
-                            can store up to Factor*2^numbits different adress in one
-                            chunk"
+    can store up to Factor*2^numbits different adress in one
+    chunk"
     echo "-F factor         This settings allow you to increase the maximum
-                            number of adress per chunks without changing the
-                            number of bits used for the hashmap"
+    number of adress per chunks without changing the
+    number of bits used for the hashmap"
     echo "-C nbChunks       Set the number of chunks to keep in memory.
-                            We can increase this number to avoid loosing data,
-                            however the more chunks we keep, the more memory
-                            we use ... If you don't see a message in your log
-                            telling you that you may have lost some data, you
-                            really shouldn't touch this parameter"
+    We can increase this number to avoid loosing data,
+    however the more chunks we keep, the more memory
+    we use ... If you don't see a message in your log
+    telling you that you may have lost some data, you
+    really shouldn't touch this parameter"
 }
 
 which schedtool > /dev/null
@@ -46,7 +46,9 @@ fi
 
 prio=$(schedtool -r | grep FIFO | sed -e 's/.*prio_max \([0-9]*\)/\1/')
 install_dir="~/install/MemMap"
-kernLogFile="MemMap.log"
+kernLogFile="MemMap"
+procdir="/proc/MemMap"
+log_thread_interval=.005
 
 while getopts "w:c:a:hp:d:f:l:F:b:C:" opt
 do
@@ -115,6 +117,17 @@ child()
     echo "$cmd ended code $ret"
     exit $ret
 }
+log()
+{
+    while test -e $procdir
+    do
+        for f in $(\ls $procdir)
+        do
+            cat $procdir/$f >> $kernLogFile-$f.log
+            sleep $log_thread_interval
+        done
+    done
+}
 
 abort_on_error()
 {
@@ -140,14 +153,11 @@ abort_on_error $? "make fail"
 insmod memmap.ko MemMap_mainPid=$pid MemMap_schedulerPriority=$prio \
     $memmap_interval $memmap_bits $memmap_factor $memmap_chunks
 abort_on_error $? "unable to load module"
+cd -
+log &
+logpid=$!
+schedtool -F -p $prio $logpid
 kill -s SIGCONT $pid
 #echo "Parent $BASHPID waiting for child $pid in script $$"
 wait $pid
 rmmod memmap
-cd -
-# Do the log
-sedarg=$(sudo grep "MemMap started" -RnH /var/log/messages  | tail -n 1 | \
-    cut -d ':' -f 2)
-sedarg+="d"
-sed "1,$sedarg" /var/log/messages | grep "==MemMap" | \
-    sed 's/.*==MemMap\(.*\)$/\1/' > $kernLogFile
