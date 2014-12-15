@@ -48,6 +48,7 @@ int MemMap_InitProcessManagment(int id)
     }
     MemMap_initTask=pid_task(pid, PIDTYPE_PID);
     rcu_read_unlock();
+    MemMap_InitTaskData();
     return 0;
 
 }

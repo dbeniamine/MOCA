@@ -83,23 +83,19 @@ int MemMap_CurrentChunk(task_data data)
     return ret;
 }
 
+void MemMap_InitTaskData(void)
+{
+    //Procfs init
+    MemMap_proc_root=proc_mkdir("MemMap", NULL);
+    if(!MemMap_proc_root)
+        MemMap_Panic("MemMap Unable to create proc root entry");
+}
 
 task_data MemMap_InitData(struct task_struct *t)
 {
     int i;
     task_data data;
     char buf[10];
-    //Procfs init
-    if(MemMap_nextTaskId==0)
-    {
-        //First call
-        MemMap_proc_root=proc_mkdir("MemMap", NULL);
-        if(!MemMap_proc_root)
-        {
-            MemMap_Panic("MemMap Unable to create proc root entry");
-            return NULL;
-        }
-    }
     //We must not wait here !
     data=kmalloc(sizeof(struct _task_data),GFP_ATOMIC);
     /* MEMMAP_DEBUG_PRINT("MemMap Initialising data for task %p\n",t); */

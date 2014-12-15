@@ -17,6 +17,7 @@ typedef struct _task_data *task_data;
 // Current number of monitored tasks
 extern int MemMap_GetNumTasks(void);
 
+void MemMap_InitTaskData(void);
 task_data MemMap_InitData(struct task_struct *t);
 void MemMap_ClearData(task_data data);
 void MemMap_ClearAllData(void);
