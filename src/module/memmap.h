@@ -24,6 +24,7 @@
 
 #include <linux/module.h>
 #include <linux/kernel.h>
+#include <linux/version.h>
 
 
 // Panic exit function

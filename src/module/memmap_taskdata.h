@@ -19,6 +19,7 @@ extern int MemMap_GetNumTasks(void);
 
 task_data MemMap_InitData(struct task_struct *t);
 void MemMap_ClearData(task_data data);
+void MemMap_ClearAllData(void);
 
 struct task_struct *MemMap_GetTaskFromData(task_data data);
 

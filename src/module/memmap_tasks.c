@@ -54,18 +54,9 @@ int MemMap_InitProcessManagment(int id)
 
 void MemMap_CleanProcessData(void)
 {
-    int i, nbTasks;
-    //Tell the kernel we don't need the tasks anymore
     if(MemMap_tasksMap)
     {
-        MEMMAP_DEBUG_PRINT("MemMap Cleaning data\n");
-        nbTasks=MemMap_GetNumTasks();
-        for(i=0;i<nbTasks;++i)
-        {
-            MemMap_ClearData(((memmap_task)
-                        MemMap_EntryAtPos(MemMap_tasksMap, (unsigned)i))->data);
-        }
-        MEMMAP_DEBUG_PRINT("MemMap Cleaning all data\n");
+        MemMap_ClearAllData();
         MemMap_FreeMap(MemMap_tasksMap);
     }
 }
