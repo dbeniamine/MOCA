@@ -48,7 +48,7 @@ prio=$(schedtool -r | grep FIFO | sed -e 's/.*prio_max \([0-9]*\)/\1/')
 install_dir="~/install/MemMap"
 kernLogFile="MemMap"
 procdir="/proc/MemMap"
-log_thread_interval=.005
+log_thread_interval=.5
 
 while getopts "w:c:a:hp:d:f:l:F:b:C:" opt
 do
@@ -124,8 +124,8 @@ log()
         for f in $(\ls $procdir)
         do
             cat $procdir/$f >> $kernLogFile-$f.log
-            sleep $log_thread_interval
         done
+        sleep $log_thread_interval
     done
 }
 

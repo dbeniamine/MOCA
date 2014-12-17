@@ -38,7 +38,7 @@ void MemMap_MonitorPage(int myId,task_data data)
                 pte, i, myId, data);
         if(!pte_none(*pte) && pte_present(*pte) && !pte_special(*pte) )
         {
-            *pte = pte_clear_flags(*pte, _PAGE_PRESENT);
+            /* *pte = pte_clear_flags(*pte, _PAGE_PRESENT); */
             MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap FLAGS CLEARED pte %p\n", pte);
         }
         // Set R/W status

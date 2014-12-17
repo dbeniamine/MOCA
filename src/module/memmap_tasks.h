@@ -30,6 +30,7 @@ int MemMap_AddTaskIfNeeded(unsigned long int id);
 
 // Current number of monitored tasks
 int MemMap_GetNumTasks(void);
-//Is the process pid monitored by memmap ?
 task_data MemMap_GetData(struct task_struct *t);
+
+void MemMap_RemoveTask(struct task_struct *t);
 #endif //__MEMMAP_TASKS__

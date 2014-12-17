@@ -37,7 +37,7 @@ void MemMap_PteFaultHandler(struct mm_struct *mm,
     MemMap_AddToChunk(data,(void *)pte,get_cpu());
     if (!pte_none(*pte) && !pte_present(*pte) && !pte_special(*pte))
     {
-        *pte = pte_set_flags(*pte, _PAGE_PRESENT);
+        /* *pte = pte_set_flags(*pte, _PAGE_PRESENT); */
         MEMMAP_DEBUG_PRINT("MemMap fixing fake pagefault\n");
     }
     MemMap_UpdateClock(get_cpu());

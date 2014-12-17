@@ -132,6 +132,7 @@ int MemMap_AddTask(struct task_struct *t)
 
     //Create the task data
     data=MemMap_InitData(t);
+    get_task_struct(t);
     if(!data)
         return -1;
     spin_lock(&MemMap_tasksLock);
@@ -141,17 +142,14 @@ int MemMap_AddTask(struct task_struct *t)
     {
         case MEMMAP_HASHMAP_FULL:
             spin_unlock(&MemMap_tasksLock);
-            MemMap_ClearData(data);
             MemMap_Panic("Too many pids");
             break;
         case MEMMAP_HASHMAP_ERROR:
             spin_unlock(&MemMap_tasksLock);
-            MemMap_ClearData(data);
             MemMap_Panic("MemMap unhandeled hashmap error");
             break;
         case  MEMMAP_HASHMAP_ALREADY_IN_MAP:
             spin_unlock(&MemMap_tasksLock);
-            MemMap_ClearData(data);
             MemMap_Panic("MemMap Adding an alreadt exixsting task");
             break;
         default:
@@ -162,4 +160,10 @@ int MemMap_AddTask(struct task_struct *t)
             break;
     }
     return 0;
+}
+
+void MemMap_RemoveTask(struct task_struct *t)
+{
+    MemMap_RemoveFromMap(MemMap_tasksMap, t);
+    put_task_struct(t);
 }
