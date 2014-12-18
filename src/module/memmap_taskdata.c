@@ -158,43 +158,42 @@ task_data MemMap_InitData(struct task_struct *t)
 void MemMap_ClearAllData(void)
 {
     int i=0, nbTasks,chunkid;
-    task_data data;
+    memmap_task t;
     char buf[10];
     MEMMAP_DEBUG_PRINT("MemMap Cleaning data\n");
     nbTasks=MemMap_GetNumTasks();
-    while((data=((memmap_task)MemMap_EntryAtPos(
-                    MemMap_tasksMap,(unsigned)i))->data))
+    while((t=(memmap_task)MemMap_EntryAtPos(MemMap_tasksMap,(unsigned)i)))
     {
-        MEMMAP_DEBUG_PRINT("MemMap asking data %d to end\n",i);
-        data->status=MEMMAP_DATA_STATUS_NEEDFLUSH;
+        MEMMAP_DEBUG_PRINT("MemMap asking data %d %p %p to end\n",i, t->data, t->key);
+        t->data->status=MEMMAP_DATA_STATUS_NEEDFLUSH;
         ++i;
     }
     i=0;
-    while((data=((memmap_task)MemMap_EntryAtPos(
-                    MemMap_tasksMap,(unsigned) i))->data))
+    while((t=(memmap_task)MemMap_EntryAtPos(MemMap_tasksMap,(unsigned)i)))
     {
         //Wait for the task to be dead
         MEMMAP_DEBUG_PRINT("MemMap waiting data %d to end\n",i);
-        while(data->status!=MEMMAP_DATA_STATUS_ZOMBIE)
+        while(t->data->status!=MEMMAP_DATA_STATUS_ZOMBIE)
             msleep(100);
-        MEMMAP_DEBUG_PRINT("MemMap data %d ended\n",i);
+        MEMMAP_DEBUG_PRINT("MemMap data %d %p %p ended\n",i, t->data, t->key);
         snprintf(buf,10,"task%d",i);
         remove_proc_entry(buf, MemMap_proc_root);
         //Clean must be done after removing the proc entry
         for(chunkid=0; chunkid < MemMap_nbChunks;++chunkid)
         {
             MEMMAP_DEBUG_PRINT("Memap Freeing data %p chunk %d\n",
-                    data, chunkid);
-            MemMap_FreeMap(data->chunks[chunkid]->map);
-            kfree(data->chunks[chunkid]->endClocks);
-            kfree(data->chunks[chunkid]->startClocks);
-            kfree(data->chunks[chunkid]);
+                    t->data, chunkid);
+            MemMap_FreeMap(t->data->chunks[chunkid]->map);
+            kfree(t->data->chunks[chunkid]->endClocks);
+            kfree(t->data->chunks[chunkid]->startClocks);
+            kfree(t->data->chunks[chunkid]);
         }
-        MemMap_RemoveTask(data->task);
-        kfree(data);
+        kfree(t->data);
+        MemMap_RemoveTask(t->key);
         MEMMAP_DEBUG_PRINT("Memap Freed data %d \n", i);
         ++i;
     }
+    MEMMAP_DEBUG_PRINT("MemMap Removing proc root\n");
     remove_proc_entry("MemMap", NULL);
 
     MEMMAP_DEBUG_PRINT("MemMap all data cleaned\n");

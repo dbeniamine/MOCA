@@ -16,6 +16,8 @@
 #include "memmap.h"
 
 
+#define MEMMAP_HASHMAP_END -1
+#define MEMMAP_HASHMAP_UNUSED -2
 #define tableElt(map, ind) \
     ( (hash_entry)((char *)((map)->table)+((ind)*((map)->elt_size)) ))
 
@@ -29,6 +31,14 @@ typedef struct _hash_map
     unsigned long tableSize;
     size_t elt_size;
 }*hash_map;
+
+unsigned int MemMap_FindNextAvailPosMap(hash_map map)
+{
+    unsigned int i=0;
+    while(i< map->tableSize && tableElt(map,i)->next!=MEMMAP_HASHMAP_UNUSED)
+        ++i;
+    return i;
+}
 
 hash_map MemMap_InitHashMap(unsigned long hash_bits, int factor,
         size_t elt_size)
@@ -49,15 +59,15 @@ hash_map MemMap_InitHashMap(unsigned long hash_bits, int factor,
         return NULL;
     }
     for(i=0;i<map->size;++i)
-    {
-        map->hashs[i]=-1;
-    }
+        map->hashs[i]=MEMMAP_HASHMAP_END;
     if(!(map->table=kcalloc(map->tableSize,elt_size,GFP_ATOMIC)))
     {
         kfree(map->hashs);
         kfree(map);
         return NULL;
     }
+    for(i=0;i<map->tableSize;++i)
+        tableElt(map,i)->next=MEMMAP_HASHMAP_UNUSED;
     return map;
 }
 
@@ -80,7 +90,7 @@ int MemMap_PosInMap(hash_map map,void *key)
         return -1;
     h=hash_ptr(key, map->hash_bits);
     ind=map->hashs[h];
-    while(ind!= -1 && tableElt(map,ind)->key!=key )
+    while(ind>=0 && tableElt(map,ind)->key!=key )
         ind=tableElt(map,ind)->next;
     return ind;
 }
@@ -113,13 +123,13 @@ hash_entry MemMap_AddToMap(hash_map map, void *key, int *status)
     MEMMAP_DEBUG_PRINT("MemMap Inserting %p in map %p\n", key, map);
     h=hash_ptr(key, map->hash_bits);
     ind=map->hashs[h];
-    if(ind==-1)
+    if(ind<0)
     {
         map->hashs[h]=map->nbentry;
     }
     else
     {
-        while(tableElt(map,ind)->key!=key && tableElt(map,ind)->next!=-1)
+        while(tableElt(map,ind)->key!=key && tableElt(map,ind)->next>=0)
             ind=tableElt(map,ind)->next;
         if(tableElt(map,ind)->key==key)
         {
@@ -133,9 +143,16 @@ hash_entry MemMap_AddToMap(hash_map map, void *key, int *status)
 
     MEMMAP_DEBUG_PRINT("MemMap inserting %p ind %d/%lu\n",
             key,map->nbentry,map->tableSize);
-    ind=map->nbentry++;
+    ind=MemMap_FindNextAvailPosMap(map);
+    if((unsigned)ind >= map->tableSize)
+    {
+        *status=MEMMAP_HASHMAP_ERROR;
+        MemMap_Panic("BUG in findavailposmap");
+        return NULL;
+    }
+    map->nbentry++;
     tableElt(map,ind)->key=key;
-    tableElt(map,ind)->next=-1;;
+    tableElt(map,ind)->next=MEMMAP_HASHMAP_END;
     MEMMAP_DEBUG_PRINT("MemMap Inserted %p in map %p\n", key, map);
     *status=ind;
     return tableElt(map,ind);
@@ -147,30 +164,31 @@ hash_entry MemMap_AddToMap(hash_map map, void *key, int *status)
  */
 hash_entry MemMap_EntryAtPos(hash_map map, unsigned int pos)
 {
-    if(!map || pos >= map->nbentry)
+    if(!map || pos >= map->tableSize ||
+            tableElt(map,pos)->next==MEMMAP_HASHMAP_UNUSED)
         return NULL;
     return tableElt(map,pos);
 }
 hash_entry MemMap_RemoveFromMap(hash_map map,void *key)
 {
     unsigned long h;
-    int ind, ind_prev=-1;
+    int ind, ind_prev=MEMMAP_HASHMAP_END;
     if(!map)
         return NULL;
     MEMMAP_DEBUG_PRINT("MemMap removing %p from %p\n", key, map);
     h=hash_ptr(key, map->hash_bits);
     ind=map->hashs[h];
-    while(ind!= -1 && tableElt(map,ind)->key!=key )
+    while(ind>=0 && tableElt(map,ind)->key!=key )
     {
         ind_prev=ind;
         ind=tableElt(map,ind)->next;
     }
     MEMMAP_DEBUG_PRINT("MemMap removing %p from %p ind %d prev %d\n", key, map, ind, ind_prev);
     //key wasn't in map
-    if(ind==-1 )
+    if(ind<0 )
         return NULL;
     //Remove from list
-    if(ind_prev!=-1)
+    if(ind_prev>=0)
     {
         tableElt(map,ind_prev)->next=tableElt(map,ind)->next;
     }
@@ -178,7 +196,7 @@ hash_entry MemMap_RemoveFromMap(hash_map map,void *key)
     {
         map->hashs[h]=tableElt(map,ind)->next;
     }
-    tableElt(map,ind)->next=-1;
+    tableElt(map,ind)->next=MEMMAP_HASHMAP_UNUSED;
     --map->nbentry;
     MEMMAP_DEBUG_PRINT("MemMap removing %p from %p ind %d ok\n", key, map, ind);
     return tableElt(map,ind);
@@ -195,8 +213,8 @@ void MemMap_ClearMap(hash_map map)
     for(i=0;i<map->nbentry;++i)
     {
         h=hash_ptr(tableElt(map,i)->key, map->hash_bits);
-        map->hashs[h]=-1;
-        tableElt(map,i)->next=-1;
+        map->hashs[h]=MEMMAP_HASHMAP_END;
+        tableElt(map,i)->next=MEMMAP_HASHMAP_UNUSED;
     }
 }
 

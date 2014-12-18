@@ -21,6 +21,7 @@ typedef unsigned long u64;
 //from linux/hash.h
 #define GOLDEN_RATIO_PRIME_64 0x9e37fffffffc0001UL
 
+#define MemMap_Panic(A) printf(A);
 
 static __always_inline u64 hash_64(u64 val, unsigned int bits)
 {

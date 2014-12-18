@@ -38,8 +38,7 @@ typedef struct _hash_map *hash_map;
  * An entry of this map must be castable in hash_entry and have a size of
  * elt_size.
  */
-hash_map MemMap_InitHashMap(unsigned long hash_bits, int factor,
-        size_t elt_size);
+hash_map MemMap_InitHashMap(unsigned long hash_bits, int factor, size_t elt_size);
 
 // Return the number of entry in map
 int MemMap_NbElementInMap(hash_map map);
@@ -64,7 +63,7 @@ int MemMap_PosInMap(hash_map map,void *key);
 hash_entry MemMap_AddToMap(hash_map map, void *key, int *status);
 /*
  * Returns the hash entry at position pos
- *         Null is pos is invalid or there is no entry at this position
+ *         Null if pos is invalid or there is no entry at this position
  */
 hash_entry MemMap_EntryAtPos(hash_map map, unsigned int pos);
 
