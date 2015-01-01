@@ -16,6 +16,7 @@
 #define MEMMAP_HASHMAP_ERROR -1
 #define MEMMAP_HASHMAP_FULL -2
 #define MEMMAP_HASHMAP_ALREADY_IN_MAP  -3
+#include "memmap.h"
 
 /*
  * This package provide very low memory cost hash map.
@@ -66,6 +67,11 @@ hash_entry MemMap_AddToMap(hash_map map, void *key, int *status);
  *         Null if pos is invalid or there is no entry at this position
  */
 hash_entry MemMap_EntryAtPos(hash_map map, unsigned int pos);
+/*
+ * Returns the next entry starting from pos
+ *  NULL if there is no entry after pos
+ */
+hash_entry MemMap_NextEntryPos(hash_map map, unsigned int *pos);
 
 // Remove key from the map
 hash_entry MemMap_RemoveFromMap(hash_map map,void *key);

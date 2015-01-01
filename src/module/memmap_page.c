@@ -63,30 +63,28 @@ void MemMap_MonitorPage(int myId,task_data data)
 int MemMap_MonitorThread(void * arg)
 {
     task_data data;
-    struct task_struct *task;
+    memmap_task t;
+    struct task_struct * task;
     //Init tlb walk data
-    int myId=get_cpu(),i;
+    unsigned int myId=get_cpu(),i=0;
     unsigned long long lastwake=0;
 
     while(!kthread_should_stop())
     {
-        int nbTasks=MemMap_GetNumTasks();
-        MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Kthread %d found  %d tasks\n",
-                myId, nbTasks);
-        //Freed in memmap_taskdata.h during flush or clear
-        for(i=0;i<nbTasks;i++)
+        while((t=((memmap_task)MemMap_NextEntryPos(MemMap_tasksMap,&i))))
         {
-            MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Kthread %d iterating taskdata %d/%d\n",
-                    myId, i,nbTasks);
-            data=((memmap_task)MemMap_EntryAtPos(MemMap_tasksMap,i))->data;
-            task=MemMap_GetTaskFromData(data);
-            MEMMAP_DEBUG_PRINT(KERN_WARNING "Kthread %d testing task %p\n", myId, task);
+            data=t->data;
+            task=(struct task_struct *)t->key;
+            MEMMAP_DEBUG_PRINT(KERN_WARNING "Kthread %d testing task %p\n",
+                    myId, task);
             if(!pid_alive(task))
             {
-                MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap task %d %p is dead\n", i, task);
+                MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap task %d %p is dead\n",
+                        i, task);
                 //TODO manage task end
             }
-            else if(task && task->on_cpu==myId && task->sched_info.last_arrival > lastwake)
+            else if(task && task->on_cpu==myId
+                    && task->sched_info.last_arrival > lastwake)
             {
                 lastwake=MAX(lastwake,task->sched_info.last_arrival);
                 MEMMAP_DEBUG_PRINT(KERN_WARNING "KThread %d found task %p running on cpu %d\n",

@@ -13,7 +13,6 @@
 #include <linux/slab.h>
 #include <linux/hash.h>
 #include "memmap_hashmap.h"
-#include "memmap.h"
 
 
 #define MEMMAP_HASHMAP_END -1
@@ -109,7 +108,7 @@ int MemMap_PosInMap(hash_map map,void *key)
 hash_entry MemMap_AddToMap(hash_map map, void *key, int *status)
 {
     unsigned long h;
-    int ind=0;
+    int ind=0, nextPos;
     if(!map)
     {
         *status=MEMMAP_HASHMAP_ERROR;
@@ -120,12 +119,24 @@ hash_entry MemMap_AddToMap(hash_map map, void *key, int *status)
         *status=MEMMAP_HASHMAP_FULL;
         return NULL;
     }
-    MEMMAP_DEBUG_PRINT("MemMap Inserting %p in map %p\n", key, map);
+    //Do the insertion
+    nextPos=MemMap_FindNextAvailPosMap(map);
+    MEMMAP_DEBUG_PRINT("MemMap inserting %p ind %d/%lu\n",
+            key,nextPos,map->tableSize);
+    if((unsigned)nextPos >= map->tableSize)
+    {
+        *status=MEMMAP_HASHMAP_ERROR;
+        MemMap_Panic("BUG in findavailposmap");
+        return NULL;
+    }
+    //Update the link
     h=hash_ptr(key, map->hash_bits);
     ind=map->hashs[h];
     if(ind<0)
     {
-        map->hashs[h]=map->nbentry;
+        tableElt(map,nextPos)->key=key;
+        tableElt(map,nextPos)->next=MEMMAP_HASHMAP_END;
+        map->hashs[h]=nextPos;
     }
     else
     {
@@ -135,27 +146,18 @@ hash_entry MemMap_AddToMap(hash_map map, void *key, int *status)
         {
             MEMMAP_DEBUG_PRINT("MemMap %p already in map %p\n", key, map);
             *status=MEMMAP_HASHMAP_ALREADY_IN_MAP;
+            tableElt(map,nextPos)->key=NULL;
             return tableElt(map,ind);
         }
         MEMMAP_DEBUG_PRINT("MemMap collision in map %p key %p\n", key, map);
-        tableElt(map,ind)->next=map->nbentry;
+        tableElt(map,nextPos)->key=key;
+        tableElt(map,nextPos)->next=MEMMAP_HASHMAP_END;
+        tableElt(map,ind)->next=nextPos;
     }
-
-    MEMMAP_DEBUG_PRINT("MemMap inserting %p ind %d/%lu\n",
-            key,map->nbentry,map->tableSize);
-    ind=MemMap_FindNextAvailPosMap(map);
-    if((unsigned)ind >= map->tableSize)
-    {
-        *status=MEMMAP_HASHMAP_ERROR;
-        MemMap_Panic("BUG in findavailposmap");
-        return NULL;
-    }
-    map->nbentry++;
-    tableElt(map,ind)->key=key;
-    tableElt(map,ind)->next=MEMMAP_HASHMAP_END;
+    ++map->nbentry;
     MEMMAP_DEBUG_PRINT("MemMap Inserted %p in map %p\n", key, map);
-    *status=ind;
-    return tableElt(map,ind);
+    *status=nextPos;
+    return tableElt(map,nextPos);
 }
 
 /*
@@ -169,6 +171,26 @@ hash_entry MemMap_EntryAtPos(hash_map map, unsigned int pos)
         return NULL;
     return tableElt(map,pos);
 }
+/*
+ * Find the first available entry from pos
+ * Returns the entry on success
+ *         NULL if there is no more entry
+ * After the call to Memmap_NextEntryPos, pos is the position of the returned
+ * entry +1
+ * This function can be used as an iterator
+ */
+hash_entry MemMap_NextEntryPos(hash_map map, unsigned int *pos)
+{
+    unsigned int i=*pos;
+    while(i< map->tableSize && tableElt(map,i)->next==MEMMAP_HASHMAP_UNUSED)
+        ++i;
+    *pos=i+1;
+    if(i >=map->tableSize)
+        return NULL;
+    return tableElt(map,i);
+}
+
+
 hash_entry MemMap_RemoveFromMap(hash_map map,void *key)
 {
     unsigned long h;

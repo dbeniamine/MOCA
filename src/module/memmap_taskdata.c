@@ -162,21 +162,20 @@ void MemMap_ClearAllData(void)
     char buf[10];
     MEMMAP_DEBUG_PRINT("MemMap Cleaning data\n");
     nbTasks=MemMap_GetNumTasks();
-    while((t=(memmap_task)MemMap_EntryAtPos(MemMap_tasksMap,(unsigned)i)))
+    while((t=(memmap_task)MemMap_NextEntryPos(MemMap_tasksMap,(unsigned int *)&i)))
     {
         MEMMAP_DEBUG_PRINT("MemMap asking data %d %p %p to end\n",i, t->data, t->key);
         t->data->status=MEMMAP_DATA_STATUS_NEEDFLUSH;
-        ++i;
     }
     i=0;
-    while((t=(memmap_task)MemMap_EntryAtPos(MemMap_tasksMap,(unsigned)i)))
+    while((t=(memmap_task)MemMap_NextEntryPos(MemMap_tasksMap,(unsigned int *)&i)))
     {
         //Wait for the task to be dead
         MEMMAP_DEBUG_PRINT("MemMap waiting data %d to end\n",i);
         while(t->data->status!=MEMMAP_DATA_STATUS_ZOMBIE)
             msleep(100);
         MEMMAP_DEBUG_PRINT("MemMap data %d %p %p ended\n",i, t->data, t->key);
-        snprintf(buf,10,"task%d",i);
+        snprintf(buf,10,"task%d",i-1);
         remove_proc_entry(buf, MemMap_proc_root);
         //Clean must be done after removing the proc entry
         for(chunkid=0; chunkid < MemMap_nbChunks;++chunkid)
@@ -191,7 +190,6 @@ void MemMap_ClearAllData(void)
         kfree(t->data);
         MemMap_RemoveTask(t->key);
         MEMMAP_DEBUG_PRINT("Memap Freed data %d \n", i);
-        ++i;
     }
     MEMMAP_DEBUG_PRINT("MemMap Removing proc root\n");
     remove_proc_entry("MemMap", NULL);
@@ -250,11 +248,6 @@ int MemMap_AddToChunk(task_data data, void *addr, int cpu)
     MEMMAP_DEBUG_PRINT("MemMap inserted %p\n", addr);
     return 0;
 }
-
-/* int MemMap_IsInChunk(task_data data, void *addr) */
-/* { */
-/*     return (MemMap_PosInMap(data->chunks[data->cur]->map,addr))!=-1; */
-/* } */
 
 int MemMap_UpdateData(task_data data,int pos, int countR, int countW, int cpu)
 {
@@ -347,23 +340,19 @@ int MemMap_PrintClocks(unsigned long long *clocks, char *buf, size_t size)
         }
         buf[pos]=',';
     }
-    buf[pos]='}';
+    buf[pos++]='}';
     return pos;
 }
 
 int MemMap_CpuMask(int cpu, char *buf, size_t size)
 {
-    int i=0,pos=8*sizeof(int)-1, ok=0;
+    int i=0,pos=MemMap_NumThreads();
     if(!buf)
         return 0;
     while(pos>=0 && i< size)
     {
-        ok|=cpu&(1<<pos);
-        if(ok)
-        {
-            buf[i]=(cpu&(1<<pos))?'1':'0';
-            ++i;
-        }
+        buf[i]=(cpu&(1<<pos))?'1':'0';
+        ++i;
         --pos;
     }
     if( i>=size)
@@ -371,7 +360,7 @@ int MemMap_CpuMask(int cpu, char *buf, size_t size)
         MemMap_Panic("MemMap Buffer overflow in CpuMask");
         return 0;
     }
-    return i-1;
+    return i;
 }
 
 
@@ -379,7 +368,7 @@ static ssize_t MemMap_FlushData(struct file *filp,  char *buffer,
         size_t length, loff_t * offset)
 {
     ssize_t len=0,sz;
-    int chunkid, ind, nelt;
+    int chunkid, ind, nelt, complete=1;
     char *MYBUFF;
     chunk_entry e;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
@@ -388,6 +377,7 @@ static ssize_t MemMap_FlushData(struct file *filp,  char *buffer,
     task_data data=(task_data)PDE(filp->f_path.dentry->d_inode)->data;
 #endif
     MEMMAP_DEBUG_PRINT("MemMap_Flushing data %p\n", data);
+
 
     MYBUFF=kmalloc(MEMMAP_BUF_SIZE,GFP_ATOMIC);
     if(!MYBUFF)
@@ -414,7 +404,6 @@ static ssize_t MemMap_FlushData(struct file *filp,  char *buffer,
         MEMMAP_DEBUG_PRINT("user size %lu\n", len);
     }
 
-    MEMMAP_DEBUG_PRINT("MemMap Flushing size %lu\n", len);
     for(chunkid=0; chunkid < MemMap_nbChunks;++chunkid)
     {
         spin_lock(&data->chunks[chunkid]->lock);
@@ -426,31 +415,26 @@ static ssize_t MemMap_FlushData(struct file *filp,  char *buffer,
                 //TODO fix chunkid
                 //Chunk id  nb element startclock endclock cpumask
                 sz=snprintf(MYBUFF,MEMMAP_BUF_SIZE,"Chunk %d %d ",
-                        chunkid+data->nbflush*MemMap_nbChunks,
+                        chunkid/*+data->nbflush*MemMap_nbChunks*/,
                         MemMap_NbElementInMap(data->chunks[chunkid]->map));
                 sz+=MemMap_PrintClocks(data->chunks[chunkid]->startClocks,MYBUFF+sz,
                         MEMMAP_BUF_SIZE-sz);
-                ++sz;
-                MYBUFF[sz]=' ';
                 sz+=MemMap_PrintClocks(data->chunks[chunkid]->endClocks,MYBUFF+sz,
                         MEMMAP_BUF_SIZE-sz);
-                ++sz;
-                MYBUFF[sz]=' ';
+                MYBUFF[sz++]=' ';
                 sz+=MemMap_CpuMask(data->chunks[chunkid]->cpu, MYBUFF+sz,
                         MEMMAP_BUF_SIZE-sz);
-                ++sz;
-                MYBUFF[sz]='\n';
+                MYBUFF[sz++]='\n';
                 if(!copy_to_user(buffer+len,MYBUFF,sz))
                     len+=sz;
                 ind=0;
-                while((e=(chunk_entry)MemMap_EntryAtPos(data->chunks[chunkid]->map,ind)))
+                while((e=(chunk_entry)MemMap_NextEntryPos(data->chunks[chunkid]->map,&ind)))
                 {
                     //Access pte countread countwrite cpumask
-                    sz=snprintf(MYBUFF,MEMMAP_BUF_SIZE,"Access %p %d %d",
+                    sz=snprintf(MYBUFF,MEMMAP_BUF_SIZE,"Access %p %d %d ",
                             e->key, e->countR, e->countW);
                     sz+=MemMap_CpuMask(e->cpu,MYBUFF+sz,MEMMAP_BUF_SIZE-sz);
-                    ++sz;
-                    MYBUFF[sz]='\n';
+                    MYBUFF[sz++]='\n';
                     if(!copy_to_user(buffer+len,MYBUFF,sz))
                         len+=sz;
                     //Re init data
@@ -466,13 +450,21 @@ static ssize_t MemMap_FlushData(struct file *filp,  char *buffer,
             data->chunks[chunkid]->used=0;
         }
         spin_unlock(&data->chunks[chunkid]->lock);
+        if(len >= length)
+        {
+            complete=0;
+            break;
+        }
     }
     MemMap_GetClocks(data->chunks[0]->startClocks);
-    ++data->nbflush;
-    if(data->status==MEMMAP_DATA_STATUS_NEEDFLUSH)
-        data->status=MEMMAP_DATA_STATUS_DYING;
+    if(complete)
+    {
+        ++data->nbflush;
+        if(data->status==MEMMAP_DATA_STATUS_NEEDFLUSH )
+            data->status=MEMMAP_DATA_STATUS_DYING;
+    }
     //Free buffers
-    if(MYBUFF)
-        kfree(MYBUFF);
+    kfree(MYBUFF);
+    MEMMAP_DEBUG_PRINT("MemMap Flushing size %lu for data %p\n", len, data);
     return len;
 }

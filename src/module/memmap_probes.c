@@ -19,7 +19,7 @@
 
 int MemMap_ForkHandler(struct kretprobe_instance *ri, struct pt_regs *regs)
 {
-    /* MEMMAP_DEBUG_PRINT("MemMap in fork handler pid %lu \n",regs_return_value(regs)); */
+    MEMMAP_DEBUG_PRINT("MemMap in fork handler pid %lu \n",regs_return_value(regs));
     MemMap_AddTaskIfNeeded(regs_return_value(regs));
     return 0;
 }
@@ -29,11 +29,12 @@ void MemMap_PteFaultHandler(struct mm_struct *mm,
         pte_t *pte, pmd_t *pmd, unsigned int flags)
 {
     task_data data;
-    data=MemMap_GetData(mm->owner);
-    if(!data || MemMap_GetTaskFromData(data)!=mm->owner)
+    data=MemMap_GetData(current);
+    /* MEMMAP_DEBUG_PRINT("Pte fault task %p\n", current); */
+    if(!data)
         jprobe_return();
     // Add pte to current chunk
-    MEMMAP_DEBUG_PRINT("MemMap pte fault %p data %p\n",pte, data);
+    /* MEMMAP_DEBUG_PRINT("MemMap pte fault %p data %p\n",pte, data); */
     MemMap_AddToChunk(data,(void *)pte,get_cpu());
     if (!pte_none(*pte) && !pte_present(*pte) && !pte_special(*pte))
     {
