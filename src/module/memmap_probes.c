@@ -16,6 +16,7 @@
 #include "memmap_taskdata.h"
 #include "memmap_probes.h"
 #include "memmap_threads.h"
+#include "memmap_page.h"
 
 int MemMap_ForkHandler(struct kretprobe_instance *ri, struct pt_regs *regs)
 {
@@ -45,6 +46,29 @@ void MemMap_PteFaultHandler(struct mm_struct *mm,
     jprobe_return();
 }
 
+void MemMap_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
+        unsigned long address, unsigned int flags)
+{
+    pte_t *pte;
+
+    task_data data;
+    data=MemMap_GetData(current);
+    /* MEMMAP_DEBUG_PRINT("Pte fault task %p\n", current); */
+    if(!data)
+        jprobe_return();
+    MemMap_AddToChunk(data,(void *)address,get_cpu());
+    pte=MemMap_PteFromAdress(address,mm);
+    //If pte exists, try to fix false pagefault
+    if (pte && !pte_none(*pte) && !pte_present(*pte) && !pte_special(*pte))
+    {
+        /* *pte = pte_set_flags(*pte, _PAGE_PRESENT); */
+        MEMMAP_DEBUG_PRINT("MemMap fixing fake pagefault\n");
+    }
+    MemMap_UpdateClock(get_cpu());
+    jprobe_return();
+
+}
+
 
 //Note that the probes is on the do_fork function which is called also for
 //thread creation.
@@ -56,8 +80,8 @@ static struct kretprobe MemMap_ForkProbe = {
 //BUG: since linux 3.3 (I think) handle_pte_fault is not available in
 ///proc/kallsyms
 static struct jprobe MemMap_PteFaultjprobe = {
-    .entry = MemMap_PteFaultHandler,
-    .kp.symbol_name = "handle_pte_fault",
+    .entry = MemMap_MmFaultHandler,
+    .kp.symbol_name = "handle_mm_fault",
 };
 int MemMap_RegisterProbes(void)
 {

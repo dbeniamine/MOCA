@@ -20,4 +20,6 @@
  */
 int MemMap_MonitorThread(void *);
 
+pte_t *MemMap_PteFromAdress(unsigned long addr, struct mm_struct *mm);
+
 #endif //__MEMMAP_PAGE__

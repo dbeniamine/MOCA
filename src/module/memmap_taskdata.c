@@ -430,7 +430,7 @@ static ssize_t MemMap_FlushData(struct file *filp,  char *buffer,
                 ind=0;
                 while((e=(chunk_entry)MemMap_NextEntryPos(data->chunks[chunkid]->map,&ind)))
                 {
-                    //Access pte countread countwrite cpumask
+                   //Access address countread countwrite cpumask
                     sz=snprintf(MYBUFF,MEMMAP_BUF_SIZE,"Access %p %d %d ",
                             e->key, e->countR, e->countW);
                     sz+=MemMap_CpuMask(e->cpu,MYBUFF+sz,MEMMAP_BUF_SIZE-sz);

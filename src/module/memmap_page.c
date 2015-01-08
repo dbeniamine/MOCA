@@ -25,29 +25,55 @@
 // Wakeup period in ms
 int MemMap_wakeupInterval=MEMMAP_DEFAULT_WAKEUP_INTERVAL;
 
+pte_t *MemMap_PteFromAdress(unsigned long address, struct mm_struct *mm)
+{
+    pgd_t *pgd;
+    pmd_t *pmd;
+    pud_t *pud;
+    pgd = pgd_offset(mm, address);
+    if (pgd_none(*pgd) || pgd_bad(*pgd))
+        return NULL;
+    pud = pud_offset(pgd, address);
+    if(pud_none(*pud) || pud_bad(*pud))
+        return NULL;
+    pmd = pmd_offset(pud, address);
+    if (pmd_none(*pmd) || pmd_bad(*pmd))
+        return NULL;
+    return pte_offset_map(pmd, address);
+
+}
+
 // Walk through the current chunk
 void MemMap_MonitorPage(int myId,task_data data)
 {
+    //TODO: fix pte
     int i=0,countR, countW;
     pte_t *pte;
+    void *addr;
     MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Kthread %d walking on data %p , task %p\n",
             myId, data, MemMap_GetTaskFromData(data));
-    while((pte=(pte_t *)MemMap_AddrInChunkPos(data,i))!=NULL)
+    while((addr=MemMap_AddrInChunkPos(data,i))!=NULL)
     {
-        MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap pagewalk pte %p ind %d cpu %d data %p\n",
-                pte, i, myId, data);
-        if(!pte_none(*pte) && pte_present(*pte) && !pte_special(*pte) )
+        pte=MemMap_PteFromAdress((unsigned long)addr,MemMap_GetTaskFromData(data)->mm);
+        MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap pagewalk addr : %p pte %p ind %d cpu %d data %p\n",
+                addr, pte, i, myId, data);
+        if(pte)
         {
-            /* *pte = pte_clear_flags(*pte, _PAGE_PRESENT); */
-            MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap FLAGS CLEARED pte %p\n", pte);
+            if(!pte_none(*pte) && pte_present(*pte) && !pte_special(*pte) )
+            {
+                /* *pte = pte_clear_flags(*pte, _PAGE_PRESENT); */
+                MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap FLAGS CLEARED pte %p\n", pte);
+            }
+            // Set R/W status
+            //TODO: count perfctr
+            if(pte_young(*pte))
+                countR=1;
+            if(pte_dirty(*pte))
+                countW=1;
+            MemMap_UpdateData(data,i,countR,countW,myId);
         }
-        // Set R/W status
-        //TODO: count perfctr
-        if(pte_young(*pte))
-            countR=1;
-        if(pte_dirty(*pte))
-            countW=1;
-        MemMap_UpdateData(data,i,countR,countW,myId);
+        else
+            MEMMAP_DEBUG_PRINT("MemMap not pte for adress %p\n", addr);
         ++i;
     }
     // Goto to next chunk
