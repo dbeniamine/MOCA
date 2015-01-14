@@ -100,5 +100,5 @@ int MemMap_RegisterProbes(void)
 void MemMap_UnregisterProbes(void)
 {
     unregister_jprobe(&MemMap_PteFaultjprobe);
-    unregister_kprobe(&MemMap_doExitprobe);
+//    unregister_kprobe(&MemMap_doExitprobe);
 }
