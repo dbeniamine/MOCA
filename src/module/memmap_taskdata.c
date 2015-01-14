@@ -427,9 +427,8 @@ static ssize_t MemMap_FlushData(struct file *filp,  char *buffer,
                 if(chunkid!=data->currentlyFlushed)
                 {
                     //Chunk id  nb element startclock endclock cpumask
-                    //TODO fix chunkid
                     sz=snprintf(MYBUFF,MEMMAP_BUF_SIZE,"Chunk %d %d ",
-                            chunkid/*+data->nbflush*MemMap_nbChunks*/,
+                            chunkid+data->nbflush*MemMap_nbChunks,
                             MemMap_NbElementInMap(data->chunks[chunkid]->map));
                     sz+=MemMap_PrintClocks(data->chunks[chunkid]->startClocks,
                             MYBUFF+sz, MEMMAP_BUF_SIZE-sz);
