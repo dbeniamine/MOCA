@@ -10,7 +10,7 @@
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
-#define MEMMAP_DEBUG
+//#define MEMMAP_DEBUG
 
 #define MEMMAP_BUF_SIZE 4096
 #define MEMMAP_DATA_STATUS_NORMAL 0
