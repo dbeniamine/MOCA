@@ -9,6 +9,7 @@
  * Copyright (C) 2010 David Beniamine
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
+//#define MEMMAP_DEBUG
 
 #include <linux/init.h>
 #include "memmap.h"

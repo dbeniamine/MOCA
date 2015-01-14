@@ -10,6 +10,8 @@
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
+#define MEMMAP_DEBUG
+
 #include "memmap.h"
 #include "memmap_page.h"
 #include "memmap_taskdata.h"
@@ -31,13 +33,13 @@ pte_t *MemMap_PteFromAdress(unsigned long address, struct mm_struct *mm)
     pmd_t *pmd;
     pud_t *pud;
     pgd = pgd_offset(mm, address);
-    if (pgd_none(*pgd) || pgd_bad(*pgd))
+    if (!pgd || pgd_none(*pgd) || pgd_bad(*pgd))
         return NULL;
     pud = pud_offset(pgd, address);
-    if(pud_none(*pud) || pud_bad(*pud))
+    if(!pud || pud_none(*pud) || pud_bad(*pud))
         return NULL;
     pmd = pmd_offset(pud, address);
-    if (pmd_none(*pmd) || pmd_bad(*pmd))
+    if (!pmd || pmd_none(*pmd) || pmd_bad(*pmd))
         return NULL;
     return pte_offset_map(pmd, address);
 
@@ -46,23 +48,22 @@ pte_t *MemMap_PteFromAdress(unsigned long address, struct mm_struct *mm)
 // Walk through the current chunk
 void MemMap_MonitorPage(int myId,task_data data)
 {
-    //TODO: fix pte
     int i=0,countR, countW;
     pte_t *pte;
     void *addr;
-    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Kthread %d walking on data %p , task %p\n",
+    MEMMAP_DEBUG_PRINT("MemMap Kthread %d walking on data %p , task %p\n",
             myId, data, MemMap_GetTaskFromData(data));
     while((addr=MemMap_AddrInChunkPos(data,i))!=NULL)
     {
         pte=MemMap_PteFromAdress((unsigned long)addr,MemMap_GetTaskFromData(data)->mm);
-        MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap pagewalk addr : %p pte %p ind %d cpu %d data %p\n",
+        MEMMAP_DEBUG_PRINT("MemMap pagewalk addr : %p pte %p ind %d cpu %d data %p\n",
                 addr, pte, i, myId, data);
         if(pte)
         {
             if(!pte_none(*pte) && pte_present(*pte) && !pte_special(*pte) )
             {
                 /* *pte = pte_clear_flags(*pte, _PAGE_PRESENT); */
-                MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap FLAGS CLEARED pte %p\n", pte);
+                MEMMAP_DEBUG_PRINT("MemMap FLAGS CLEARED pte %p\n", pte);
             }
             // Set R/W status
             //TODO: count perfctr
@@ -78,7 +79,7 @@ void MemMap_MonitorPage(int myId,task_data data)
     }
     // Goto to next chunk
     MemMap_NextChunks(data);
-    MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap pagewalk pte cpu %d data %p end\n",
+    MEMMAP_DEBUG_PRINT("MemMap pagewalk pte cpu %d data %p end\n",
             myId,data);
 }
 
@@ -92,34 +93,29 @@ int MemMap_MonitorThread(void * arg)
     memmap_task t;
     struct task_struct * task;
     //Init tlb walk data
-    unsigned int myId=get_cpu(),i=0;
+    unsigned int myId=get_cpu(),i;
     unsigned long long lastwake=0;
 
     while(!kthread_should_stop())
     {
-        while((t=((memmap_task)MemMap_NextEntryPos(MemMap_tasksMap,&i))))
+        i=0;
+        while((t=MemMap_NextTask(&i)))
         {
             data=t->data;
             task=(struct task_struct *)t->key;
-            MEMMAP_DEBUG_PRINT(KERN_WARNING "Kthread %d testing task %p\n",
+            MEMMAP_DEBUG_PRINT("Kthread %d testing task %p\n",
                     myId, task);
-            if(!pid_alive(task))
-            {
-                MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap task %d %p is dead\n",
-                        i, task);
-                //TODO manage task end
-            }
-            else if(task && task->on_cpu==myId
+            if(pid_alive(task) && task->on_cpu==myId
                     && task->sched_info.last_arrival > lastwake)
             {
                 lastwake=MAX(lastwake,task->sched_info.last_arrival);
-                MEMMAP_DEBUG_PRINT(KERN_WARNING "KThread %d found task %p running on cpu %d\n",
+                MEMMAP_DEBUG_PRINT("KThread %d found task %p running on cpu %d\n",
                         myId, task, task->on_cpu);
                 MemMap_MonitorPage(myId,data);
             }
         }
         MemMap_UpdateClock(myId);
-        MEMMAP_DEBUG_PRINT(KERN_WARNING "MemMap Kthread %d going to sleep for %d\n",
+        MEMMAP_DEBUG_PRINT("MemMap Kthread %d going to sleep for %d\n",
                 myId, MemMap_wakeupInterval);
         msleep(MemMap_wakeupInterval);
     }

@@ -10,6 +10,8 @@
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
+//#define MEMMAP_DEBUG
+
 #include <linux/kthread.h>
 #include <linux/cpumask.h>  // num_online_cpus
 #include <linux/slab.h>    // kcalloc /kfree

@@ -10,6 +10,8 @@
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
+//#define MEMMAP_DEBUG
+
 #include <linux/slab.h>
 #include <linux/hash.h>
 #include "memmap_hashmap.h"
@@ -201,9 +203,13 @@ hash_entry MemMap_EntryAtPos(hash_map map, unsigned int pos)
 hash_entry MemMap_NextEntryPos(hash_map map, unsigned int *pos)
 {
     unsigned int i=*pos;
+    MEMMAP_DEBUG_PRINT("Searching element after %d /%d\n",
+            i, MemMap_NbElementInMap(map));
     while(i< map->tableSize && tableElt(map,i)->next==MEMMAP_HASHMAP_UNUSED)
         ++i;
     *pos=i+1;
+    MEMMAP_DEBUG_PRINT("found  %p at %d\n",
+            i>=map->tableSize?NULL:tableElt(map,i),i);
     if(i >=map->tableSize)
         return NULL;
     return tableElt(map,i);

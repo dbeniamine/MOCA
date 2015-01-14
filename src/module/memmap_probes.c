@@ -9,6 +9,7 @@
  * Copyright (C) 2010 David Beniamine
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
+#define __NO_VERSION__
 //#define MEMMAP_DEBUG
 
 #include <linux/kprobes.h>
@@ -18,14 +19,6 @@
 #include "memmap_probes.h"
 #include "memmap_threads.h"
 #include "memmap_page.h"
-
-int MemMap_ExecHandler(struct kretprobe_instance *ri, struct pt_regs *regs)
-{
-    MEMMAP_DEBUG_PRINT("MemMap in exec handler task %p %s %d\n",current,
-            current->comm, current->pid);
-    //MemMap_AddTaskIfNeeded(current);
-    return 0;
-}
 
 void MemMap_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
         unsigned long address, unsigned int flags)
@@ -54,12 +47,6 @@ void MemMap_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
 
 }
 
-
-/* static struct kretprobe MemMap_ExecProbe = { */
-/*     .handler = MemMap_ExecHandler, */
-/*     .kp.symbol_name = "do_execve", */
-/* }; */
-
 static struct jprobe MemMap_PteFaultjprobe = {
     .entry = MemMap_MmFaultHandler,
     .kp.symbol_name = "handle_mm_fault",
@@ -67,8 +54,6 @@ static struct jprobe MemMap_PteFaultjprobe = {
 int MemMap_RegisterProbes(void)
 {
     int ret;
-    /* if ((ret=register_kretprobe(&MemMap_ExecProbe))) */
-    /*     MemMap_Panic("Unable to register fork probe"); */
     if ((ret=register_jprobe(&MemMap_PteFaultjprobe)))
         MemMap_Panic("Unable to register pte fault probe");
     return ret;
@@ -77,6 +62,5 @@ int MemMap_RegisterProbes(void)
 
 void MemMap_UnregisterProbes(void)
 {
-    /* unregister_kretprobe(&MemMap_ExecProbe); */
     unregister_jprobe(&MemMap_PteFaultjprobe);
 }

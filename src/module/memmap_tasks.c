@@ -9,6 +9,7 @@
  * Copyright (C) 2010 David Beniamine
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
+#define __NO_VERSION__
 //#define MEMMAP_DEBUG
 
 #include <linux/pid.h>
@@ -85,6 +86,17 @@ int MemMap_GetNumTasks(void)
     nb=MemMap_NbElementInMap(MemMap_tasksMap);
     spin_unlock(&MemMap_tasksLock);
     return nb;
+}
+
+memmap_task MemMap_NextTask(int *pos)
+{
+    memmap_task ret=NULL;
+    MEMMAP_DEBUG_PRINT("MemMap Looking for task at %d\n", *pos);
+    spin_lock(&MemMap_tasksLock);
+    ret=(memmap_task)MemMap_NextEntryPos(MemMap_tasksMap,pos);
+    MEMMAP_DEBUG_PRINT("MemMap found task %p at %d\n", ret, *pos);
+    spin_unlock(&MemMap_tasksLock);
+    return ret;
 }
 
 task_data MemMap_GetData(struct task_struct *t)

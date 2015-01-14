@@ -20,7 +20,6 @@ typedef struct _memmap_task
     int next;
     task_data data;
 }*memmap_task;
-extern hash_map MemMap_tasksMap;
 
 int MemMap_InitProcessManagment(int mainpid);
 void MemMap_CleanProcessData(void);
@@ -34,6 +33,8 @@ memmap_task MemMap_AddTaskIfNeeded(struct task_struct *t);
 
 // Current number of monitored tasks
 int MemMap_GetNumTasks(void);
+
+memmap_task MemMap_NextTask(int *pos);
 task_data MemMap_GetData(struct task_struct *t);
 
 void MemMap_RemoveTask(struct task_struct *t);
