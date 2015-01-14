@@ -7,7 +7,7 @@ MEMMAP=sudo ../src/utils/MemMap -d $(INSTALL_DIR) -p $(PRIO) -f $(LOG_FILE) \
 # Testing config
 PRIO=99
 SIZE=500
-SEED=$(shell head /dev/urandom -n 1 | tr -cd '[:digit:]' | sed 's/\([0-9]\{1,4\}\).*/\1/')
+SEED=$(shell head /dev/urandom | tr -cd '[:digit:]' | sed 's/\([0-9]\{1,4\}\).*/\1/')
 ALGO=par_modulo
 THREADS=2
 MAT_ARG="-S $(SIZE) -s $(SEED) -a $(ALGO) -n $(THREADS) -v -V"
