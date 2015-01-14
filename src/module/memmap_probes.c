@@ -39,7 +39,7 @@ void MemMap_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
     //If pte exists, try to fix false pagefault
     if (pte && !pte_none(*pte) && !pte_present(*pte) && !pte_special(*pte))
     {
-        /* *pte = pte_set_flags(*pte, _PAGE_PRESENT); */
+        *pte = pte_set_flags(*pte, _PAGE_PRESENT);
         MEMMAP_DEBUG_PRINT("MemMap fixing fake pagefault\n");
     }
     MemMap_UpdateClock(get_cpu());
