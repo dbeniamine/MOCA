@@ -17,10 +17,10 @@ all: fork matrix
 fork:
 	$(MEMMAP) -c ./fork.sh
 
-matrix: matrix/matrix_naif
-	$(MEMMAP) -c matrix/matrix_naif -a $(MAT_ARG)
+matrix: matrix/matrix
+	$(MEMMAP) -c matrix/matrix -a $(MAT_ARG)
 
-matrix/matrix_naif: matrix/matrix_naif.c
+matrix/matrix: matrix/matrix_naif.c
 	make -C matrix/
 
 .phony: clean
