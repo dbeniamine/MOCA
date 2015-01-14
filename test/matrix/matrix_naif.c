@@ -1,15 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/types.h>
-#include <sys/syscall.h>
-#include <unistd.h>
 #include <pthread.h>
 #include <string.h>
 #include <assert.h>
 #include <math.h>
+#define _GNU_SOURCE
+#include <unistd.h>
+#include <sys/syscall.h>
+#include <sys/types.h>
+#include <time.h>
 /* #include "heapinfo.h" */
 
-#define _GNU_SOURCE
 #define NAIF 0
 #define TRANSPOSE 1
 #define PAR_MODULO 2
@@ -141,7 +142,7 @@ void *do_mult_par_bloc_thread(void *arg)
 {
     th_args args=(th_args)arg;
     double *Res=args->mat;
-    printf("thread %d alive  pid %d tid %d !\n", args->tid, getpid(), syscall(SYS_gettid));
+    printf("thread %d alive  pid %d tid %ld !\n", args->tid, getpid(), syscall(SYS_gettid));
     //    printf("Working on %p from [%d][%d] to [%d][%d]\n", Res, args->lrmin,
     //            args->colrmin, args->lrmax, args->colrmax);
     for(unsigned int lr=args->lrmin; lr<args->lrmax;lr++)
@@ -242,7 +243,7 @@ void* do_mult_par_modulo_thread(void *arg)
 {
     double *Res=((th_args)arg)->mat;
     int tid=((th_args) arg)->tid;
-    printf("thread %d alive  pid %d tid %d !\n", tid, getpid(), syscall(SYS_gettid));
+    printf("thread %d alive  pid %d tid %ld !\n", tid, getpid(), syscall(SYS_gettid));
     //Very unefficient parallel matrix multplication
     unsigned int ligr=0, colr=tid;
     while(ligr*sz+colr<sz*sz)
@@ -293,7 +294,9 @@ int main(int argc, char *argv[])
     int opt, verbose=0, verify=0;
     long int seed=-1;
     int algo=NAIF;
-    sz=0;
+    double exp_time ;
+    struct timespec m_time_s, m_time_f ; \
+        sz=0;
     //Options
     extern char *optarg;
     printf("Main pid %d\n", getpid());
@@ -381,6 +384,7 @@ int main(int argc, char *argv[])
     if(verbose)
         print();
 
+    clock_gettime(CLOCK_REALTIME, &m_time_s ) ;
     //Do the multiplication using the selected algorithm
     switch(algo)
     {
@@ -401,6 +405,11 @@ int main(int argc, char *argv[])
             assert(0);
             break;
     }
+
+    clock_gettime(CLOCK_REALTIME, &m_time_f ) ;
+    exp_time = (double)(m_time_f.tv_sec - m_time_s.tv_sec)
+        + (double)(m_time_f.tv_nsec - m_time_s.tv_nsec) / 1e9 ;
+    printf ( "----------> %f (ms)\n", 1e3 * exp_time ) ;
     if(verbose)
         print();
     //Do verification
