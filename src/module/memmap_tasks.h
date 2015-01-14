@@ -25,8 +25,12 @@ extern hash_map MemMap_tasksMap;
 int MemMap_InitProcessManagment(int mainpid);
 void MemMap_CleanProcessData(void);
 
-// Add the process id if its parent is already monitored
-int MemMap_AddTaskIfNeeded(unsigned long int id);
+/*
+ * If t should be monitored, add the task to the monitored list and return
+ *      the memmap_task
+ * else returns NULL without doing anything
+ */
+memmap_task MemMap_AddTaskIfNeeded(struct task_struct *t);
 
 // Current number of monitored tasks
 int MemMap_GetNumTasks(void);

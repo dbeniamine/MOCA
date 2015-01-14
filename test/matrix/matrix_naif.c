@@ -1,13 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <sys/types.h>
+#include <sys/syscall.h>
 #include <unistd.h>
-#include <assert.h>
 #include <pthread.h>
+#include <string.h>
+#include <assert.h>
 #include <math.h>
 /* #include "heapinfo.h" */
 
-
+#define _GNU_SOURCE
 #define NAIF 0
 #define TRANSPOSE 1
 #define PAR_MODULO 2
@@ -139,7 +141,7 @@ void *do_mult_par_bloc_thread(void *arg)
 {
     th_args args=(th_args)arg;
     double *Res=args->mat;
-    printf("thread %d alive !\n", args->tid);
+    printf("thread %d alive  pid %d tid %d !\n", args->tid, getpid(), syscall(SYS_gettid));
     //    printf("Working on %p from [%d][%d] to [%d][%d]\n", Res, args->lrmin,
     //            args->colrmin, args->lrmax, args->colrmax);
     for(unsigned int lr=args->lrmin; lr<args->lrmax;lr++)
@@ -240,6 +242,7 @@ void* do_mult_par_modulo_thread(void *arg)
 {
     double *Res=((th_args)arg)->mat;
     int tid=((th_args) arg)->tid;
+    printf("thread %d alive  pid %d tid %d !\n", tid, getpid(), syscall(SYS_gettid));
     //Very unefficient parallel matrix multplication
     unsigned int ligr=0, colr=tid;
     while(ligr*sz+colr<sz*sz)
@@ -293,6 +296,7 @@ int main(int argc, char *argv[])
     sz=0;
     //Options
     extern char *optarg;
+    printf("Main pid %d\n", getpid());
     while((opt=getopt(argc, argv, "a:s:S:n:vVh"))!=-1)
     {
         switch(opt)

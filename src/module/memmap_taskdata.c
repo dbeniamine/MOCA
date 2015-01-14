@@ -19,6 +19,7 @@
 //We can free data (after removing the /proc entry)
 #define MEMMAP_DATA_STATUS_ZOMBIE -2
 #define MEMMAP_DATA_STATUS_DYING_OR_ZOMBIE(data) ((data)->status < 0)
+#define REQ_CH_SZ_OUTPUT(nelt) (((nelt)+1)*30)
 
 int MemMap_taskDataHashBits=14;
 int MemMap_taskDataTableFactor=2;
@@ -376,7 +377,7 @@ static ssize_t MemMap_FlushData(struct file *filp,  char *buffer,
 #else
     task_data data=(task_data)PDE(filp->f_path.dentry->d_inode)->data;
 #endif
-    MEMMAP_DEBUG_PRINT("MemMap_Flushing data %p\n", data);
+    MEMMAP_DEBUG_PRINT("MemMap_Flushing data %p allowed len %lu\n", data, length);
 
 
     MYBUFF=kmalloc(MEMMAP_BUF_SIZE,GFP_ATOMIC);
@@ -397,7 +398,9 @@ static ssize_t MemMap_FlushData(struct file *filp,  char *buffer,
     {
         //First flush
         MEMMAP_DEBUG_PRINT("MemMap first flush for data %p\n", data);
-        sz=snprintf(MYBUFF,MEMMAP_BUF_SIZE,"Taskdata %d %p%p\n", data->internalId,data->task, data);
+
+        sz=snprintf(MYBUFF,MEMMAP_BUF_SIZE,"Taskdata %d %d %p\n",
+                data->internalId,task_pid_nr(data->task), data->task);
         MEMMAP_DEBUG_PRINT("buf size %lu\n", sz);
         if(!copy_to_user(buffer, MYBUFF,sz))
             len+=sz;
@@ -410,17 +413,18 @@ static ssize_t MemMap_FlushData(struct file *filp,  char *buffer,
         if(data->status==MEMMAP_DATA_STATUS_NEEDFLUSH
                 || data->chunks[chunkid]->used)
         {
-            if((nelt=MemMap_NbElementInMap(data->chunks[chunkid]->map)))
+            nelt=MemMap_NbElementInMap(data->chunks[chunkid]->map);
+            if(nelt>0)
             {
                 //TODO fix chunkid
                 //Chunk id  nb element startclock endclock cpumask
                 sz=snprintf(MYBUFF,MEMMAP_BUF_SIZE,"Chunk %d %d ",
                         chunkid/*+data->nbflush*MemMap_nbChunks*/,
                         MemMap_NbElementInMap(data->chunks[chunkid]->map));
-                sz+=MemMap_PrintClocks(data->chunks[chunkid]->startClocks,MYBUFF+sz,
-                        MEMMAP_BUF_SIZE-sz);
-                sz+=MemMap_PrintClocks(data->chunks[chunkid]->endClocks,MYBUFF+sz,
-                        MEMMAP_BUF_SIZE-sz);
+                sz+=MemMap_PrintClocks(data->chunks[chunkid]->startClocks,
+                        MYBUFF+sz, MEMMAP_BUF_SIZE-sz);
+                sz+=MemMap_PrintClocks(data->chunks[chunkid]->endClocks,
+                        MYBUFF+sz,MEMMAP_BUF_SIZE-sz);
                 MYBUFF[sz++]=' ';
                 sz+=MemMap_CpuMask(data->chunks[chunkid]->cpu, MYBUFF+sz,
                         MEMMAP_BUF_SIZE-sz);
@@ -430,7 +434,7 @@ static ssize_t MemMap_FlushData(struct file *filp,  char *buffer,
                 ind=0;
                 while((e=(chunk_entry)MemMap_NextEntryPos(data->chunks[chunkid]->map,&ind)))
                 {
-                   //Access address countread countwrite cpumask
+                    //Access address countread countwrite cpumask
                     sz=snprintf(MYBUFF,MEMMAP_BUF_SIZE,"Access %p %d %d ",
                             e->key, e->countR, e->countW);
                     sz+=MemMap_CpuMask(e->cpu,MYBUFF+sz,MEMMAP_BUF_SIZE-sz);
@@ -443,20 +447,23 @@ static ssize_t MemMap_FlushData(struct file *filp,  char *buffer,
                     e->countW=0;
                     e->cpu=0;
                     ++ind;
+                    if(len+50 >= length)
+                    {
+                        complete=0;
+                        break;
+                    }
                 }
             }
-
+            if(complete)
+            {
             data->chunks[chunkid]->cpu=0;
             data->chunks[chunkid]->used=0;
+            }
         }
         spin_unlock(&data->chunks[chunkid]->lock);
-        if(len >= length)
-        {
-            complete=0;
-            break;
-        }
     }
-    MemMap_GetClocks(data->chunks[0]->startClocks);
+    if(!data->chunks[0]->used)
+        MemMap_GetClocks(data->chunks[0]->startClocks);
     if(complete)
     {
         ++data->nbflush;

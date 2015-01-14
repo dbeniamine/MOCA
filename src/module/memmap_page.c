@@ -73,7 +73,7 @@ void MemMap_MonitorPage(int myId,task_data data)
             MemMap_UpdateData(data,i,countR,countW,myId);
         }
         else
-            MEMMAP_DEBUG_PRINT("MemMap not pte for adress %p\n", addr);
+            MEMMAP_DEBUG_PRINT("MemMap no pte for adress %p\n", addr);
         ++i;
     }
     // Goto to next chunk

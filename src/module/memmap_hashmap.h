@@ -51,6 +51,12 @@ int MemMap_NbElementInMap(hash_map map);
 int MemMap_PosInMap(hash_map map,void *key);
 
 /*
+ * Return the hash entry corresponding to key,
+ *        NULL if key is not in the map
+ */
+hash_entry MemMap_EntryFromKey(hash_map map, void *key);
+
+/*
  * Insert key in map
  * Returns A pointer to the hash_entry corresponding to key
  *         Null in case of error

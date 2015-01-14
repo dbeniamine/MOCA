@@ -1,6 +1,7 @@
 CC=gcc
 DEBUG=yes
-FLAGS=-std=c99 -Wall -Wextra -Werror -D_XOPEN_SOURCE
+#FLAGS=-std=c99 -Wall -Wextra -Werror -D_XOPEN_SOURCE
+FLAGS=-std=c99 -Wall -Wextra -D_XOPEN_SOURCE
 ifeq ($(DEBUG),yes)
 	CFLAGS=$(FLAGS) -g
 else

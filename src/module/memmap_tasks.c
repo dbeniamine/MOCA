@@ -9,6 +9,8 @@
  * Copyright (C) 2010 David Beniamine
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
+//#define MEMMAP_DEBUG
+
 #include <linux/pid.h>
 #include <linux/sched.h>
 #include <linux/hash.h>
@@ -16,26 +18,26 @@
 #include "memmap.h"
 #include "memmap_threads.h"
 #include "memmap_tasks.h"
-#include "memmap_lock.h"
+#include <linux/spinlock.h>
 
 
 // The first bits are not random enough, 14 bits should be enough for pids
 unsigned long MemMap_tasksHashBits=14UL;
 int MemMap_tasksTableFactor=2;
 int MemMap_AddTaskWaiting=0;
-MemMap_Lock_t MemMap_tasksLock;
+spinlock_t MemMap_tasksLock;
 
 // Monitored process
 hash_map MemMap_tasksMap;
 struct task_struct *MemMap_initTask=NULL;
 
-int MemMap_AddTask(struct task_struct *t);
+memmap_task MemMap_AddTask(struct task_struct *t);
 
 int MemMap_InitProcessManagment(int id)
 {
     // Monitored pids
     struct pid *pid;
-    MemMap_tasksLock=MemMap_Lock_Init();
+    spin_lock_init(&MemMap_tasksLock);
     MemMap_tasksMap=MemMap_InitHashMap(MemMap_tasksHashBits,
             MemMap_tasksTableFactor, sizeof(struct _memmap_task));
     rcu_read_lock();
@@ -64,54 +66,24 @@ void MemMap_CleanProcessData(void)
 }
 
 // Add pid to the monitored process if pid is a monitored process
-int MemMap_AddTaskIfNeeded(unsigned long int id)
+memmap_task MemMap_AddTaskIfNeeded(struct task_struct *t)
 {
-    struct pid *pid;
-    int pos, ret=0;
-    struct task_struct *task, *ptask, *tmptask=NULL;
-    // Get iternal pid representation
-    rcu_read_lock();
-    pid=find_vpid(id);
-
-    if(!pid)
-    {
-        // Skip internal process
-        rcu_read_unlock();
-        MEMMAP_DEBUG_PRINT("MemMap process skiped %lu NULL\n", id);
-        return 0;
-    }
-    task=pid_task(pid, PIDTYPE_PID);
-    rcu_read_unlock();
-    if(!task)
-        MemMap_Panic("Unable to add find task from pid\n");
-
-
-    ptask=task->real_parent;
-    MemMap_Lock(MemMap_tasksLock, MEMMAP_LOCK_PRIO_MAX);
-    if(ptask == MemMap_initTask)
-    {
-        //The task is a direct child of the init task
-        ret=MemMap_AddTask(task);
-    }
-    else
-    {
-        if((pos=MemMap_PosInMap(MemMap_tasksMap ,ptask))!=-1)
-            tmptask=(struct task_struct *)((memmap_task)(MemMap_EntryAtPos(MemMap_tasksMap,pos))->key);
-        //Check if the parent is known
-        if (tmptask==ptask)
-            ret=MemMap_AddTask(task);
-    }
-    MemMap_Unlock(MemMap_tasksLock);
-    return ret;
+    memmap_task tsk=NULL;
+    spin_lock(&MemMap_tasksLock);
+    if(t->real_parent == MemMap_initTask  ||
+            MemMap_EntryFromKey(MemMap_tasksMap, t->real_parent)!=NULL )
+        tsk=MemMap_AddTask(t);
+    spin_unlock(&MemMap_tasksLock);
+    return tsk;
 }
 
 // Current number of monitored pids
 int MemMap_GetNumTasks(void)
 {
     int nb=0;
-    MemMap_Lock(MemMap_tasksLock, MEMMAP_LOCK_PRIO_MIN);
+    spin_lock(&MemMap_tasksLock);
     nb=MemMap_NbElementInMap(MemMap_tasksMap);
-    MemMap_Unlock(MemMap_tasksLock);
+    spin_unlock(&MemMap_tasksLock);
     return nb;
 }
 
@@ -119,14 +91,16 @@ task_data MemMap_GetData(struct task_struct *t)
 {
     int pos;
     task_data ret=NULL;
+    spin_lock(&MemMap_tasksLock);
     if((pos=MemMap_PosInMap(MemMap_tasksMap ,t))!=-1)
         ret=((memmap_task)MemMap_EntryAtPos(MemMap_tasksMap,pos))->data;
+    spin_unlock(&MemMap_tasksLock);
     return ret;
 }
 
 
 // Add t to the monitored pids
-int MemMap_AddTask(struct task_struct *t)
+memmap_task MemMap_AddTask(struct task_struct *t)
 {
     task_data data;
     memmap_task tsk;
@@ -138,7 +112,7 @@ int MemMap_AddTask(struct task_struct *t)
     data=MemMap_InitData(t);
     get_task_struct(t);
     if(!data)
-        return -1;
+        return NULL;
 
     tsk=(memmap_task)MemMap_AddToMap(MemMap_tasksMap,t,&status);
     switch(status)
@@ -150,7 +124,7 @@ int MemMap_AddTask(struct task_struct *t)
             MemMap_Panic("MemMap unhandeled hashmap error");
             break;
         case  MEMMAP_HASHMAP_ALREADY_IN_MAP:
-            MemMap_Panic("MemMap Adding an alreadt exixsting task");
+            MemMap_Panic("MemMap Adding an already exixsting task");
             break;
         default:
             //normal add
@@ -158,13 +132,13 @@ int MemMap_AddTask(struct task_struct *t)
             MEMMAP_DEBUG_PRINT("MemMap Added task %p at pos %d \n", t, status);
             break;
     }
-    return 0;
+    return tsk;
 }
 
 void MemMap_RemoveTask(struct task_struct *t)
 {
-    MemMap_Lock(MemMap_tasksLock, MEMMAP_LOCK_PRIO_MIN);
+    spin_lock(&MemMap_tasksLock);
     MemMap_RemoveFromMap(MemMap_tasksMap, t);
-    MemMap_Unlock(MemMap_tasksLock);
+    spin_unlock(&MemMap_tasksLock);
     put_task_struct(t);
 }

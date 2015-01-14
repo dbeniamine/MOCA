@@ -95,6 +95,25 @@ int MemMap_PosInMap(hash_map map,void *key)
 }
 
 /*
+ * Return the hash entry corresponding to key,
+ *        NULL if key is not in the map
+ */
+hash_entry MemMap_EntryFromKey(hash_map map, void *key)
+{
+    unsigned long h;
+    int ind=0;
+    if(!map)
+        return NULL;
+    h=hash_ptr(key, map->hash_bits);
+    ind=map->hashs[h];
+    while(ind>=0 && tableElt(map,ind)->key!=key )
+        ind=tableElt(map,ind)->next;
+    if(ind >=0)
+        return tableElt(map,ind);
+    return NULL;
+}
+
+/*
  * Insert key in map
  * Returns A pointer to the hash_entry corresponding to key
  *         Null in case of error
