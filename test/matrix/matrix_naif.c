@@ -251,7 +251,8 @@ void* do_mult_par_modulo_thread(void *arg)
         for(unsigned int k=0;k<sz;k++)
         {
             //Compute
-            Res[ligr*sz+colr]+=A[ligr*sz+k]*BT[colr*sz+k];
+            // Tr: Res[ligr*sz+colr]+=A[ligr*sz+k]*BT[colr*sz+k];
+            Res[ligr*sz+colr]+=A[ligr*sz+k]*B[k*sz+colr];
         }
         colr+=Nthreads;
         if(colr>=sz)
@@ -266,7 +267,7 @@ void* do_mult_par_modulo_thread(void *arg)
 //Launch threads for mat mult
 void do_mult_par_modulo(double *Res)
 {
-    do_transpose();
+    //do_transpose();
     threads=malloc(sizeof(pthread_t)*Nthreads);
     args=malloc(sizeof(struct th_arg_t)*Nthreads);
     void *res;
