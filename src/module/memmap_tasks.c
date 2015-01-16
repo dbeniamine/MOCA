@@ -17,7 +17,6 @@
 #include <linux/hash.h>
 #include <linux/slab.h>
 #include "memmap.h"
-#include "memmap_threads.h"
 #include "memmap_tasks.h"
 #include <linux/spinlock.h>
 

@@ -30,12 +30,12 @@ int MemMap_nbChunks=20;
 #include <linux/spinlock.h>
 #include <linux/slab.h>
 #include <linux/proc_fs.h>
+#include <linux/cpumask.h> //num_online_cpus
 #include <asm/uaccess.h>  /* for copy_*_user */
 #include <linux/delay.h>
 #include "memmap.h"
 #include "memmap_taskdata.h"
 #include "memmap_tasks.h"
-#include "memmap_threads.h"
 #include "memmap_hashmap.h"
 
 
@@ -62,8 +62,8 @@ typedef struct _chunk_entry
 typedef struct
 {
     hash_map map;
-    unsigned long long *startClocks;
-    unsigned long long *endClocks;
+    unsigned long startClock;
+    unsigned long endClock;
     int cpu;
     int used;
     spinlock_t lock;
@@ -130,15 +130,8 @@ task_data MemMap_InitData(struct task_struct *t)
             MemMap_Panic("MemMap unable to allocate data chunk");
             return NULL;
         }
-        data->chunks[i]->startClocks=
-            kcalloc(MemMap_NumThreads(),sizeof(unsigned long long), GFP_ATOMIC);
-        data->chunks[i]->endClocks=
-            kcalloc(MemMap_NumThreads(),sizeof(unsigned long long), GFP_ATOMIC);
-        if(!data->chunks[i]->startClocks || ! data->chunks[i]->startClocks)
-        {
-            MemMap_Panic("MemMap unable to allocate data chunk");
-            return NULL;
-        }
+        data->chunks[i]->startClock=0;
+        data->chunks[i]->endClock=0;
         data->chunks[i]->cpu=0;
         data->chunks[i]->used=0;
         data->chunks[i]->map=MemMap_InitHashMap(MemMap_taskDataHashBits,
@@ -147,7 +140,7 @@ task_data MemMap_InitData(struct task_struct *t)
     }
     data->task=t;
     data->cur=0;
-    MemMap_GetClocks(data->chunks[0]->startClocks);
+    data->chunks[0]->startClock=MemMap_GetClock();
     data->internalId=MemMap_nextTaskId++;
     data->nbflush=0;
     data->status=MEMMAP_DATA_STATUS_NORMAL;
@@ -187,8 +180,6 @@ void MemMap_ClearAllData(void)
             MEMMAP_DEBUG_PRINT("Memap Freeing data %p chunk %d\n",
                     t->data, chunkid);
             MemMap_FreeMap(t->data->chunks[chunkid]->map);
-            kfree(t->data->chunks[chunkid]->endClocks);
-            kfree(t->data->chunks[chunkid]->startClocks);
             kfree(t->data->chunks[chunkid]);
         }
         kfree(t->data);
@@ -206,6 +197,16 @@ void MemMap_ClearAllData(void)
 struct task_struct *MemMap_GetTaskFromData(task_data data)
 {
     return data->task;
+}
+
+void MemMap_LockChunk(task_data data)
+{
+    spin_lock(&data->chunks[MemMap_CurrentChunk(data)]->lock);
+}
+
+void MemMap_UnlockChunk(task_data data)
+{
+    spin_unlock(&data->chunks[MemMap_CurrentChunk(data)]->lock);
 }
 
 int MemMap_AddToChunk(task_data data, void *addr, int cpu)
@@ -286,7 +287,7 @@ int MemMap_NextChunks(task_data data)
     spin_lock(&data->lock);
     cur=data->cur;
     spin_lock(&data->chunks[cur]->lock);
-    MemMap_GetClocks(data->chunks[cur]->endClocks);
+    data->chunks[cur]->endClock=MemMap_GetClock();
     data->chunks[cur]->used=1;
     data->cur=(cur+1)%MemMap_nbChunks;
     spin_unlock(&data->chunks[cur]->lock);
@@ -300,7 +301,7 @@ int MemMap_NextChunks(task_data data)
         return 1;
     }
     else
-        MemMap_GetClocks(data->chunks[data->cur]->startClocks);
+        data->chunks[data->cur]->startClock=MemMap_GetClock();
     return 0;
 }
 
@@ -326,31 +327,10 @@ void *MemMap_AddrInChunkPos(task_data data,int pos)
     return e->key;
 }
 
-int MemMap_PrintClocks(unsigned long long *clocks, char *buf, size_t size)
-{
-    int i,pos=0;
-    if(!buf)
-        return 0;
-    buf[0]='{';
-    for(i=0;i<MemMap_NumThreads();++i)
-    {
-        ++pos;
-        size-=pos;
-        pos+=snprintf(buf+pos, size, "%llu", clocks[i]);
-        if(size==0)
-        {
-            MemMap_Panic("MemMap Buffer overflow in print clocks");
-            return 0;
-        }
-        buf[pos]=',';
-    }
-    buf[pos++]='}';
-    return pos;
-}
 
 int MemMap_CpuMask(int cpu, char *buf, size_t size)
 {
-    int i=0,pos=MemMap_NumThreads();
+    int i=0,pos=num_online_cpus();
     if(!buf)
         return 0;
     while(pos>=0 && i< size)
@@ -426,17 +406,14 @@ static ssize_t MemMap_FlushData(struct file *filp,  char *buffer,
                 //If we are resuming, no need to output this line again
                 if(chunkid!=data->currentlyFlushed)
                 {
-                    //Chunk id  nb element startclock endclock cpumask
-                    sz=snprintf(MYBUFF,MEMMAP_BUF_SIZE,"Chunk %d %d ",
-                            chunkid+data->nbflush*MemMap_nbChunks,
-                            MemMap_NbElementInMap(data->chunks[chunkid]->map));
-                    sz+=MemMap_PrintClocks(data->chunks[chunkid]->startClocks,
-                            MYBUFF+sz, MEMMAP_BUF_SIZE-sz);
                     if(chunkid==data->cur)
-                        MemMap_GetClocks(data->chunks[chunkid]->endClocks);
-                    sz+=MemMap_PrintClocks(data->chunks[chunkid]->endClocks,
-                            MYBUFF+sz,MEMMAP_BUF_SIZE-sz);
-                    MYBUFF[sz++]=' ';
+                        data->chunks[chunkid]->endClock=MemMap_GetClock();
+                    //Chunk id  nb element startclock endclock cpumask
+                    sz=snprintf(MYBUFF,MEMMAP_BUF_SIZE,"Chunk %d %d %lu %lu ",
+                            chunkid+data->nbflush*MemMap_nbChunks,
+                            MemMap_NbElementInMap(data->chunks[chunkid]->map),
+                            data->chunks[chunkid]->startClock,
+                            data->chunks[chunkid]->endClock);
                     sz+=MemMap_CpuMask(data->chunks[chunkid]->cpu, MYBUFF+sz,
                             MEMMAP_BUF_SIZE-sz);
                     MYBUFF[sz++]='\n';
@@ -476,8 +453,8 @@ static ssize_t MemMap_FlushData(struct file *filp,  char *buffer,
                 if((nelt=MemMap_NbElementInMap(data->chunks[chunkid]->map))!=0)
                     MEMMAP_DEBUG_PRINT("MemMap Still %d elt, ch %d atfer complete flush\n",
                             nelt, chunkid);
-                MemMap_GetClocks(data->chunks[chunkid]->startClocks);
-                MemMap_GetClocks(data->chunks[chunkid]->endClocks);
+                data->chunks[chunkid]->startClock=MemMap_GetClock();
+                data->chunks[chunkid]->endClock=MemMap_GetClock();
             }
         }
         if(complete)
@@ -491,7 +468,7 @@ static ssize_t MemMap_FlushData(struct file *filp,  char *buffer,
         }
     }
     if(!data->chunks[0]->used)
-        MemMap_GetClocks(data->chunks[0]->startClocks);
+        data->chunks[0]->startClock=MemMap_GetClock();
     if(complete)
     {
         ++data->nbflush;

@@ -57,4 +57,7 @@ int MemMap_NextChunks(task_data data);
  */
 void *MemMap_AddrInChunkPos(task_data data,int pos);
 
+void MemMap_LockChunk(task_data data);
+void MemMap_UnlockChunk(task_data data);
+
 #endif //__MEMMAP_TASK_DATA__

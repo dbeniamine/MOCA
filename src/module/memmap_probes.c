@@ -17,7 +17,6 @@
 #include "memmap_tasks.h"
 #include "memmap_taskdata.h"
 #include "memmap_probes.h"
-#include "memmap_threads.h"
 #include "memmap_page.h"
 
 //static int MemMap_DoExitHandler(struct kprobe *p, struct pt_regs *regs)
@@ -72,7 +71,7 @@ void MemMap_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
         *pte = pte_set_flags(*pte, _PAGE_PRESENT);
         MEMMAP_DEBUG_PRINT("MemMap fixing fake pagefault\n");
     }
-    MemMap_UpdateClock(get_cpu());
+    MemMap_UpdateClock();
     jprobe_return();
 
 }

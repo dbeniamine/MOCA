@@ -28,7 +28,10 @@
 
 // Panic exit function
 void MemMap_Panic(const char *s);
-int MemMap_NumThreads(void);
+//Clocks managment
+void MemMap_UpdateClock(void);
+unsigned long MemMap_GetClock(void);
+
 
 #endif //__MEMMAP__
 
