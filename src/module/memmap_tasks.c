@@ -22,8 +22,7 @@
 
 
 // The first bits are not random enough, 14 bits should be enough for pids
-unsigned long MemMap_tasksHashBits=14UL;
-int MemMap_tasksTableFactor=2;
+unsigned long MemMap_tasksHashBits=14;
 int MemMap_AddTaskWaiting=0;
 spinlock_t MemMap_tasksLock;
 
@@ -39,7 +38,7 @@ int MemMap_InitProcessManagment(int id)
     struct pid *pid;
     spin_lock_init(&MemMap_tasksLock);
     MemMap_tasksMap=MemMap_InitHashMap(MemMap_tasksHashBits,
-            MemMap_tasksTableFactor, sizeof(struct _memmap_task));
+            2*(1<<MemMap_tasksHashBits), sizeof(struct _memmap_task));
     rcu_read_lock();
     pid=find_vpid(id);
     if(!pid)

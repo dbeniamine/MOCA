@@ -34,12 +34,12 @@ typedef struct _hash_entry
 
 typedef struct _hash_map *hash_map;
 
-/* Initialize an empty map of (1<<hash_bit) different keys, (1<<hash_bit)
- * elements max.
+/* Initialize an empty map of (1<<hash_bits) different keys, able to hold
+ * nb_elt elements
  * An entry of this map must be castable in hash_entry and have a size of
  * elt_size.
  */
-hash_map MemMap_InitHashMap(unsigned long hash_bits, int factor, size_t elt_size);
+hash_map MemMap_InitHashMap(unsigned long hash_bits, int nb_elt, size_t elt_size);
 
 // Return the number of entry in map
 int MemMap_NbElementInMap(hash_map map);

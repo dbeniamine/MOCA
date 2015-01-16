@@ -21,9 +21,10 @@
 //We can free data (after removing the /proc entry)
 #define MEMMAP_DATA_STATUS_ZOMBIE -2
 #define MEMMAP_DATA_STATUS_DYING_OR_ZOMBIE(data) ((data)->status < 0)
+#define MEMMAP_HASH_BITS 14
 
-int MemMap_taskDataHashBits=14;
-int MemMap_taskDataTableFactor=2;
+int MemMap_taskDataHashBits=MEMMAP_HASH_BITS;
+int MemMap_taskDataChunkSize=2*(1<<MEMMAP_HASH_BITS);
 int MemMap_nbChunks=20;
 
 #include <linux/sched.h>
@@ -135,7 +136,7 @@ task_data MemMap_InitData(struct task_struct *t)
         data->chunks[i]->cpu=0;
         data->chunks[i]->used=0;
         data->chunks[i]->map=MemMap_InitHashMap(MemMap_taskDataHashBits,
-                MemMap_taskDataTableFactor, sizeof(struct _chunk_entry));
+                MemMap_taskDataChunkSize, sizeof(struct _chunk_entry));
         spin_lock_init(&data->chunks[i]->lock);
     }
     data->task=t;

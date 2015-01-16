@@ -2,32 +2,44 @@
 
 usage()
 {
-    echo "Usage : $0 [options] -c \"command\""
-    echo "Loads MemMap kernel module and configure it to monitor command, then
+    echo "Usage : $name [options] -c \"command\""
+    echo "Loads $name kernel module and configure it to monitor command, then
     execute the command given by the user"
     echo "-c cmd            The command to be executed"
     echo "Options:"
-    echo "-w    interval    Set the wakeup interval for MemMap to interval ms,
-    default: $interval"
-    echo "-a \"args\"       The arguments for command"
     echo "-h                Display this help and exit"
-    echo "-p prio           Schedtool priority for the kernel module, the user
-    program priority will be prio-1, default: $prio"
+    echo "-a \"args\"       The arguments for command"
     echo "-d dir            Path to the MemMap dir default $install_dir"
     echo "-f file           Log cmd into file"
     echo "-l file           Log module output into file"
-    echo "-b numbits        Set the number of bits used for the chunk hashmaps we
-    can store up to Factor*2^numbits different adress in one
-    chunk"
-    echo "-F factor         This settings allow you to increase the maximum
-    number of adress per chunks without changing the
-    number of bits used for the hashmap"
+    echo "The following parameters allows you to do fine tuning on the module.
+          By default you shouldn't need to use them.
+            + If you encounter performance issues, you can increase the wakeup
+            interval, the priority (reduce the system noise) or the hashmap
+            numbit parameter.
+            + If $name tells you that a part of the trace have been dropped
+            because there was not enought space to sotre it, you can increase
+            the number of chunks, the chunksize or reduce the wakeup interval.
+          Please note that as memory is quite restricted in the kernel, it
+          might be a better idea to play on the wakeup interval the priority
+          than on the storage related parameters."
+    echo "-w ms             Set the wakeup interval for MemMap to interval ms,
+                            Default: $interval."
+    echo "-p prio           Schedtool priority for the kernel module, the
+                            program priority will be prio-1. You can increase
+                            this parameter to reduce the system noise.
+                            Default: $prio"
+    echo "-b numbits        Set the number of bits used for the chunk
+                            hashmaps. The map size is 2^numbits. the higher
+                            numbits is, the less collision you should have.
+                            Default: 14"
+    echo "-S ChunkSize      Set the number of adress that can be stored in one
+                            chunk. You can also use the -w toggle to reduce to
+                            wakeup interval, and therefore the number of
+                            adresses needed per chunks.
+                            Default: 2*2^14."
     echo "-C nbChunks       Set the number of chunks to keep in memory.
-    We can increase this number to avoid loosing data,
-    however the more chunks we keep, the more memory
-    we use ... If you don't see a message in your log
-    telling you that you may have lost some data, you
-    really shouldn't touch this parameter"
+                            Default: 20."
 }
 
 which schedtool > /dev/null
@@ -44,30 +56,25 @@ then
     exit 1
 fi
 
-prio=$(schedtool -r | grep FIFO | sed -e 's/.*prio_max \([0-9]*\)/\1/')
+prio=1 #$(schedtool -r | grep FIFO | sed -e 's/.*prio_max \([0-9]*\)/\1/')
 install_dir="~/install/MemMap"
 kernLogFile="MemMap"
 procdir="/proc/MemMap"
 log_thread_interval=.5
+name=$(basename $0)
 
-while getopts "w:c:a:hp:d:f:l:F:b:C:" opt
+while getopts "c:ha:d:f:l:w:p:b:S:C:" opt
 do
     case $opt in
+        c)
+            cmd="$OPTARG"
+            ;;
         h)
             usage
             exit 0
             ;;
-        w)
-            memmap_interval="MemMap_wakeupInterval=$OPTARG"
-            ;;
         a)
             args="$OPTARG"
-            ;;
-        c)
-            cmd="$OPTARG"
-            ;;
-        p)
-            prio=$OPTARG
             ;;
         d)
             install_dir="$OPTARG"
@@ -78,11 +85,17 @@ do
         l)
             kernLogFile="$OPTARG"
             ;;
+        w)
+            memmap_interval="MemMap_wakeupInterval=$OPTARG"
+            ;;
+        p)
+            prio=$OPTARG
+            ;;
         b)
             memmap_bits="MemMap_taskDataHashBits=$OPTARG"
             ;;
-        F)
-            memmap_factor="MemMap_taskDataTableFactor=$OPTARG"
+        S)
+            memmap_factor="MemMap_taskDataChunkSize=$OPTARG"
             ;;
         C)
             memmap_chunks="MemMap_nbChunks=$OPTARG"

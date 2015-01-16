@@ -41,7 +41,7 @@ unsigned int MemMap_FindNextAvailPosMap(hash_map map)
     return i;
 }
 
-hash_map MemMap_InitHashMap(unsigned long hash_bits, int factor,
+hash_map MemMap_InitHashMap(unsigned long hash_bits, int nb_elt,
         size_t elt_size)
 {
     unsigned int i;
@@ -49,8 +49,8 @@ hash_map MemMap_InitHashMap(unsigned long hash_bits, int factor,
     if(!map)
         return NULL;
     map->hash_bits=hash_bits;
-    map->size=1UL<<hash_bits;
-    map->tableSize=factor*map->size;
+    map->size=1<<hash_bits;
+    map->tableSize=nb_elt;
     map->nbentry=0;
     map->elt_size=elt_size;
     MEMMAP_DEBUG_PRINT("MemmMap allocationg hash size %lu\n", map->size);

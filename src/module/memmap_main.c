@@ -33,7 +33,7 @@ int MemMap_mainPid=0;
 // Wakeup period in ms (defined in memmap_tlb.c)
 extern int MemMap_wakeupInterval;
 extern int MemMap_taskDataHashBits;
-extern int MemMap_taskDataTableFactor;
+extern int MemMap_taskDataChunkSize;
 extern int MemMap_nbChunks;
 // Priority for FIFO scheduler
 int MemMap_schedulerPriority=MEMMAP_DEFAULT_SCHED_PRIO;
@@ -42,7 +42,7 @@ module_param(MemMap_mainPid, int, 0);
 module_param(MemMap_wakeupInterval,int,0);
 module_param(MemMap_schedulerPriority,int,0);
 module_param(MemMap_taskDataHashBits,int,0);
-module_param(MemMap_taskDataTableFactor,int,0);
+module_param(MemMap_taskDataChunkSize,int,0);
 module_param(MemMap_nbChunks,int,0);
 
 // Thread task representation
