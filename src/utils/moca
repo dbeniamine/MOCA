@@ -10,8 +10,8 @@ usage()
     echo "  -h                Display this help and exit."
     echo "  -a \"args\"         The arguments for command."
     echo "  -d dir            Path to the Moca dir. Default: $install_dir"
-    echo "  -f file           Log cmd into file. Default: $logfile"
-    echo "  -l file           Log module output into file. Default: $kernLogFile-taskX"
+    echo "  -f file           Log cmd into file. Default: Moca-cmd.log"
+    echo "  -l file           Log module output into file. Default: $Moca_log"
     echo -e "\n  The following parameters allows you to do fine tuning on the
   module. By default you shouldn't need to use them.
     + If you encounter performance issues, you can increase the wakeup
@@ -46,18 +46,13 @@ then
     exit 1
 fi
 
-if [ $(whoami) != "root"  ]
-then
-    echo "$0 must be run as root"
-    exit 1
-fi
 
 prio=1 #$(schedtool -r | grep FIFO | sed -e 's/.*prio_max \([0-9]*\)/\1/')
 install_dir="~/install/Moca"
 kernLogFile="Moca"
 procdir="/proc/Moca"
 log_thread_interval=.5
-logfile="log"
+Moca_log="Moca-output.log"
 name=$(basename $0)
 
 while getopts "c:ha:d:f:l:w:p:b:S:C:" opt
@@ -80,7 +75,7 @@ do
             logfile="$OPTARG"
             ;;
         l)
-            kernLogFile="$OPTARG"
+            Moca_log="$OPTARG"
             ;;
         w)
             moca_interval="Moca_wakeupInterval=$OPTARG"
@@ -104,11 +99,22 @@ do
     esac
 done
 
+if [ $(whoami) != "root"  ]
+then
+    echo "$0 must be run as root"
+    exit 1
+fi
+
 if [ -z "$cmd" ]
 then
     echo "A command is required"
     usage
     exit 1
+fi
+
+if [ -z $logfile ]
+then
+    logfile="Moca-$cmd.log"
 fi
 
 # Wait for the kernel module to start
@@ -171,3 +177,8 @@ kill -s SIGCONT $pid
 #echo "Parent $BASHPID waiting for child $pid in script $$"
 wait $pid
 rmmod moca
+# Create the log
+line=$(grep -n "Moca started" /var/log/kern.log | tail -n 1 | cut -d ':' -f 1)
+line=$(($line-1))
+line+='d'
+sed 1,$line /var/log/kern.log | grep "Moca" > $Moca_log
