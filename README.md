@@ -109,6 +109,10 @@ are responsible of these access.
 
 **TODO**
 
+## Limitations
+
++ mprotect
+
 ## References
 
 [1] HI
