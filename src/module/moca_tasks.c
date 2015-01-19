@@ -128,7 +128,7 @@ moca_task Moca_AddTask(struct task_struct *t)
     switch(status)
     {
         case MOCA_HASHMAP_FULL:
-            Moca_Panic("Too many pids");
+            Moca_Panic("Moca Too many pids");
             break;
         case MOCA_HASHMAP_ERROR:
             Moca_Panic("Moca unhandeled hashmap error");

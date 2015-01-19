@@ -56,7 +56,7 @@ void Moca_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
 
     task_data data;
     moca_task tsk;
-    MOCA_DEBUG_PRINT("Pte fault task %p\n", current);
+    //MOCA_DEBUG_PRINT("Moca Pte fault task %p\n", current);
     if(!(data=Moca_GetData(current)))
     {
         if(!(tsk=Moca_AddTaskIfNeeded(current)))
@@ -91,7 +91,7 @@ int Moca_RegisterProbes(void)
 //    if ((ret=register_kprobe(&Moca_doExitprobe)))
 //        Moca_Panic("Unable to register do exit probe");
     if ((ret=register_jprobe(&Moca_PteFaultjprobe)))
-        Moca_Panic("Unable to register pte fault probe");
+        Moca_Panic("Moca Unable to register pte fault probe");
     return ret;
 }
 

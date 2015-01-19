@@ -24,7 +24,7 @@
 /* Informations about the module */
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("David Beniamine David.Beniamine@imag.fr");
-MODULE_DESCRIPTION("Moca's kernel module tracks memory access");
+MODULE_DESCRIPTION("Memory Organisation Cartography & Analysis");
 
 /* Parameters */
 
@@ -67,7 +67,7 @@ int Moca_InitThreads(void)
     param.sched_priority=Moca_schedulerPriority;
     //Creating the thread
     Moca_threadTask=kthread_create(Moca_MonitorThread, NULL,
-            "Moca tlb walker thread");
+            "Moca main thread");
     MOCA_DEBUG_PRINT("Moca kthread task %p\n", Moca_threadTask);
     if(!Moca_threadTask)
     {

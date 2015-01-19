@@ -324,7 +324,7 @@ void *Moca_AddrInChunkPos(task_data data,int pos)
     spin_unlock(&data->chunks[cur]->lock);
     if(!e)
         return NULL;
-    MOCA_DEBUG_PRINT("found adress %p\n", e->key);
+    MOCA_DEBUG_PRINT("Moca found adress %p\n", e->key);
     return e->key;
 }
 
@@ -386,10 +386,10 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
 
         sz=snprintf(MYBUFF,MOCA_BUF_SIZE,"Taskdata %d %d %p\n",
                 data->internalId,task_pid_nr(data->task), data->task);
-        MOCA_DEBUG_PRINT("buf size %lu\n", sz);
+        MOCA_DEBUG_PRINT("Moca buf size %lu\n", sz);
         if(!copy_to_user(buffer, MYBUFF,sz))
             len+=sz;
-        MOCA_DEBUG_PRINT("user size %lu\n", len);
+        MOCA_DEBUG_PRINT("Moca user size %lu\n", len);
     }
 
     //Iterate on all chunks, start where we stopped if needed

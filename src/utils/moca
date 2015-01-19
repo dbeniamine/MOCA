@@ -3,43 +3,39 @@
 usage()
 {
     echo "Usage : $name [options] -c \"command\""
-    echo "Loads $name kernel module and configure it to monitor command, then
-    execute the command given by the user"
-    echo "-c cmd            The command to be executed"
+    echo "Loads $name kernel module and configure it to monitor the user given
+    command."
+    echo "  -c cmd            The command to be monitored."
     echo "Options:"
-    echo "-h                Display this help and exit"
-    echo "-a \"args\"       The arguments for command"
-    echo "-d dir            Path to the Moca dir default $install_dir"
-    echo "-f file           Log cmd into file"
-    echo "-l file           Log module output into file"
-    echo "The following parameters allows you to do fine tuning on the module.
-          By default you shouldn't need to use them.
-            + If you encounter performance issues, you can increase the wakeup
-            interval, the priority (reduce the system noise) or the hashmap
-            numbit parameter.
-            + If $name tells you that a part of the trace have been dropped
-            because there was not enought space to sotre it, you can increase
-            the number of chunks, the chunksize or reduce the wakeup interval.
-          Please note that as memory is quite restricted in the kernel, it
-          might be a better idea to play on the wakeup interval the priority
-          than on the storage related parameters."
-    echo "-w ms             Set the wakeup interval for Moca to interval ms,
-                            Default: $interval."
-    echo "-p prio           Schedtool priority for the kernel module, the
-                            program priority will be prio-1. You can increase
-                            this parameter to reduce the system noise.
-                            Default: $prio"
-    echo "-b numbits        Set the number of bits used for the chunk
-                            hashmaps. The map size is 2^numbits. the higher
-                            numbits is, the less collision you should have.
-                            Default: 14"
-    echo "-S ChunkSize      Set the number of adress that can be stored in one
-                            chunk. You can also use the -w toggle to reduce to
-                            wakeup interval, and therefore the number of
-                            adresses needed per chunks.
-                            Default: 2*2^14."
-    echo "-C nbChunks       Set the number of chunks to keep in memory.
-                            Default: 20."
+    echo "  -h                Display this help and exit."
+    echo "  -a \"args\"         The arguments for command."
+    echo "  -d dir            Path to the Moca dir. Default: $install_dir"
+    echo "  -f file           Log cmd into file. Default: $logfile"
+    echo "  -l file           Log module output into file. Default: $kernLogFile-taskX"
+    echo -e "\n  The following parameters allows you to do fine tuning on the
+  module. By default you shouldn't need to use them.
+    + If you encounter performance issues, you can increase the wakeup
+    interval, the priority (reduce the system noise) or the hashmap numbit
+    parameter.
+    + If $name tells you that a part of the trace have been dropped because
+      there was not enought space to sotre it, you can increase the number of
+      chunks, the chunksize or reduce the wakeup interval.
+  Please note that, as memory is quite restricted in the kernel, it might be a
+  better idea to play on the wakeup interval the priority than on the storage
+  related parameters.\n"
+    echo "  -w ms             Set the wakeup interval for Moca to interval ms,
+                    Default: 50ms"
+    echo "  -p prio           Schedtool priority for the kernel module, the program
+                    priority will be prio-1. You can increase this parameter
+                    to reduce the system noise. Default: $prio"
+    echo "  -b numbits        Set the number of bits used for the chunk hashmaps.
+                    The map size is 2^numbits. the higher numbits is, the
+                    less collision you should have. Default: 14"
+    echo "  -S ChunkSize      Set the number of adress that can be stored in one
+                    chunk. You can also reduce the wakeup interval, and
+                    therefore the number of adresses needed per chunks.
+                    Default: 2*2^14."
+    echo "  -C nbChunks       Set the number of chunks kept in memory. Default: 20."
 }
 
 which schedtool > /dev/null
@@ -61,6 +57,7 @@ install_dir="~/install/Moca"
 kernLogFile="Moca"
 procdir="/proc/Moca"
 log_thread_interval=.5
+logfile="log"
 name=$(basename $0)
 
 while getopts "c:ha:d:f:l:w:p:b:S:C:" opt
