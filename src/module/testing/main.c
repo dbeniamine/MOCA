@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include "memmap.h"
-#include "memmap_hashmap.h"
+#include "moca.h"
+#include "moca_hashmap.h"
 
 typedef struct _foo
 {
@@ -17,7 +17,7 @@ int main()
     //Init
     int i, nbAdd, *ptr,st, **keys,j;// k;
     foo e;
-    hash_map map=MemMap_InitHashMap(14,2*(1UL<<14), sizeof(struct _foo));
+    hash_map map=Moca_InitHashMap(14,2*(1UL<<14), sizeof(struct _foo));
     srand(time(NULL));
 
     nbAdd=1000;
@@ -35,7 +35,7 @@ int main()
         }
         keys[j]=ptr;
         /* printf("inserting %p, %d/%d\n", ptr, i, nbAdd); */
-        e= (foo)MemMap_AddToMap(map,ptr, &st);
+        e= (foo)Moca_AddToMap(map,ptr, &st);
         /* printf("inserting %p, %d/%d res: %p / %d\n", ptr, i, nbAdd, e, st); */
         if(e)
         {
@@ -44,36 +44,36 @@ int main()
         }
         printf("inserted e %p, k %p, n: %d, v %d, ov %d\n", e, e->key,
                 e->next,e->val, e->other_val);
-        printf("%d elements in map\n", MemMap_NbElementInMap(map));
+        printf("%d elements in map\n", Moca_NbElementInMap(map));
     }
     for(i=0;i<nbAdd;i++)
     {
-        j=MemMap_PosInMap(map, keys[i]);
+        j=Moca_PosInMap(map, keys[i]);
         printf("key %p at pos %d\n",keys[i],j);
-        e=(foo)MemMap_EntryAtPos(map,(unsigned)j);
+        e=(foo)Moca_EntryAtPos(map,(unsigned)j);
         printf("Entry at pos %d, %p %p %d %d %d\n", j,e, e->key, e->next,
                 e->val, e->other_val);
     }
-    printf("All insert done, table size :%d\n", MemMap_NbElementInMap(map));
+    printf("All insert done, table size :%d\n", Moca_NbElementInMap(map));
     for(i=0;i<nbAdd/2;i++)
     {
-        e=(foo)MemMap_RemoveFromMap(map, keys[i]);
+        e=(foo)Moca_RemoveFromMap(map, keys[i]);
         printf("Removing key %p %p %p %d %d %d\n", keys[i], e,
                 e->key, e->next, e->val,e->other_val);
-        printf("Still %d elements \n", MemMap_NbElementInMap(map));
+        printf("Still %d elements \n", Moca_NbElementInMap(map));
         free(e->key);
         keys[i]=NULL;
     }
-    printf("half remove done, table size :%d\n", MemMap_NbElementInMap(map));
+    printf("half remove done, table size :%d\n", Moca_NbElementInMap(map));
     i=0;
-    while((e=(foo)MemMap_NextEntryPos(map, (unsigned int *)&i)))
+    while((e=(foo)Moca_NextEntryPos(map, (unsigned int *)&i)))
     {
         printf("Entry at pos %d, %p %p %d %d %d\n", i-1,e, e->key, e->next,
                 e->val, e->other_val);
-        MemMap_RemoveFromMap(map,e->key);
+        Moca_RemoveFromMap(map,e->key);
     }
-    printf("All remove done, table size :%d\n", MemMap_NbElementInMap(map));
+    printf("All remove done, table size :%d\n", Moca_NbElementInMap(map));
     //}
-    MemMap_FreeMap(map);
+    Moca_FreeMap(map);
     return 0;
 }

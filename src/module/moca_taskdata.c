@@ -4,28 +4,28 @@
  * published by the Free Software Foundation, version 2 of the
  * License.
  *
- * MemMap is a kernel module designed to track memory access
+ * Moca is a kernel module designed to track memory access
  *
  * Copyright (C) 2010 David Beniamine
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
-//#define MEMMAP_DEBUG
+//#define MOCA_DEBUG
 
-#define MEMMAP_BUF_SIZE 4096
-#define MEMMAP_DATA_STATUS_NORMAL 0
+#define MOCA_BUF_SIZE 4096
+#define MOCA_DATA_STATUS_NORMAL 0
 //Data won't be written anymore, but need to be saved to file
-#define MEMMAP_DATA_STATUS_NEEDFLUSH 1
+#define MOCA_DATA_STATUS_NEEDFLUSH 1
 //Data have been outputed  but FlushData must be called again for EOF
-#define MEMMAP_DATA_STATUS_DYING -1
+#define MOCA_DATA_STATUS_DYING -1
 //We can free data (after removing the /proc entry)
-#define MEMMAP_DATA_STATUS_ZOMBIE -2
-#define MEMMAP_DATA_STATUS_DYING_OR_ZOMBIE(data) ((data)->status < 0)
-#define MEMMAP_HASH_BITS 14
+#define MOCA_DATA_STATUS_ZOMBIE -2
+#define MOCA_DATA_STATUS_DYING_OR_ZOMBIE(data) ((data)->status < 0)
+#define MOCA_HASH_BITS 14
 
-int MemMap_taskDataHashBits=MEMMAP_HASH_BITS;
-int MemMap_taskDataChunkSize=2*(1<<MEMMAP_HASH_BITS);
-int MemMap_nbChunks=20;
+int Moca_taskDataHashBits=MOCA_HASH_BITS;
+int Moca_taskDataChunkSize=2*(1<<MOCA_HASH_BITS);
+int Moca_nbChunks=20;
 
 #include <linux/sched.h>
 #include <linux/spinlock.h>
@@ -34,21 +34,21 @@ int MemMap_nbChunks=20;
 #include <linux/cpumask.h> //num_online_cpus
 #include <asm/uaccess.h>  /* for copy_*_user */
 #include <linux/delay.h>
-#include "memmap.h"
-#include "memmap_taskdata.h"
-#include "memmap_tasks.h"
-#include "memmap_hashmap.h"
+#include "moca.h"
+#include "moca_taskdata.h"
+#include "moca_tasks.h"
+#include "moca_hashmap.h"
 
 
 
-static struct proc_dir_entry *MemMap_proc_root;
+static struct proc_dir_entry *Moca_proc_root;
 
-static ssize_t MemMap_FlushData(struct file *filp,  char *buffer,
+static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
         size_t length, loff_t * offset);
 
-static const struct file_operations MemMap_taskdata_fops = {
+static const struct file_operations Moca_taskdata_fops = {
     .owner   = THIS_MODULE,
-    .read    = MemMap_FlushData,
+    .read    = Moca_FlushData,
 };
 
 typedef struct _chunk_entry
@@ -83,9 +83,9 @@ typedef struct _task_data
     struct proc_dir_entry *proc_entry;
 }*task_data;
 
-int MemMap_nextTaskId=0;
+int Moca_nextTaskId=0;
 
-int MemMap_CurrentChunk(task_data data)
+int Moca_CurrentChunk(task_data data)
 {
     int ret=-1;
     spin_lock(&data->lock);
@@ -94,150 +94,150 @@ int MemMap_CurrentChunk(task_data data)
     return ret;
 }
 
-void MemMap_InitTaskData(void)
+void Moca_InitTaskData(void)
 {
     //Procfs init
-    MemMap_proc_root=proc_mkdir("MemMap", NULL);
-    if(!MemMap_proc_root)
-        MemMap_Panic("MemMap Unable to create proc root entry");
+    Moca_proc_root=proc_mkdir("Moca", NULL);
+    if(!Moca_proc_root)
+        Moca_Panic("Moca Unable to create proc root entry");
 }
 
-task_data MemMap_InitData(struct task_struct *t)
+task_data Moca_InitData(struct task_struct *t)
 {
     int i;
     task_data data;
     char buf[10];
     //We must not wait here !
     data=kmalloc(sizeof(struct _task_data),GFP_ATOMIC);
-    MEMMAP_DEBUG_PRINT("MemMap Initialising data for task %p\n",t);
+    MOCA_DEBUG_PRINT("Moca Initialising data for task %p\n",t);
     if(!data)
     {
-        MemMap_Panic("MemMap unable to allocate data ");
+        Moca_Panic("Moca unable to allocate data ");
         return NULL;
     }
-    data->chunks=kmalloc(sizeof(chunk)*MemMap_nbChunks,GFP_ATOMIC);
+    data->chunks=kmalloc(sizeof(chunk)*Moca_nbChunks,GFP_ATOMIC);
     if(!data->chunks)
     {
         kfree(data);
-        MemMap_Panic("MemMap unable to allocate chunks");
+        Moca_Panic("Moca unable to allocate chunks");
         return NULL;
     }
-    for(i=0;i<MemMap_nbChunks;i++)
+    for(i=0;i<Moca_nbChunks;i++)
     {
-        MEMMAP_DEBUG_PRINT("MemMap Initialising data chunk %d for task %p\n",i, t);
+        MOCA_DEBUG_PRINT("Moca Initialising data chunk %d for task %p\n",i, t);
         data->chunks[i]=kmalloc(sizeof(chunk),GFP_ATOMIC);
         if(!data->chunks[i])
         {
-            MemMap_Panic("MemMap unable to allocate data chunk");
+            Moca_Panic("Moca unable to allocate data chunk");
             return NULL;
         }
         data->chunks[i]->startClock=0;
         data->chunks[i]->endClock=0;
         data->chunks[i]->cpu=0;
         data->chunks[i]->used=0;
-        data->chunks[i]->map=MemMap_InitHashMap(MemMap_taskDataHashBits,
-                MemMap_taskDataChunkSize, sizeof(struct _chunk_entry));
+        data->chunks[i]->map=Moca_InitHashMap(Moca_taskDataHashBits,
+                Moca_taskDataChunkSize, sizeof(struct _chunk_entry));
         spin_lock_init(&data->chunks[i]->lock);
     }
     data->task=t;
     data->cur=0;
-    data->chunks[0]->startClock=MemMap_GetClock();
-    data->internalId=MemMap_nextTaskId++;
+    data->chunks[0]->startClock=Moca_GetClock();
+    data->internalId=Moca_nextTaskId++;
     data->nbflush=0;
-    data->status=MEMMAP_DATA_STATUS_NORMAL;
+    data->status=MOCA_DATA_STATUS_NORMAL;
     snprintf(buf,10,"task%d",data->internalId);
-    data->proc_entry=proc_create_data(buf,0,MemMap_proc_root,
-            &MemMap_taskdata_fops,data);
+    data->proc_entry=proc_create_data(buf,0,Moca_proc_root,
+            &Moca_taskdata_fops,data);
     data->currentlyFlushed=-1;
     spin_lock_init(&data->lock);
     return data;
 }
 
-void MemMap_ClearAllData(void)
+void Moca_ClearAllData(void)
 {
     int i=0, nbTasks,chunkid;
-    memmap_task t;
+    moca_task t;
     char buf[10];
-    MEMMAP_DEBUG_PRINT("MemMap Cleaning data\n");
-    nbTasks=MemMap_GetNumTasks();
-    while((t=MemMap_NextTask(&i)))
+    MOCA_DEBUG_PRINT("Moca Cleaning data\n");
+    nbTasks=Moca_GetNumTasks();
+    while((t=Moca_NextTask(&i)))
     {
-        MEMMAP_DEBUG_PRINT("MemMap asking data %d %p %p to end\n",i, t->data, t->key);
-        t->data->status=MEMMAP_DATA_STATUS_NEEDFLUSH;
+        MOCA_DEBUG_PRINT("Moca asking data %d %p %p to end\n",i, t->data, t->key);
+        t->data->status=MOCA_DATA_STATUS_NEEDFLUSH;
     }
     i=0;
-    while((t=MemMap_NextTask(&i)))
+    while((t=Moca_NextTask(&i)))
     {
         //Wait for the task to be dead
-        MEMMAP_DEBUG_PRINT("MemMap waiting data %d to end\n",i);
-        while(t->data->status!=MEMMAP_DATA_STATUS_ZOMBIE)
+        MOCA_DEBUG_PRINT("Moca waiting data %d to end\n",i);
+        while(t->data->status!=MOCA_DATA_STATUS_ZOMBIE)
             msleep(100);
-        MEMMAP_DEBUG_PRINT("MemMap data %d %p %p ended\n",i, t->data, t->key);
+        MOCA_DEBUG_PRINT("Moca data %d %p %p ended\n",i, t->data, t->key);
         snprintf(buf,10,"task%d",i-1);
-        remove_proc_entry(buf, MemMap_proc_root);
+        remove_proc_entry(buf, Moca_proc_root);
         //Clean must be done after removing the proc entry
-        for(chunkid=0; chunkid < MemMap_nbChunks;++chunkid)
+        for(chunkid=0; chunkid < Moca_nbChunks;++chunkid)
         {
-            MEMMAP_DEBUG_PRINT("Memap Freeing data %p chunk %d\n",
+            MOCA_DEBUG_PRINT("Memap Freeing data %p chunk %d\n",
                     t->data, chunkid);
-            MemMap_FreeMap(t->data->chunks[chunkid]->map);
+            Moca_FreeMap(t->data->chunks[chunkid]->map);
             kfree(t->data->chunks[chunkid]);
         }
         kfree(t->data);
-        MemMap_RemoveTask(t->key);
-        MEMMAP_DEBUG_PRINT("Memap Freed data %d \n", i);
+        Moca_RemoveTask(t->key);
+        MOCA_DEBUG_PRINT("Memap Freed data %d \n", i);
     }
-    MEMMAP_DEBUG_PRINT("MemMap Removing proc root\n");
-    remove_proc_entry("MemMap", NULL);
+    MOCA_DEBUG_PRINT("Moca Removing proc root\n");
+    remove_proc_entry("Moca", NULL);
 
-    MEMMAP_DEBUG_PRINT("MemMap all data cleaned\n");
+    MOCA_DEBUG_PRINT("Moca all data cleaned\n");
 }
 
 
 
-struct task_struct *MemMap_GetTaskFromData(task_data data)
+struct task_struct *Moca_GetTaskFromData(task_data data)
 {
     return data->task;
 }
 
-void MemMap_LockChunk(task_data data)
+void Moca_LockChunk(task_data data)
 {
-    spin_lock(&data->chunks[MemMap_CurrentChunk(data)]->lock);
+    spin_lock(&data->chunks[Moca_CurrentChunk(data)]->lock);
 }
 
-void MemMap_UnlockChunk(task_data data)
+void Moca_UnlockChunk(task_data data)
 {
-    spin_unlock(&data->chunks[MemMap_CurrentChunk(data)]->lock);
+    spin_unlock(&data->chunks[Moca_CurrentChunk(data)]->lock);
 }
 
-int MemMap_AddToChunk(task_data data, void *addr, int cpu)
+int Moca_AddToChunk(task_data data, void *addr, int cpu)
 {
     int status, cur;
     chunk_entry e;
-    cur=MemMap_CurrentChunk(data);
+    cur=Moca_CurrentChunk(data);
     spin_lock(&data->chunks[cur]->lock);
     if(data->chunks[cur]->used)
     {
         spin_unlock(&data->chunks[cur]->lock);
         return -1;
     }
-    MEMMAP_DEBUG_PRINT("MemMap hashmap adding %p to chunk %d %p data %p cpu %d\n",
+    MOCA_DEBUG_PRINT("Moca hashmap adding %p to chunk %d %p data %p cpu %d\n",
             addr, cur, data->chunks[cur],data, cpu);
-    e=(chunk_entry)MemMap_AddToMap(data->chunks[cur]->map,addr, &status);
+    e=(chunk_entry)Moca_AddToMap(data->chunks[cur]->map,addr, &status);
     switch(status)
     {
-        case MEMMAP_HASHMAP_FULL :
-            MemMap_Panic("MemMap hashmap full");
+        case MOCA_HASHMAP_FULL :
+            Moca_Panic("Moca hashmap full");
             spin_unlock(&data->chunks[cur]->lock);
             return -1;
             break;
-        case MEMMAP_HASHMAP_ERROR :
-            MemMap_Panic("MemMap hashmap error");
+        case MOCA_HASHMAP_ERROR :
+            Moca_Panic("Moca hashmap error");
             spin_unlock(&data->chunks[cur]->lock);
             return -1;
             break;
-        case MEMMAP_HASHMAP_ALREADY_IN_MAP :
-            MEMMAP_DEBUG_PRINT("MemMap addr already in chunk %p\n", addr);
+        case MOCA_HASHMAP_ALREADY_IN_MAP :
+            MOCA_DEBUG_PRINT("Moca addr already in chunk %p\n", addr);
             ++e->countR;
             ++e->countW;
             break;
@@ -250,21 +250,21 @@ int MemMap_AddToChunk(task_data data, void *addr, int cpu)
     e->cpu|=1<<cpu;
     data->chunks[cur]->cpu|=1<<cpu;
     spin_unlock(&data->chunks[cur]->lock);
-    MEMMAP_DEBUG_PRINT("MemMap inserted %p\n", addr);
+    MOCA_DEBUG_PRINT("Moca inserted %p\n", addr);
     return 0;
 }
 
-int MemMap_UpdateData(task_data data,int pos, int countR, int countW, int cpu)
+int Moca_UpdateData(task_data data,int pos, int countR, int countW, int cpu)
 {
     chunk_entry e;
-    int cur=MemMap_CurrentChunk(data);
+    int cur=Moca_CurrentChunk(data);
     spin_lock(&data->chunks[cur]->lock);
     if(data->chunks[cur]->used)
     {
         spin_unlock(&data->chunks[cur]->lock);
         return -1;
     }
-    e=(chunk_entry )MemMap_EntryAtPos(data->chunks[cur]->map,
+    e=(chunk_entry )Moca_EntryAtPos(data->chunks[cur]->map,
             pos);
     if(!e)
     {
@@ -280,56 +280,56 @@ int MemMap_UpdateData(task_data data,int pos, int countR, int countW, int cpu)
     return 0;
 }
 
-int MemMap_NextChunks(task_data data)
+int Moca_NextChunks(task_data data)
 {
     int cur;
-    MEMMAP_DEBUG_PRINT("MemMap Goto next chunks %p, %d\n", data, data->cur);
+    MOCA_DEBUG_PRINT("Moca Goto next chunks %p, %d\n", data, data->cur);
     //Global lock
     spin_lock(&data->lock);
     cur=data->cur;
     spin_lock(&data->chunks[cur]->lock);
-    data->chunks[cur]->endClock=MemMap_GetClock();
+    data->chunks[cur]->endClock=Moca_GetClock();
     data->chunks[cur]->used=1;
-    data->cur=(cur+1)%MemMap_nbChunks;
+    data->cur=(cur+1)%Moca_nbChunks;
     spin_unlock(&data->chunks[cur]->lock);
     spin_unlock(&data->lock);
-    MEMMAP_DEBUG_PRINT("MemMap Goto chunks  %p %d, %d\n", data, data->cur,
-            MemMap_nbChunks);
+    MOCA_DEBUG_PRINT("Moca Goto chunks  %p %d, %d\n", data, data->cur,
+            Moca_nbChunks);
     if(data->chunks[data->cur]->used)
     {
-        printk(KERN_ALERT "MemMap no more chunks, stopping trace for task %d\n You can fix that by relaunching MemMap either with a higher number of chunks\n or by decreasing the logging daemon wakeupinterval\n",
+        printk(KERN_ALERT "Moca no more chunks, stopping trace for task %d\n You can fix that by relaunching Moca either with a higher number of chunks\n or by decreasing the logging daemon wakeupinterval\n",
                 data->internalId);
         return 1;
     }
     else
-        data->chunks[data->cur]->startClock=MemMap_GetClock();
+        data->chunks[data->cur]->startClock=Moca_GetClock();
     return 0;
 }
 
 
-void *MemMap_AddrInChunkPos(task_data data,int pos)
+void *Moca_AddrInChunkPos(task_data data,int pos)
 {
     chunk_entry e;
-    int cur=MemMap_CurrentChunk(data);
+    int cur=Moca_CurrentChunk(data);
     spin_lock(&data->chunks[cur]->lock);
     if(data->chunks[cur]->used)
     {
         spin_unlock(&data->chunks[cur]->lock);
         return NULL;
     }
-    MEMMAP_DEBUG_PRINT("MemMap Looking for next addr in ch %d, pos %d/%u\n",
-            cur, pos, MemMap_NbElementInMap(data->chunks[cur]->map));
-    e=(chunk_entry)MemMap_EntryAtPos(data->chunks[cur]->map,
+    MOCA_DEBUG_PRINT("Moca Looking for next addr in ch %d, pos %d/%u\n",
+            cur, pos, Moca_NbElementInMap(data->chunks[cur]->map));
+    e=(chunk_entry)Moca_EntryAtPos(data->chunks[cur]->map,
             pos);
     spin_unlock(&data->chunks[cur]->lock);
     if(!e)
         return NULL;
-    MEMMAP_DEBUG_PRINT("found adress %p\n", e->key);
+    MOCA_DEBUG_PRINT("found adress %p\n", e->key);
     return e->key;
 }
 
 
-int MemMap_CpuMask(int cpu, char *buf, size_t size)
+int Moca_CpuMask(int cpu, char *buf, size_t size)
 {
     int i=0,pos=num_online_cpus();
     if(!buf)
@@ -342,7 +342,7 @@ int MemMap_CpuMask(int cpu, char *buf, size_t size)
     }
     if( i>=size)
     {
-        MemMap_Panic("MemMap Buffer overflow in CpuMask");
+        Moca_Panic("Moca Buffer overflow in CpuMask");
         return 0;
     }
     return i;
@@ -350,7 +350,7 @@ int MemMap_CpuMask(int cpu, char *buf, size_t size)
 
 
 #define LINE_SZ 80
-static ssize_t MemMap_FlushData(struct file *filp,  char *buffer,
+static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
         size_t length, loff_t * offset)
 {
     ssize_t len=0,sz;
@@ -362,70 +362,70 @@ static ssize_t MemMap_FlushData(struct file *filp,  char *buffer,
 #else
     task_data data=(task_data)PDE(filp->f_path.dentry->d_inode)->data;
 #endif
-    MEMMAP_DEBUG_PRINT("MemMap_Flushing data %p allowed len %lu\n", data, length);
+    MOCA_DEBUG_PRINT("Moca_Flushing data %p allowed len %lu\n", data, length);
 
 
-    MYBUFF=kmalloc(MEMMAP_BUF_SIZE,GFP_ATOMIC);
+    MYBUFF=kmalloc(MOCA_BUF_SIZE,GFP_ATOMIC);
     if(!MYBUFF)
     {
         //We might already be in a panic: don't panic, just free stuff
-        printk(KERN_WARNING "MemMap unable to allocate buffer in flush data\n");
-        data->status=MEMMAP_DATA_STATUS_DYING;
+        printk(KERN_WARNING "Moca unable to allocate buffer in flush data\n");
+        data->status=MOCA_DATA_STATUS_DYING;
     }
-    if(MEMMAP_DATA_STATUS_DYING_OR_ZOMBIE(data))
+    if(MOCA_DATA_STATUS_DYING_OR_ZOMBIE(data))
     {
         //Data already flush, do noting and wait for kfreedom
-        data->status=MEMMAP_DATA_STATUS_ZOMBIE;
+        data->status=MOCA_DATA_STATUS_ZOMBIE;
         return 0;
     }
 
     if(data->nbflush==0)
     {
         //First flush
-        MEMMAP_DEBUG_PRINT("MemMap first flush for data %p\n", data);
+        MOCA_DEBUG_PRINT("Moca first flush for data %p\n", data);
 
-        sz=snprintf(MYBUFF,MEMMAP_BUF_SIZE,"Taskdata %d %d %p\n",
+        sz=snprintf(MYBUFF,MOCA_BUF_SIZE,"Taskdata %d %d %p\n",
                 data->internalId,task_pid_nr(data->task), data->task);
-        MEMMAP_DEBUG_PRINT("buf size %lu\n", sz);
+        MOCA_DEBUG_PRINT("buf size %lu\n", sz);
         if(!copy_to_user(buffer, MYBUFF,sz))
             len+=sz;
-        MEMMAP_DEBUG_PRINT("user size %lu\n", len);
+        MOCA_DEBUG_PRINT("user size %lu\n", len);
     }
 
     //Iterate on all chunks, start where we stopped if needed
     for(chunkid=(data->currentlyFlushed<0)?0:data->currentlyFlushed;
-            chunkid < MemMap_nbChunks;++chunkid)
+            chunkid < Moca_nbChunks;++chunkid)
     {
         //If we are resuming a Flush, we are already helding the lock
         if(chunkid!=data->currentlyFlushed)
             spin_lock(&data->chunks[chunkid]->lock);
-        if(data->status==MEMMAP_DATA_STATUS_NEEDFLUSH
+        if(data->status==MOCA_DATA_STATUS_NEEDFLUSH
                 || data->chunks[chunkid]->used)
         {
-            if((nelt=MemMap_NbElementInMap(data->chunks[chunkid]->map))>0)
+            if((nelt=Moca_NbElementInMap(data->chunks[chunkid]->map))>0)
             {
                 //If we are resuming, no need to output this line again
                 if(chunkid!=data->currentlyFlushed)
                 {
                     if(chunkid==data->cur)
-                        data->chunks[chunkid]->endClock=MemMap_GetClock();
+                        data->chunks[chunkid]->endClock=Moca_GetClock();
                     //Chunk id  nb element startclock endclock cpumask
-                    sz=snprintf(MYBUFF,MEMMAP_BUF_SIZE,"Chunk %d %d %lu %lu ",
-                            chunkid+data->nbflush*MemMap_nbChunks,
-                            MemMap_NbElementInMap(data->chunks[chunkid]->map),
+                    sz=snprintf(MYBUFF,MOCA_BUF_SIZE,"Chunk %d %d %lu %lu ",
+                            chunkid+data->nbflush*Moca_nbChunks,
+                            Moca_NbElementInMap(data->chunks[chunkid]->map),
                             data->chunks[chunkid]->startClock,
                             data->chunks[chunkid]->endClock);
-                    sz+=MemMap_CpuMask(data->chunks[chunkid]->cpu, MYBUFF+sz,
-                            MEMMAP_BUF_SIZE-sz);
+                    sz+=Moca_CpuMask(data->chunks[chunkid]->cpu, MYBUFF+sz,
+                            MOCA_BUF_SIZE-sz);
                     MYBUFF[sz++]='\n';
                     if(!copy_to_user(buffer+len,MYBUFF,sz))
                         len+=sz;
                 }
                 else
-                    MEMMAP_DEBUG_PRINT("MemMap resuming flush chunk %d, available space %lu\n",
+                    MOCA_DEBUG_PRINT("Moca resuming flush chunk %d, available space %lu\n",
                             chunkid, length-len);
                 ind=0;
-                while((e=(chunk_entry)MemMap_NextEntryPos(data->chunks[chunkid]->map,&ind)))
+                while((e=(chunk_entry)Moca_NextEntryPos(data->chunks[chunkid]->map,&ind)))
                 {
                     if(len+LINE_SZ >= length)
                     {
@@ -433,14 +433,14 @@ static ssize_t MemMap_FlushData(struct file *filp,  char *buffer,
                         break;
                     }
                     //Access address countread countwrite cpumask
-                    sz=snprintf(MYBUFF,MEMMAP_BUF_SIZE,"Access %p %d %d ",
+                    sz=snprintf(MYBUFF,MOCA_BUF_SIZE,"Access %p %d %d ",
                             e->key, e->countR, e->countW);
-                    sz+=MemMap_CpuMask(e->cpu,MYBUFF+sz,MEMMAP_BUF_SIZE-sz);
+                    sz+=Moca_CpuMask(e->cpu,MYBUFF+sz,MOCA_BUF_SIZE-sz);
                     MYBUFF[sz++]='\n';
                     if(!copy_to_user(buffer+len,MYBUFF,sz))
                         len+=sz;
                     //Re init data
-                    MemMap_RemoveFromMap(data->chunks[chunkid]->map,e->key);
+                    Moca_RemoveFromMap(data->chunks[chunkid]->map,e->key);
                     e->countR=0;
                     e->countW=0;
                     e->cpu=0;
@@ -451,34 +451,34 @@ static ssize_t MemMap_FlushData(struct file *filp,  char *buffer,
                 data->chunks[chunkid]->cpu=0;
                 data->chunks[chunkid]->used=0;
                 //TODO: remove the following lines
-                if((nelt=MemMap_NbElementInMap(data->chunks[chunkid]->map))!=0)
-                    MEMMAP_DEBUG_PRINT("MemMap Still %d elt, ch %d atfer complete flush\n",
+                if((nelt=Moca_NbElementInMap(data->chunks[chunkid]->map))!=0)
+                    MOCA_DEBUG_PRINT("Moca Still %d elt, ch %d atfer complete flush\n",
                             nelt, chunkid);
-                data->chunks[chunkid]->startClock=MemMap_GetClock();
-                data->chunks[chunkid]->endClock=MemMap_GetClock();
+                data->chunks[chunkid]->startClock=Moca_GetClock();
+                data->chunks[chunkid]->endClock=Moca_GetClock();
             }
         }
         if(complete)
             spin_unlock(&data->chunks[chunkid]->lock);
         else
         {
-            MEMMAP_DEBUG_PRINT("MemMap stopping flush chunk %d, available space %lu\n",
+            MOCA_DEBUG_PRINT("Moca stopping flush chunk %d, available space %lu\n",
                     chunkid, length-len);
             data->currentlyFlushed=chunkid;
             break;
         }
     }
     if(!data->chunks[0]->used)
-        data->chunks[0]->startClock=MemMap_GetClock();
+        data->chunks[0]->startClock=Moca_GetClock();
     if(complete)
     {
         ++data->nbflush;
-        if(data->status==MEMMAP_DATA_STATUS_NEEDFLUSH )
-            data->status=MEMMAP_DATA_STATUS_DYING;
+        if(data->status==MOCA_DATA_STATUS_NEEDFLUSH )
+            data->status=MOCA_DATA_STATUS_DYING;
         data->currentlyFlushed=-1;
     }
     //Free buffers
     kfree(MYBUFF);
-    MEMMAP_DEBUG_PRINT("MemMap Flushing size %lu for data %p\n", len, data);
+    MOCA_DEBUG_PRINT("Moca Flushing size %lu for data %p\n", len, data);
     return len;
 }

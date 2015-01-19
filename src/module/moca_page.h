@@ -4,22 +4,22 @@
  * published by the Free Software Foundation, version 2 of the
  * License.
  *
- * MemMap is a kernel module designed to track memory access
+ * Moca is a kernel module designed to track memory access
  *
  * Copyright (C) 2010 David Beniamine
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
-#ifndef __MEMMAP_PAGE__
-#define __MEMMAP_PAGE__
+#ifndef __MOCA_PAGE__
+#define __MOCA_PAGE__
 
-#define MEMMAP_DEFAULT_WAKEUP_INTERVAL 50
+#define MOCA_DEFAULT_WAKEUP_INTERVAL 50
 
 /* Main function for TLB walkthrough
  * Check accessed page every Memmap_wakeupsIinterval ms
  */
-int MemMap_MonitorThread(void *);
+int Moca_MonitorThread(void *);
 
-pte_t *MemMap_PteFromAdress(unsigned long addr, struct mm_struct *mm);
+pte_t *Moca_PteFromAdress(unsigned long addr, struct mm_struct *mm);
 
-#endif //__MEMMAP_PAGE__
+#endif //__MOCA_PAGE__

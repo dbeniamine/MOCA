@@ -4,16 +4,16 @@
  * published by the Free Software Foundation, version 2 of the
  * License.
  *
- * MemMap is a kernel module designed to track memory access
+ * Moca is a kernel module designed to track memory access
  *
  * Copyright (C) 2010 David Beniamine
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 
-#ifndef __MEMMAP_PROBES__
-#define __MEMMAP_PROBES__
+#ifndef __MOCA_PROBES__
+#define __MOCA_PROBES__
 
-int MemMap_RegisterProbes(void);
-void MemMap_UnregisterProbes(void);
+int Moca_RegisterProbes(void);
+void Moca_UnregisterProbes(void);
 
-#endif //__MEMMAP_PROBES__
+#endif //__MOCA_PROBES__

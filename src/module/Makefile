@@ -1,5 +1,5 @@
-obj-m := memmap.o
-memmap-objs := memmap_main.o  memmap_hashmap.o memmap_tasks.o memmap_taskdata.o memmap_page.o memmap_probes.o
+obj-m := moca.o
+moca-objs := moca_main.o  moca_hashmap.o moca_tasks.o moca_taskdata.o moca_page.o moca_probes.o
 ccflags-m += -Wall -Werror
 
 all: module
@@ -14,10 +14,10 @@ clean:
 	rm -f tags cscope*
 
 load: install
-	sudo modprobe memmap
+	sudo modprobe moca
 
 unload:
-	sudo rmmod memmap
+	sudo rmmod moca
 
 install: module
 	sudo make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules_install

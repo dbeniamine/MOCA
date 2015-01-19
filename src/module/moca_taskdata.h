@@ -4,24 +4,24 @@
  * published by the Free Software Foundation, version 2 of the
  * License.
  *
- * MemMap is a kernel module designed to track memory access
+ * Moca is a kernel module designed to track memory access
  *
  * Copyright (C) 2010 David Beniamine
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
-#ifndef __MEMMAP_TASK_DATA__
-#define __MEMMAP_TASK_DATA__
+#ifndef __MOCA_TASK_DATA__
+#define __MOCA_TASK_DATA__
 
 typedef struct _task_data *task_data;
 
 // Current number of monitored tasks
-extern int MemMap_GetNumTasks(void);
+extern int Moca_GetNumTasks(void);
 
-void MemMap_InitTaskData(void);
-task_data MemMap_InitData(struct task_struct *t);
-void MemMap_ClearAllData(void);
+void Moca_InitTaskData(void);
+task_data Moca_InitData(struct task_struct *t);
+void Moca_ClearAllData(void);
 
-struct task_struct *MemMap_GetTaskFromData(task_data data);
+struct task_struct *Moca_GetTaskFromData(task_data data);
 
 /*
  * Add data to current chunk
@@ -29,35 +29,35 @@ struct task_struct *MemMap_GetTaskFromData(task_data data);
  *         1 iff addr wad already in chunk
  *        -1 if current chunk is unusable (flush required)
  */
-int MemMap_AddToChunk(task_data data, void *addr,int cpu);
+int Moca_AddToChunk(task_data data, void *addr,int cpu);
 
 /*
  * Check if add is in chunkid
  * Returns  0 if addr is in chunk
  *          1 if not
  */
-/* int MemMap_IsInChunk(task_data data, void *addr); */
+/* int Moca_IsInChunk(task_data data, void *addr); */
 
 /*
  * Update the posth entry of the current chunk
  * Add count access and update the type
  */
-int MemMap_UpdateData(task_data data,int pos, int countR, int countW, int cpu);
+int Moca_UpdateData(task_data data,int pos, int countR, int countW, int cpu);
 
 /*
  * Start working on the next chunks
  * If required, flush data
  * returns 1 if data were flushed, 0 else
  */
-int MemMap_NextChunks(task_data data);
+int Moca_NextChunks(task_data data);
 
 /*
  * This function returns the pos th add in the data's current chunk
  * returns NULL if pos is invalid ( < 0 || >= nbentry in chunk)
  */
-void *MemMap_AddrInChunkPos(task_data data,int pos);
+void *Moca_AddrInChunkPos(task_data data,int pos);
 
-void MemMap_LockChunk(task_data data);
-void MemMap_UnlockChunk(task_data data);
+void Moca_LockChunk(task_data data);
+void Moca_UnlockChunk(task_data data);
 
-#endif //__MEMMAP_TASK_DATA__
+#endif //__MOCA_TASK_DATA__

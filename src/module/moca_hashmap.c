@@ -4,21 +4,21 @@
  * published by the Free Software Foundation, version 2 of the
  * License.
  *
- * MemMap is a kernel module designed to track memory access
+ * Moca is a kernel module designed to track memory access
  *
  * Copyright (C) 2010 David Beniamine
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
-//#define MEMMAP_DEBUG
+//#define MOCA_DEBUG
 
 #include <linux/slab.h>
 #include <linux/hash.h>
-#include "memmap_hashmap.h"
+#include "moca_hashmap.h"
 
 
-#define MEMMAP_HASHMAP_END -1
-#define MEMMAP_HASHMAP_UNUSED -2
+#define MOCA_HASHMAP_END -1
+#define MOCA_HASHMAP_UNUSED -2
 #define tableElt(map, ind) \
     ( (hash_entry)((char *)((map)->table)+((ind)*((map)->elt_size)) ))
 
@@ -33,15 +33,15 @@ typedef struct _hash_map
     size_t elt_size;
 }*hash_map;
 
-unsigned int MemMap_FindNextAvailPosMap(hash_map map)
+unsigned int Moca_FindNextAvailPosMap(hash_map map)
 {
     unsigned int i=0;
-    while(i< map->tableSize && tableElt(map,i)->next!=MEMMAP_HASHMAP_UNUSED)
+    while(i< map->tableSize && tableElt(map,i)->next!=MOCA_HASHMAP_UNUSED)
         ++i;
     return i;
 }
 
-hash_map MemMap_InitHashMap(unsigned long hash_bits, int nb_elt,
+hash_map Moca_InitHashMap(unsigned long hash_bits, int nb_elt,
         size_t elt_size)
 {
     unsigned int i;
@@ -53,14 +53,14 @@ hash_map MemMap_InitHashMap(unsigned long hash_bits, int nb_elt,
     map->tableSize=nb_elt;
     map->nbentry=0;
     map->elt_size=elt_size;
-    MEMMAP_DEBUG_PRINT("MemmMap allocationg hash size %lu\n", map->size);
+    MOCA_DEBUG_PRINT("MemmMap allocationg hash size %lu\n", map->size);
     if(!(map->hashs=kmalloc(sizeof(int)*map->size,GFP_ATOMIC)))
     {
         kfree(map);
         return NULL;
     }
     for(i=0;i<map->size;++i)
-        map->hashs[i]=MEMMAP_HASHMAP_END;
+        map->hashs[i]=MOCA_HASHMAP_END;
     if(!(map->table=kcalloc(map->tableSize,elt_size,GFP_ATOMIC)))
     {
         kfree(map->hashs);
@@ -68,11 +68,11 @@ hash_map MemMap_InitHashMap(unsigned long hash_bits, int nb_elt,
         return NULL;
     }
     for(i=0;i<map->tableSize;++i)
-        tableElt(map,i)->next=MEMMAP_HASHMAP_UNUSED;
+        tableElt(map,i)->next=MOCA_HASHMAP_UNUSED;
     return map;
 }
 
-int MemMap_NbElementInMap(hash_map map)
+int Moca_NbElementInMap(hash_map map)
 {
     if(!map)
         return -1;
@@ -83,7 +83,7 @@ int MemMap_NbElementInMap(hash_map map)
  * Returns -1 if key is not in map
  *         the position of key in the map if it is present
  */
-int MemMap_PosInMap(hash_map map,void *key)
+int Moca_PosInMap(hash_map map,void *key)
 {
     unsigned long h;
     int ind=0;
@@ -100,7 +100,7 @@ int MemMap_PosInMap(hash_map map,void *key)
  * Return the hash entry corresponding to key,
  *        NULL if key is not in the map
  */
-hash_entry MemMap_EntryFromKey(hash_map map, void *key)
+hash_entry Moca_EntryFromKey(hash_map map, void *key)
 {
     unsigned long h;
     int ind=0;
@@ -122,32 +122,32 @@ hash_entry MemMap_EntryFromKey(hash_map map, void *key)
  * status is set to:
  *         The position of hash_entry in case of success
  *         One of the following in case of errors:
- *          MEMMAP_HASHMAP_ALREADY_IN_MAP
- *          MEMMAP_HASHMAP_FULL
- *          MEMMAP_HASHMAP_ERROR
+ *          MOCA_HASHMAP_ALREADY_IN_MAP
+ *          MOCA_HASHMAP_FULL
+ *          MOCA_HASHMAP_ERROR
  */
-hash_entry MemMap_AddToMap(hash_map map, void *key, int *status)
+hash_entry Moca_AddToMap(hash_map map, void *key, int *status)
 {
     unsigned long h;
     int ind=0, nextPos;
     if(!map)
     {
-        *status=MEMMAP_HASHMAP_ERROR;
+        *status=MOCA_HASHMAP_ERROR;
         return NULL;
     }
     if(map->nbentry==map->tableSize)
     {
-        *status=MEMMAP_HASHMAP_FULL;
+        *status=MOCA_HASHMAP_FULL;
         return NULL;
     }
     //Do the insertion
-    nextPos=MemMap_FindNextAvailPosMap(map);
-    MEMMAP_DEBUG_PRINT("MemMap inserting %p ind %d/%lu\n",
+    nextPos=Moca_FindNextAvailPosMap(map);
+    MOCA_DEBUG_PRINT("Moca inserting %p ind %d/%lu\n",
             key,nextPos,map->tableSize);
     if((unsigned)nextPos >= map->tableSize)
     {
-        *status=MEMMAP_HASHMAP_ERROR;
-        MemMap_Panic("BUG in findavailposmap");
+        *status=MOCA_HASHMAP_ERROR;
+        Moca_Panic("BUG in findavailposmap");
         return NULL;
     }
     //Update the link
@@ -156,7 +156,7 @@ hash_entry MemMap_AddToMap(hash_map map, void *key, int *status)
     if(ind<0)
     {
         tableElt(map,nextPos)->key=key;
-        tableElt(map,nextPos)->next=MEMMAP_HASHMAP_END;
+        tableElt(map,nextPos)->next=MOCA_HASHMAP_END;
         map->hashs[h]=nextPos;
     }
     else
@@ -165,18 +165,18 @@ hash_entry MemMap_AddToMap(hash_map map, void *key, int *status)
             ind=tableElt(map,ind)->next;
         if(tableElt(map,ind)->key==key)
         {
-            MEMMAP_DEBUG_PRINT("MemMap %p already in map %p\n", key, map);
-            *status=MEMMAP_HASHMAP_ALREADY_IN_MAP;
+            MOCA_DEBUG_PRINT("Moca %p already in map %p\n", key, map);
+            *status=MOCA_HASHMAP_ALREADY_IN_MAP;
             tableElt(map,nextPos)->key=NULL;
             return tableElt(map,ind);
         }
-        MEMMAP_DEBUG_PRINT("MemMap collision in map %p key %p\n", key, map);
+        MOCA_DEBUG_PRINT("Moca collision in map %p key %p\n", key, map);
         tableElt(map,nextPos)->key=key;
-        tableElt(map,nextPos)->next=MEMMAP_HASHMAP_END;
+        tableElt(map,nextPos)->next=MOCA_HASHMAP_END;
         tableElt(map,ind)->next=nextPos;
     }
     ++map->nbentry;
-    MEMMAP_DEBUG_PRINT("MemMap Inserted %p in map %p\n", key, map);
+    MOCA_DEBUG_PRINT("Moca Inserted %p in map %p\n", key, map);
     *status=nextPos;
     return tableElt(map,nextPos);
 }
@@ -185,10 +185,10 @@ hash_entry MemMap_AddToMap(hash_map map, void *key, int *status)
  * Returns the hash entry at position pos
  *         Null is pos is invalid or there is no entry at this position
  */
-hash_entry MemMap_EntryAtPos(hash_map map, unsigned int pos)
+hash_entry Moca_EntryAtPos(hash_map map, unsigned int pos)
 {
     if(!map || pos >= map->tableSize ||
-            tableElt(map,pos)->next==MEMMAP_HASHMAP_UNUSED)
+            tableElt(map,pos)->next==MOCA_HASHMAP_UNUSED)
         return NULL;
     return tableElt(map,pos);
 }
@@ -200,15 +200,15 @@ hash_entry MemMap_EntryAtPos(hash_map map, unsigned int pos)
  * entry +1
  * This function can be used as an iterator
  */
-hash_entry MemMap_NextEntryPos(hash_map map, unsigned int *pos)
+hash_entry Moca_NextEntryPos(hash_map map, unsigned int *pos)
 {
     unsigned int i=*pos;
-    MEMMAP_DEBUG_PRINT("Searching element after %d /%d\n",
-            i, MemMap_NbElementInMap(map));
-    while(i< map->tableSize && tableElt(map,i)->next==MEMMAP_HASHMAP_UNUSED)
+    MOCA_DEBUG_PRINT("Searching element after %d /%d\n",
+            i, Moca_NbElementInMap(map));
+    while(i< map->tableSize && tableElt(map,i)->next==MOCA_HASHMAP_UNUSED)
         ++i;
     *pos=i+1;
-    MEMMAP_DEBUG_PRINT("found  %p at %d\n",
+    MOCA_DEBUG_PRINT("found  %p at %d\n",
             i>=map->tableSize?NULL:tableElt(map,i),i);
     if(i >=map->tableSize)
         return NULL;
@@ -216,13 +216,13 @@ hash_entry MemMap_NextEntryPos(hash_map map, unsigned int *pos)
 }
 
 
-hash_entry MemMap_RemoveFromMap(hash_map map,void *key)
+hash_entry Moca_RemoveFromMap(hash_map map,void *key)
 {
     unsigned long h;
-    int ind, ind_prev=MEMMAP_HASHMAP_END;
+    int ind, ind_prev=MOCA_HASHMAP_END;
     if(!map)
         return NULL;
-    MEMMAP_DEBUG_PRINT("MemMap removing %p from %p\n", key, map);
+    MOCA_DEBUG_PRINT("Moca removing %p from %p\n", key, map);
     h=hash_ptr(key, map->hash_bits);
     ind=map->hashs[h];
     while(ind>=0 && tableElt(map,ind)->key!=key )
@@ -230,7 +230,7 @@ hash_entry MemMap_RemoveFromMap(hash_map map,void *key)
         ind_prev=ind;
         ind=tableElt(map,ind)->next;
     }
-    MEMMAP_DEBUG_PRINT("MemMap removing %p from %p ind %d prev %d\n", key, map, ind, ind_prev);
+    MOCA_DEBUG_PRINT("Moca removing %p from %p ind %d prev %d\n", key, map, ind, ind_prev);
     //key wasn't in map
     if(ind<0 )
         return NULL;
@@ -243,15 +243,15 @@ hash_entry MemMap_RemoveFromMap(hash_map map,void *key)
     {
         map->hashs[h]=tableElt(map,ind)->next;
     }
-    tableElt(map,ind)->next=MEMMAP_HASHMAP_UNUSED;
+    tableElt(map,ind)->next=MOCA_HASHMAP_UNUSED;
     --map->nbentry;
-    MEMMAP_DEBUG_PRINT("MemMap removing %p from %p ind %d ok\n", key, map, ind);
+    MOCA_DEBUG_PRINT("Moca removing %p from %p ind %d ok\n", key, map, ind);
     return tableElt(map,ind);
 }
 
 
 // Clear map, after this call, map is still usable
-void MemMap_ClearMap(hash_map map)
+void Moca_ClearMap(hash_map map)
 {
     unsigned int i;
     unsigned long h;
@@ -260,12 +260,12 @@ void MemMap_ClearMap(hash_map map)
     for(i=0;i<map->nbentry;++i)
     {
         h=hash_ptr(tableElt(map,i)->key, map->hash_bits);
-        map->hashs[h]=MEMMAP_HASHMAP_END;
-        tableElt(map,i)->next=MEMMAP_HASHMAP_UNUSED;
+        map->hashs[h]=MOCA_HASHMAP_END;
+        tableElt(map,i)->next=MOCA_HASHMAP_UNUSED;
     }
 }
 
-void MemMap_FreeMap(hash_map map)
+void Moca_FreeMap(hash_map map)
 {
     if(!map)
         return;

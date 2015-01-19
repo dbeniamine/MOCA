@@ -9,7 +9,7 @@ usage()
     echo "Options:"
     echo "-h                Display this help and exit"
     echo "-a \"args\"       The arguments for command"
-    echo "-d dir            Path to the MemMap dir default $install_dir"
+    echo "-d dir            Path to the Moca dir default $install_dir"
     echo "-f file           Log cmd into file"
     echo "-l file           Log module output into file"
     echo "The following parameters allows you to do fine tuning on the module.
@@ -23,7 +23,7 @@ usage()
           Please note that as memory is quite restricted in the kernel, it
           might be a better idea to play on the wakeup interval the priority
           than on the storage related parameters."
-    echo "-w ms             Set the wakeup interval for MemMap to interval ms,
+    echo "-w ms             Set the wakeup interval for Moca to interval ms,
                             Default: $interval."
     echo "-p prio           Schedtool priority for the kernel module, the
                             program priority will be prio-1. You can increase
@@ -57,9 +57,9 @@ then
 fi
 
 prio=1 #$(schedtool -r | grep FIFO | sed -e 's/.*prio_max \([0-9]*\)/\1/')
-install_dir="~/install/MemMap"
-kernLogFile="MemMap"
-procdir="/proc/MemMap"
+install_dir="~/install/Moca"
+kernLogFile="Moca"
+procdir="/proc/Moca"
 log_thread_interval=.5
 name=$(basename $0)
 
@@ -86,19 +86,19 @@ do
             kernLogFile="$OPTARG"
             ;;
         w)
-            memmap_interval="MemMap_wakeupInterval=$OPTARG"
+            moca_interval="Moca_wakeupInterval=$OPTARG"
             ;;
         p)
             prio=$OPTARG
             ;;
         b)
-            memmap_bits="MemMap_taskDataHashBits=$OPTARG"
+            moca_bits="Moca_taskDataHashBits=$OPTARG"
             ;;
         S)
-            memmap_factor="MemMap_taskDataChunkSize=$OPTARG"
+            moca_factor="Moca_taskDataChunkSize=$OPTARG"
             ;;
         C)
-            memmap_chunks="MemMap_nbChunks=$OPTARG"
+            moca_chunks="Moca_nbChunks=$OPTARG"
             ;;
         *)
             usage
@@ -163,8 +163,8 @@ make clean && make
 abort_on_error $? "make fail"
 # make install
 # abort_on_error $? "Install fail"
-insmod memmap.ko MemMap_mainPid=$pid MemMap_schedulerPriority=$prio \
-    $memmap_interval $memmap_bits $memmap_factor $memmap_chunks
+insmod moca.ko Moca_mainPid=$pid Moca_schedulerPriority=$prio \
+    $moca_interval $moca_bits $moca_factor $moca_chunks
 abort_on_error $? "unable to load module"
 cd -
 log &
@@ -173,4 +173,4 @@ schedtool -F -p $prio $logpid
 kill -s SIGCONT $pid
 #echo "Parent $BASHPID waiting for child $pid in script $$"
 wait $pid
-rmmod memmap
+rmmod moca

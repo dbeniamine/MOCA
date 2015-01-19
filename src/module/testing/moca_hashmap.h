@@ -4,19 +4,19 @@
  * published by the Free Software Foundation, version 2 of the
  * License.
  *
- * MemMap is a kernel module designed to track memory access
+ * Moca is a kernel module designed to track memory access
  *
  * Copyright (C) 2010 David Beniamine
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
-#ifndef __MEMMAP_HASHMAP_H__
-#define __MEMMAP_HASHMAP_H__
+#ifndef __MOCA_HASHMAP_H__
+#define __MOCA_HASHMAP_H__
 #define __NO_VERSION__
-#define MEMMAP_HASHMAP_ADDED 0
-#define MEMMAP_HASHMAP_ERROR -1
-#define MEMMAP_HASHMAP_FULL -2
-#define MEMMAP_HASHMAP_ALREADY_IN_MAP  -3
-#include "memmap.h"
+#define MOCA_HASHMAP_ADDED 0
+#define MOCA_HASHMAP_ERROR -1
+#define MOCA_HASHMAP_FULL -2
+#define MOCA_HASHMAP_ALREADY_IN_MAP  -3
+#include "moca.h"
 
 /*
  * This package provide very low memory cost hash map.
@@ -39,16 +39,16 @@ typedef struct _hash_map *hash_map;
  * An entry of this map must be castable in hash_entry and have a size of
  * elt_size.
  */
-hash_map MemMap_InitHashMap(unsigned long hash_bits, int factor, size_t elt_size);
+hash_map Moca_InitHashMap(unsigned long hash_bits, int factor, size_t elt_size);
 
 // Return the number of entry in map
-int MemMap_NbElementInMap(hash_map map);
+int Moca_NbElementInMap(hash_map map);
 
 /*
  * Returns -1 if key is not in map
  *         the position of key in the map if it is present
  */
-int MemMap_PosInMap(hash_map map,void *key);
+int Moca_PosInMap(hash_map map,void *key);
 
 /*
  * Insert key in map
@@ -57,25 +57,25 @@ int MemMap_PosInMap(hash_map map,void *key);
  * status is set to:
  *         The position of hash_entry in case of success
  *         One of the following in case of errors:
- *          MEMMAP_HASHMAP_ALREADY_IN_MAP
- *          MEMMAP_HASHMAP_FULL
- *          MEMMAP_HASHMAP_ERROR
+ *          MOCA_HASHMAP_ALREADY_IN_MAP
+ *          MOCA_HASHMAP_FULL
+ *          MOCA_HASHMAP_ERROR
  */
-hash_entry MemMap_AddToMap(hash_map map, void *key, int *status);
+hash_entry Moca_AddToMap(hash_map map, void *key, int *status);
 /*
  * Returns the hash entry at position pos
  *         Null if pos is invalid or there is no entry at this position
  */
-hash_entry MemMap_EntryAtPos(hash_map map, unsigned int pos);
+hash_entry Moca_EntryAtPos(hash_map map, unsigned int pos);
 /*
  * Returns the next entry starting from pos
  *  NULL if there is no entry after pos
  */
-hash_entry MemMap_NextEntryPos(hash_map map, unsigned int *pos);
+hash_entry Moca_NextEntryPos(hash_map map, unsigned int *pos);
 
 // Remove key from the map
-hash_entry MemMap_RemoveFromMap(hash_map map,void *key);
+hash_entry Moca_RemoveFromMap(hash_map map,void *key);
 // Reset the map, be carefull with this one
-void MemMap_ClearMap(hash_map map);
-void MemMap_FreeMap(hash_map map);
-#endif // __MEMMAP_HASHMAP_H__
+void Moca_ClearMap(hash_map map);
+void Moca_FreeMap(hash_map map);
+#endif // __MOCA_HASHMAP_H__

@@ -1,12 +1,12 @@
-//false memmap
-#ifndef __MEMMAP_H__
-#define __MEMMAP_H__
+//false moca
+#ifndef __MOCA_H__
+#define __MOCA_H__
 
 #include <stdlib.h>
 #include <stdio.h>
 // printf
 #define printk(...) printf(__VA_ARGS__)
-#define MEMMAP_DEBUG_PRINT(...) printf(__VA_ARGS__)
+#define MOCA_DEBUG_PRINT(...) printf(__VA_ARGS__)
 // Malloc
 #define kmalloc(A,B) malloc(A)
 #define kcalloc(A,B,C) calloc(A,B)
@@ -21,7 +21,7 @@ typedef unsigned long u64;
 //from linux/hash.h
 #define GOLDEN_RATIO_PRIME_64 0x9e37fffffffc0001UL
 
-#define MemMap_Panic(A) printf(A);
+#define Moca_Panic(A) printf(A);
 
 static __always_inline u64 hash_64(u64 val, unsigned int bits)
 {

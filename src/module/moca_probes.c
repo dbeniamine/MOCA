@@ -4,29 +4,29 @@
  * published by the Free Software Foundation, version 2 of the
  * License.
  *
- * MemMap is a kernel module designed to track memory access
+ * Moca is a kernel module designed to track memory access
  *
  * Copyright (C) 2010 David Beniamine
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
-//#define MEMMAP_DEBUG
+//#define MOCA_DEBUG
 
 #include <linux/kprobes.h>
-#include "memmap.h"
-#include "memmap_tasks.h"
-#include "memmap_taskdata.h"
-#include "memmap_probes.h"
-#include "memmap_page.h"
+#include "moca.h"
+#include "moca_tasks.h"
+#include "moca_taskdata.h"
+#include "moca_probes.h"
+#include "moca_page.h"
 
-//static int MemMap_DoExitHandler(struct kprobe *p, struct pt_regs *regs)
+//static int Moca_DoExitHandler(struct kprobe *p, struct pt_regs *regs)
 //{
 //    int i,j,k,l;
 //    pgd_t *pgd=pgd_offset(current->mm,0);
 //    pmd_t *pmd;
 //    pud_t *pud;
 //    pte_t *pte;
-//    MEMMAP_DEBUG_PRINT("MemMap in do exit task %p\n", current);
+//    MOCA_DEBUG_PRINT("Moca in do exit task %p\n", current);
 //
 //    for (i=0;i<PTRS_PER_PGD;++i)
 //        if(!pgd_none(pgd[i]) && pgd_present(pgd[i]))
@@ -49,55 +49,55 @@
 //    return 0;
 //}
 
-void MemMap_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
+void Moca_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
         unsigned long address, unsigned int flags)
 {
     pte_t *pte;
 
     task_data data;
-    memmap_task tsk;
-    MEMMAP_DEBUG_PRINT("Pte fault task %p\n", current);
-    if(!(data=MemMap_GetData(current)))
+    moca_task tsk;
+    MOCA_DEBUG_PRINT("Pte fault task %p\n", current);
+    if(!(data=Moca_GetData(current)))
     {
-        if(!(tsk=MemMap_AddTaskIfNeeded(current)))
+        if(!(tsk=Moca_AddTaskIfNeeded(current)))
             jprobe_return();
         data=tsk->data;
     }
-    MemMap_AddToChunk(data,(void *)address,get_cpu());
-    pte=MemMap_PteFromAdress(address,mm);
+    Moca_AddToChunk(data,(void *)address,get_cpu());
+    pte=Moca_PteFromAdress(address,mm);
     //If pte exists, try to fix false pagefault
     if (pte && !pte_none(*pte) && !pte_present(*pte) && !pte_special(*pte))
     {
         *pte = pte_set_flags(*pte, _PAGE_PRESENT);
-        MEMMAP_DEBUG_PRINT("MemMap fixing fake pagefault\n");
+        MOCA_DEBUG_PRINT("Moca fixing fake pagefault\n");
     }
-    MemMap_UpdateClock();
+    Moca_UpdateClock();
     jprobe_return();
 
 }
 
-//static struct kprobe MemMap_doExitprobe = {
+//static struct kprobe Moca_doExitprobe = {
 //    .symbol_name = "do_exit",
 //};
 
-static struct jprobe MemMap_PteFaultjprobe = {
-    .entry = MemMap_MmFaultHandler,
+static struct jprobe Moca_PteFaultjprobe = {
+    .entry = Moca_MmFaultHandler,
     .kp.symbol_name = "handle_mm_fault",
 };
-int MemMap_RegisterProbes(void)
+int Moca_RegisterProbes(void)
 {
     int ret;
-//    MemMap_doExitprobe.pre_handler = MemMap_DoExitHandler;
-//    if ((ret=register_kprobe(&MemMap_doExitprobe)))
-//        MemMap_Panic("Unable to register do exit probe");
-    if ((ret=register_jprobe(&MemMap_PteFaultjprobe)))
-        MemMap_Panic("Unable to register pte fault probe");
+//    Moca_doExitprobe.pre_handler = Moca_DoExitHandler;
+//    if ((ret=register_kprobe(&Moca_doExitprobe)))
+//        Moca_Panic("Unable to register do exit probe");
+    if ((ret=register_jprobe(&Moca_PteFaultjprobe)))
+        Moca_Panic("Unable to register pte fault probe");
     return ret;
 }
 
 
-void MemMap_UnregisterProbes(void)
+void Moca_UnregisterProbes(void)
 {
-    unregister_jprobe(&MemMap_PteFaultjprobe);
-//    unregister_kprobe(&MemMap_doExitprobe);
+    unregister_jprobe(&Moca_PteFaultjprobe);
+//    unregister_kprobe(&Moca_doExitprobe);
 }

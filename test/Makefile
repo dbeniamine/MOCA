@@ -1,8 +1,8 @@
-# MemMap config
-INSTALL_DIR=/home/david/Work/MemMap
+# Moca config
+INSTALL_DIR=/home/david/Work/Moca
 LOG_FILE=$(INSTALL_DIR)/log
-MEMMAP=sudo ../src/utils/MemMap -d $(INSTALL_DIR) -p $(PRIO) -f $(LOG_FILE) \
-	   -w 50 -C 20 -F 2
+MOCA=sudo ../src/utils/moca -d $(INSTALL_DIR) -p $(PRIO) -f $(LOG_FILE) \
+	   -w 50 -C 20
 #-b 14 -F 2
 # Testing config
 PRIO=99
@@ -15,10 +15,10 @@ MAT_ARG="-S $(SIZE) -s $(SEED) -a $(ALGO) -n $(THREADS) -v -V"
 all: fork matrix
 
 fork:
-	$(MEMMAP) -c ./fork.sh
+	$(MOCA) -c ./fork.sh
 
 matrix: matrix/matrix
-	$(MEMMAP) -c matrix/matrix -a $(MAT_ARG)
+	$(MOCA) -c matrix/matrix -a $(MAT_ARG)
 
 matrix/matrix: matrix/matrix_naif.c
 	make -C matrix/
