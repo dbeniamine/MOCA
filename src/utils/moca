@@ -13,41 +13,31 @@ usage()
     echo "  -f file           Log cmd into file. Default: Moca-cmd.log"
     echo "  -l file           Log module output into file. Default: $Moca_log"
     echo -e "\n  The following parameters allows you to do fine tuning on the
-  module. By default you shouldn't need to use them.
+    module. By default you shouldn't need to use them.
     + If you encounter performance issues, you can increase the wakeup
     interval, the priority (reduce the system noise) or the hashmap numbit
     parameter.
     + If $name tells you that a part of the trace have been dropped because
-      there was not enought space to sotre it, you can increase the number of
-      chunks, the chunksize or reduce the wakeup interval.
-  Please note that, as memory is quite restricted in the kernel, it might be a
-  better idea to play on the wakeup interval the priority than on the storage
-  related parameters.\n"
+    there was not enought space to sotre it, you can increase the number of
+    chunks, the chunksize or reduce the wakeup interval.
+    Please note that, as memory is quite restricted in the kernel, it might be a
+    better idea to play on the wakeup interval the priority than on the storage
+    related parameters.\n"
     echo "  -w ms             Set the wakeup interval for Moca to interval ms,
-                    Default: 50ms"
+    Default: 50ms"
     echo "  -p prio           Schedtool priority for the kernel module, the program
-                    priority will be prio-1. You can increase this parameter
-                    to reduce the system noise. Default: $prio"
+    priority will be prio-1. You can increase this parameter
+    to reduce the system noise. Default: $prio"
     echo "  -b numbits        Set the number of bits used for the chunk hashmaps.
-                    The map size is 2^numbits. the higher numbits is, the
-                    less collision you should have. Default: 14"
+    The map size is 2^numbits. the higher numbits is, the
+    less collision you should have. Default: 14"
     echo "  -S ChunkSize      Set the number of adress that can be stored in one
-                    chunk. You can also reduce the wakeup interval, and
-                    therefore the number of adresses needed per chunks.
-                    Default: 2*2^14."
+    chunk. You can also reduce the wakeup interval, and
+    therefore the number of adresses needed per chunks.
+    Default: 2*2^14."
     echo "  -C nbChunks       Set the number of chunks kept in memory. Default: 20."
 }
 
-which schedtool > /dev/null
-if [ $? -ne 0 ]
-then
-    echo "$0 requires the schedtool which is not find in your PATH"
-    echo "Please install schedtool or update your PATH"
-    exit 1
-fi
-
-
-prio=1 #$(schedtool -r | grep FIFO | sed -e 's/.*prio_max \([0-9]*\)/\1/')
 install_dir="~/install/Moca"
 kernLogFile="Moca"
 procdir="/proc/Moca"
@@ -82,6 +72,14 @@ do
             ;;
         p)
             prio=$OPTARG
+            moca_prio="Moca_schedulerPriority=$OPTARG"
+            which schedtool > /dev/null
+            if [ $? -ne 0 ]
+            then
+                echo "$0 requires the schedtool to set the priority."
+                echo "Please install schedtool or update your PATH"
+                exit 1
+            fi
             ;;
         b)
             moca_bits="Moca_taskDataHashBits=$OPTARG"
@@ -155,24 +153,30 @@ abort_on_error()
         exit 1
     fi
 }
-
-let user_prio=$(( $prio - 1 ))
 child &
 pid=$!
-schedtool -F -p $prio $$
-schedtool -F -p $user_prio $pid
+
+if [ ! -z $prio ]
+then
+    let user_prio=$(( $prio - 1 ))
+    schedtool -F -p $prio $$
+    schedtool -F -p $user_prio $pid
+fi
 cd $install_dir/src/module/
 make clean && make
 abort_on_error $? "make fail"
 # make install
 # abort_on_error $? "Install fail"
-insmod moca.ko Moca_mainPid=$pid Moca_schedulerPriority=$prio \
-    $moca_interval $moca_bits $moca_factor $moca_chunks
+insmod moca.ko Moca_mainPid=$pid $moca_interval $moca_bits $moca_factor \
+    $moca_chunks $moca_prio
 abort_on_error $? "unable to load module"
 cd -
 log &
 logpid=$!
-schedtool -F -p $prio $logpid
+if [ ! -z $prio ]
+then
+    schedtool -F -p $prio $logpid
+fi
 kill -s SIGCONT $pid
 #echo "Parent $BASHPID waiting for child $pid in script $$"
 wait $pid
@@ -181,4 +185,4 @@ rmmod moca
 line=$(grep -n "Moca started" /var/log/kern.log | tail -n 1 | cut -d ':' -f 1)
 line=$(($line-1))
 line+='d'
-sed 1,$line /var/log/kern.log | grep "Moca" > $Moca_log
+sed 1,$line /var/log/kern.log | grep -i "moca" > $Moca_log

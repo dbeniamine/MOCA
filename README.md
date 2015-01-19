@@ -15,7 +15,7 @@ program.
 + HI
 + Chunks
 + Probes
-+ False page faults (ref SPCD)
++ False page faults (ref SPCD) + mprotect
 + System Noise
 
 

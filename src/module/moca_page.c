@@ -10,7 +10,7 @@
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
-#define MOCA_DEBUG
+//#define MOCA_DEBUG
 
 #include "moca.h"
 #include "moca_page.h"
@@ -62,7 +62,7 @@ void Moca_MonitorPage(task_data data)
         {
             if(!pte_none(*pte) && pte_present(*pte) && !pte_special(*pte) )
             {
-                *pte = pte_clear_flags(*pte, _PAGE_PRESENT);
+                MOCA_SET_FALSE_PTE(pte);
                 MOCA_DEBUG_PRINT("Moca FLAGS CLEARED pte %p\n", pte);
             }
             // Set R/W status
