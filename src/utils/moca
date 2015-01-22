@@ -114,14 +114,17 @@ then
     exit 1
 fi
 
-if [ -z $logfile ]
+if [ -z "$logdir" ]
 then
-    logfile="Moca-$cmd.log"
+    logdir="Moca-$(basename $cmd)-$(date +%Y-%m-%d_%H-%M-%S)"
 fi
-if [ -z $logdir ]
+mkdir $logdir
+
+if [ -z "$logfile" ]
 then
-    logdir="Moca-$cmd-$(date +%Y-%m-%d_%H-%M-%S)"
+    logfile="$logdir/Moca-$cmd.log"
 fi
+kernLogFile="$logdir/$kernLogFile"
 
 # Wait for the kernel module to start
 child()
@@ -133,7 +136,7 @@ child()
     then
         $cmd $args
     else
-        $cmd $args > $logdir/$logfile 2> $logdir/$logfile.err
+        $cmd $args > $logfile 2> $logfile.err
     fi
     ret=$?
     echo "$cmd ended code $ret"
@@ -145,7 +148,7 @@ log()
     do
         for f in $(\ls $procdir)
         do
-            cat $procdir/$f >> $logdir/$kernLogFile-$f.log
+            cat $procdir/$f >> $kernLogFile-$f.log
         done
         sleep $log_thread_interval
     done
