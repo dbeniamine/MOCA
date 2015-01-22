@@ -12,6 +12,7 @@ program.
 
 + Page
 + Pagefault
++ Phy vs virt
 + HI
 + Chunks
 + Probes
@@ -92,17 +93,17 @@ and a bitmask telling which processors have accessed to this chunk.
 
 Each Chunk line is followed by N access lines:
 
-    Access addr countread countwrite cpumas
+    Access @Virt @Phy countread countwrite cpumas
 
-Each access lines correspond to one page, it gives the address of the page,
-the number of read and writes observed and a cpumask telling which processors
-are responsible of these access.
+Each access lines correspond to one page, it gives the virtual and physical
+address of the page, the number of read and writes observed and a cpumask
+telling which processors are responsible of these access.
 
 
 ### Visualisation
 
 **TODO**
-+ Framesoc[3
++ Framesoc[3]
 + ocelotl[4]
 
 ## Installation
