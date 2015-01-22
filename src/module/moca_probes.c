@@ -34,14 +34,14 @@ void Moca_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
             jprobe_return();
         data=tsk->data;
     }
-    Moca_AddToChunk(data,(void *)address,get_cpu());
+    Moca_AddToChunk(data,(void *)(address&PAGE_MASK),get_cpu());
     pte=Moca_PteFromAdress(address,mm);
     //If pte exists, try to fix false pagefault
-    if (pte && !pte_none(*pte) && !pte_special(*pte) && MOCA_FALSE_PF(*pte,mm))
-    {
-        //MOCA_CLEAR_FALSE_PF(*pte);
-        MOCA_DEBUG_PRINT("Moca fixing fake pagefault\n");
-    }
+    /* if (pte && !pte_none(*pte) && !pte_special(*pte) && MOCA_FALSE_PF(*pte,mm)) */
+    /* { */
+    /*     //MOCA_CLEAR_FALSE_PF(*pte); */
+    /*     MOCA_DEBUG_PRINT("Moca fixing fake pagefault\n"); */
+    /* } */
     Moca_UpdateClock();
     jprobe_return();
 
@@ -51,6 +51,7 @@ static struct jprobe Moca_PteFaultjprobe = {
     .entry = Moca_MmFaultHandler,
     .kp.symbol_name = "handle_mm_fault",
 };
+
 int Moca_RegisterProbes(void)
 {
     int ret;

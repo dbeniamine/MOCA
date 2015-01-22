@@ -23,4 +23,5 @@ int Moca_MonitorThread(void *);
 
 pte_t *Moca_PteFromAdress(unsigned long addr, struct mm_struct *mm);
 
+void *Moca_PhyFromVirt(void *addr, struct mm_struct *mm);
 #endif //__MOCA_PAGE__

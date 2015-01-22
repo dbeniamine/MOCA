@@ -38,6 +38,7 @@ int Moca_nbChunks=20;
 #include "moca_taskdata.h"
 #include "moca_tasks.h"
 #include "moca_hashmap.h"
+#include "moca_page.h"
 
 
 
@@ -53,7 +54,7 @@ static const struct file_operations Moca_taskdata_fops = {
 
 typedef struct _chunk_entry
 {
-    void *key; //Address
+    void *key; //Virtual Address
     int next;
     int countR;
     int countW;
@@ -435,7 +436,9 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
                     }
                     //Access @Virt @Phy countread countwrite cpumask
                     sz=snprintf(MYBUFF,MOCA_BUF_SIZE,"Access %p %p %d %d ",
-                            e->key,e->key,  e->countR, e->countW);
+                            e->key, e->key,
+                            //Moca_PhyFromVirt(e->key, data->task->mm),
+                            e->countR, e->countW);
                     sz+=Moca_CpuMask(e->cpu,MYBUFF+sz,MOCA_BUF_SIZE-sz);
                     MYBUFF[sz++]='\n';
                     if(!copy_to_user(buffer+len,MYBUFF,sz))

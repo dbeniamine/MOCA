@@ -27,6 +27,15 @@
 // Wakeup period in ms
 int Moca_wakeupInterval=MOCA_DEFAULT_WAKEUP_INTERVAL;
 
+void *Moca_PhyFromVirt(void *addr, struct mm_struct *mm)
+{
+    return addr; //TODO fixme
+    pte_t *pte=Moca_PteFromAdress((unsigned long)addr,mm);
+    if(!pte)
+        return NULL;
+    return (void *)__pa(page_address(pte_page(*pte)));
+}
+
 pte_t *Moca_PteFromAdress(unsigned long address, struct mm_struct *mm)
 {
     pgd_t *pgd;
