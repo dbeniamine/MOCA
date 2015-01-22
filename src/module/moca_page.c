@@ -10,12 +10,13 @@
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
-//#define MOCA_DEBUG
+#define MOCA_DEBUG
 
 #include "moca.h"
 #include "moca_page.h"
 #include "moca_taskdata.h"
 #include "moca_tasks.h"
+#include "moca_false_pf.h"
 #include <linux/kthread.h>
 #include <linux/smp.h> //get_cpu()
 #include <linux/delay.h> //msleep
@@ -62,8 +63,17 @@ void Moca_MonitorPage(task_data data)
         {
             if(!pte_none(*pte) && pte_present(*pte) && !pte_special(*pte) )
             {
-                MOCA_SET_FALSE_PTE(pte);
+                MOCA_SET_FALSE_PF(*pte);
                 MOCA_DEBUG_PRINT("Moca FLAGS CLEARED pte %p\n", pte);
+                if(!MOCA_FALSE_PF(*pte,tsk->mm))
+                {
+                    MOCA_DEBUG_PRINT("MOCA false PF isn't recognised !!!!\n");
+                }
+                MOCA_CLEAR_FALSE_PF(*pte);
+                if(MOCA_FALSE_PF(*pte,tsk->mm))
+                {
+                    MOCA_DEBUG_PRINT("Moca pte still detected as false pf after fix\n");
+                }
             }
             // Set R/W status
             //TODO: count perfctr

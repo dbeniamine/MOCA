@@ -18,6 +18,7 @@
 #include "moca_taskdata.h"
 #include "moca_probes.h"
 #include "moca_page.h"
+#include "moca_false_pf.h"
 
 void Moca_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
         unsigned long address, unsigned int flags)
@@ -36,9 +37,9 @@ void Moca_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
     Moca_AddToChunk(data,(void *)address,get_cpu());
     pte=Moca_PteFromAdress(address,mm);
     //If pte exists, try to fix false pagefault
-    if (pte && !pte_none(*pte) && !pte_special(*pte) && MOCA_PTE_FALSE(pte))
+    if (pte && !pte_none(*pte) && !pte_special(*pte) && MOCA_FALSE_PF(*pte,mm))
     {
-        MOCA_CLEAR_FALSE_PTE(pte);
+        //MOCA_CLEAR_FALSE_PF(*pte);
         MOCA_DEBUG_PRINT("Moca fixing fake pagefault\n");
     }
     Moca_UpdateClock();
