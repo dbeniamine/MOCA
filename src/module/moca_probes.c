@@ -10,7 +10,7 @@
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
-//#define MOCA_DEBUG
+#define MOCA_DEBUG
 
 #include <linux/kprobes.h>
 #include "moca.h"
@@ -27,21 +27,26 @@ void Moca_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
 
     task_data data;
     moca_task tsk;
-    //MOCA_DEBUG_PRINT("Moca Pte fault task %p\n", current);
     if(!(data=Moca_GetData(current)))
     {
         if(!(tsk=Moca_AddTaskIfNeeded(current)))
             jprobe_return();
         data=tsk->data;
     }
-    Moca_AddToChunk(data,(void *)(address&PAGE_MASK),get_cpu());
     pte=Moca_PteFromAdress(address,mm);
+    // Track only user pages
+    if(!MOCA_USEFULL_PTE(pte))
+        jprobe_return();
+    MOCA_DEBUG_PRINT("Moca Pte fault task %p\n", current);
+    MOCA_PRINT_FLAGS(pte);
+    Moca_AddToChunk(data,(void *)(address&PAGE_MASK),get_cpu());
     //If pte exists, try to fix false pagefault
-    /* if (pte && !pte_none(*pte) && !pte_special(*pte) && MOCA_FALSE_PF(*pte,mm)) */
-    /* { */
-    /*     //MOCA_CLEAR_FALSE_PF(*pte); */
-    /*     MOCA_DEBUG_PRINT("Moca fixing fake pagefault\n"); */
-    /* } */
+    if (pte && MOCA_FALSE_PF(*pte))
+    {
+        MOCA_CLEAR_FALSE_PF(*pte);
+        MOCA_DEBUG_PRINT("Moca fixing fake pagefault pte %p flags %x page %lx\n",
+                pte, (unsigned int)pte_flags(*pte), (*(unsigned long*)pte)&PTE_PFN_MASK);
+    }
     Moca_UpdateClock();
     jprobe_return();
 

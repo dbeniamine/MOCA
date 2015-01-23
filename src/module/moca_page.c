@@ -30,10 +30,12 @@ int Moca_wakeupInterval=MOCA_DEFAULT_WAKEUP_INTERVAL;
 void *Moca_PhyFromVirt(void *addr, struct mm_struct *mm)
 {
     return addr; //TODO fixme
-    pte_t *pte=Moca_PteFromAdress((unsigned long)addr,mm);
-    if(!pte)
-        return NULL;
-    return (void *)__pa(page_address(pte_page(*pte)));
+    /*
+       pte_t *pte=Moca_PteFromAdress((unsigned long)addr,mm);
+       if(!pte)
+       return NULL;
+       return (void *)__pa(page_address(pte_page(*pte)));
+       */
 }
 
 pte_t *Moca_PteFromAdress(unsigned long address, struct mm_struct *mm)
@@ -70,18 +72,15 @@ void Moca_MonitorPage(task_data data)
                 addr, pte, i,tsk->on_cpu, data);
         if(pte)
         {
-            if(!pte_none(*pte) && pte_present(*pte) && !pte_special(*pte) )
+            if(pte_present(*pte) && MOCA_USEFULL_PTE(pte))
             {
+                MOCA_PRINT_FLAGS(pte);
                 MOCA_SET_FALSE_PF(*pte);
+                MOCA_PRINT_FLAGS(pte);
                 MOCA_DEBUG_PRINT("Moca FLAGS CLEARED pte %p\n", pte);
-                if(!MOCA_FALSE_PF(*pte,tsk->mm))
+                if(!MOCA_FALSE_PF(*pte))
                 {
                     MOCA_DEBUG_PRINT("MOCA false PF isn't recognised !!!!\n");
-                }
-                MOCA_CLEAR_FALSE_PF(*pte);
-                if(MOCA_FALSE_PF(*pte,tsk->mm))
-                {
-                    MOCA_DEBUG_PRINT("Moca pte still detected as false pf after fix\n");
                 }
             }
             // Set R/W status

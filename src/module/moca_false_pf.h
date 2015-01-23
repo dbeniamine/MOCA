@@ -13,6 +13,9 @@
 #ifndef __MOCA_FALSE_PF__
 #define __MOCA_FALSE_PF__
 
+#define MOCA_USEFULL_PTE(pte) ((pte) && !pte_none(*(pte)) \
+        && !pte_special(*(pte)))
+
 /*
  * False pte fault hack:
  */
@@ -26,9 +29,15 @@
 // The forbidden flag configuration
 // Is pte in the "false" state ?
         /*&& !pte_file(ptent) ) \*/
-#define MOCA_FALSE_PF(ptent,mm) ( !pte_present(ptent) ) && pte_file(ptent) \
-        && !((mm)->mmap->vm_flags & VM_NONLINEAR )
-/*        && non_swap_entry(pte_to_swp_entry(ptent)) \
+#define MOCA_FALSE_PF(ptent) ( !pte_present(ptent) && !is_swap_pte(ptent) )
+/*
+( !pte_none(ptent) && !pte_present(ptent) && \
+        !!pte_special(*pte) && !(pte_flags(ptent) & _PAGE_PROTNONE ) ) && \
+        !is_swap_pte(ptent))*/
+ /*&& pte_file(ptent) \
+        && ( !((mm)->mmap->vm_flags & VM_NONLINEAR) \
+                || !lookup_swap_cache(pte_to_swp_entry(ptent),0) )
+        && non_swap_entry(pte_to_swp_entry(ptent)) \
         && !is_migration_entry(pte_to_swp_entry(ptent)) ) */
 // Put pte in a clean state
 #define MOCA_CLEAR_FALSE_PF(ptent) ptent=pte_set_flags(ptent, _PAGE_PRESENT);
@@ -41,4 +50,10 @@
 #define MOCA_SET_FALSE_PF(ptent)
 #endif //MOCA_USE_FALSE_PF
 
+#define MOCA_PRINT_FLAGS(pte) MOCA_DEBUG_PRINT("Moca pte %p, none %d, \
+        present %u, protnone %u,special %u, all %x\n" ,\
+        pte, pte_none(*pte), pte_present(*pte), \
+        (unsigned int)(pte_flags(*pte)&_PAGE_PROTNONE), pte_special(*pte),\
+        (unsigned int)pte_flags(*pte));
 #endif //__MOCA_FALSE_PF__
+
