@@ -137,7 +137,7 @@ task_data Moca_InitData(struct task_struct *t)
         data->chunks[i]->cpu=0;
         data->chunks[i]->used=0;
         data->chunks[i]->map=Moca_InitHashMap(Moca_taskDataHashBits,
-                Moca_taskDataChunkSize, sizeof(struct _chunk_entry));
+                Moca_taskDataChunkSize, sizeof(struct _chunk_entry), NULL);
         spin_lock_init(&data->chunks[i]->lock);
     }
     data->task=t;

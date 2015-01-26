@@ -38,7 +38,7 @@ int Moca_InitProcessManagment(int id)
     struct pid *pid;
     spin_lock_init(&Moca_tasksLock);
     Moca_tasksMap=Moca_InitHashMap(Moca_tasksHashBits,
-            2*(1<<Moca_tasksHashBits), sizeof(struct _moca_task));
+            2*(1<<Moca_tasksHashBits), sizeof(struct _moca_task), NULL);
     rcu_read_lock();
     pid=find_vpid(id);
     if(!pid)

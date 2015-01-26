@@ -17,7 +17,7 @@ int main()
     //Init
     int i, nbAdd, *ptr,st, **keys,j;// k;
     foo e;
-    hash_map map=Moca_InitHashMap(14,2*(1UL<<14), sizeof(struct _foo));
+    hash_map map=Moca_InitHashMap(14,2*(1UL<<14), sizeof(struct _foo),NULL);
     srand(time(NULL));
 
     nbAdd=1000;

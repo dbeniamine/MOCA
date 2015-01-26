@@ -31,7 +31,13 @@ typedef struct _hash_map
     unsigned long size;
     unsigned long tableSize;
     size_t elt_size;
+    comp_fct_t comp;
 }*hash_map;
+
+int Moca_DefaultHashMapComp(hash_entry e1, hash_entry e2)
+{
+    return e1==e2?0:(unsigned long)e1>(unsigned long)(e2)?1:-1;
+}
 
 unsigned int Moca_FindNextAvailPosMap(hash_map map)
 {
@@ -42,7 +48,7 @@ unsigned int Moca_FindNextAvailPosMap(hash_map map)
 }
 
 hash_map Moca_InitHashMap(unsigned long hash_bits, int nb_elt,
-        size_t elt_size)
+        size_t elt_size, comp_fct_t comp)
 {
     unsigned int i;
     hash_map map=kmalloc(sizeof(struct _hash_map), GFP_ATOMIC);
@@ -53,6 +59,11 @@ hash_map Moca_InitHashMap(unsigned long hash_bits, int nb_elt,
     map->tableSize=nb_elt;
     map->nbentry=0;
     map->elt_size=elt_size;
+    if(comp)
+        map->comp=comp;
+    else
+        map->comp=Moca_DefaultHashMapComp;
+
     MOCA_DEBUG_PRINT("Moca allocationg hash size %lu\n", map->size);
     if(!(map->hashs=kmalloc(sizeof(int)*map->size,GFP_ATOMIC)))
     {
@@ -91,7 +102,7 @@ int Moca_PosInMap(hash_map map,void *key)
         return -1;
     h=hash_ptr(key, map->hash_bits);
     ind=map->hashs[h];
-    while(ind>=0 && tableElt(map,ind)->key!=key )
+    while(ind>=0 && map->comp(tableElt(map,ind)->key,key)!=0 )
         ind=tableElt(map,ind)->next;
     return ind;
 }
@@ -108,7 +119,7 @@ hash_entry Moca_EntryFromKey(hash_map map, void *key)
         return NULL;
     h=hash_ptr(key, map->hash_bits);
     ind=map->hashs[h];
-    while(ind>=0 && tableElt(map,ind)->key!=key )
+    while(ind>=0 && map->comp(tableElt(map,ind)->key,key)!=0 )
         ind=tableElt(map,ind)->next;
     if(ind >=0)
         return tableElt(map,ind);
@@ -161,7 +172,8 @@ hash_entry Moca_AddToMap(hash_map map, void *key, int *status)
     }
     else
     {
-        while(tableElt(map,ind)->key!=key && tableElt(map,ind)->next>=0)
+        while(map->comp(tableElt(map,ind)->key,key)!=0 &&
+                tableElt(map,ind)->next>=0)
             ind=tableElt(map,ind)->next;
         if(tableElt(map,ind)->key==key)
         {
@@ -225,7 +237,7 @@ hash_entry Moca_RemoveFromMap(hash_map map,void *key)
     MOCA_DEBUG_PRINT("Moca removing %p from %p\n", key, map);
     h=hash_ptr(key, map->hash_bits);
     ind=map->hashs[h];
-    while(ind>=0 && tableElt(map,ind)->key!=key )
+    while(ind>=0 && map->comp(tableElt(map,ind)->key,key)!=0 )
     {
         ind_prev=ind;
         ind=tableElt(map,ind)->next;

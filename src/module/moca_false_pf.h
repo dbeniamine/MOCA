@@ -13,19 +13,19 @@
 #ifndef __MOCA_FALSE_PF__
 #define __MOCA_FALSE_PF__
 
-#define MOCA_USEFULL_PTE(pte) ((pte) && !pte_none(*(pte)) \
-        && !pte_special(*(pte)))
+#define MOCA_USEFULL_PTE(pte) ((pte) && !pte_none(*(pte)) ) /*\
+        && !pte_special(*(pte)))*/
 
 /*
  * False pte fault hack:
  */
 #define MOCA_USE_FALSE_PF
 #ifdef MOCA_USE_FALSE_PF
+#include <linux/mm.h>
 #include <asm/pgtable.h>
 #include <linux/swap.h>
 #include <linux/swapops.h>
 #include <linux/mm_types.h>
-#include <linux/mm.h>
 // The forbidden flag configuration
 // Is pte in the "false" state ?
         /*&& !pte_file(ptent) ) \*/

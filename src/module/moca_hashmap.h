@@ -34,12 +34,23 @@ typedef struct _hash_entry
 
 typedef struct _hash_map *hash_map;
 
+/*
+ * Hashmap comparator
+ * returns >0 if e1 > e2
+ *         0  if e1==e2
+ *         <0 else
+ */
+typedef int (*comp_fct_t)(hash_entry e1, hash_entry e2);
+
 /* Initialize an empty map of (1<<hash_bits) different keys, able to hold
  * nb_elt elements
  * An entry of this map must be castable in hash_entry and have a size of
  * elt_size.
+ * A comparator function can be given via the comp parameter. If non are
+ * given, we use the default comparator function (key comparison).
  */
-hash_map Moca_InitHashMap(unsigned long hash_bits, int nb_elt, size_t elt_size);
+hash_map Moca_InitHashMap(unsigned long hash_bits, int nb_elt, size_t elt_size, 
+        comp_fct_t comp);
 
 // Return the number of entry in map
 int Moca_NbElementInMap(hash_map map);
