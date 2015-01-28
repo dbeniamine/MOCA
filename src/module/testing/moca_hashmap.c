@@ -10,10 +10,12 @@
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
-//#include <linux/slab.h>
+//#define MOCA_DEBUG
+
+//#include <linux/slab.h> //malloc
 //#include <linux/hash.h>
+//#include <linux/string.h> //memcpy
 #include "moca_hashmap.h"
-#include "moca.h"
 
 
 #define MOCA_HASHMAP_END -1
@@ -30,7 +32,14 @@ typedef struct _hash_map
     unsigned long size;
     unsigned long tableSize;
     size_t elt_size;
+    comp_fct_t comp;
 }*hash_map;
+
+int Moca_DefaultHashMapComp(hash_entry e1, hash_entry e2)
+{
+    unsigned long k1=(unsigned long)(e1->key),k2=(unsigned long)(e2->key);
+    return k1==k2?0:(k1>k2?1:-1);
+}
 
 unsigned int Moca_FindNextAvailPosMap(hash_map map)
 {
@@ -40,19 +49,24 @@ unsigned int Moca_FindNextAvailPosMap(hash_map map)
     return i;
 }
 
-hash_map Moca_InitHashMap(unsigned long hash_bits, int factor,
-        size_t elt_size)
+hash_map Moca_InitHashMap(unsigned long hash_bits, int nb_elt,
+        size_t elt_size, comp_fct_t comp)
 {
     unsigned int i;
     hash_map map=kmalloc(sizeof(struct _hash_map), GFP_ATOMIC);
     if(!map)
         return NULL;
     map->hash_bits=hash_bits;
-    map->size=1UL<<hash_bits;
-    map->tableSize=factor*map->size;
+    map->size=1<<hash_bits;
+    map->tableSize=nb_elt;
     map->nbentry=0;
     map->elt_size=elt_size;
-    MOCA_DEBUG_PRINT("MemmMap allocationg hash size %lu\n", map->size);
+    if(comp)
+        map->comp=comp;
+    else
+        map->comp=Moca_DefaultHashMapComp;
+
+    MOCA_DEBUG_PRINT("Moca allocationg hash size %lu\n", map->size);
     if(!(map->hashs=kmalloc(sizeof(int)*map->size,GFP_ATOMIC)))
     {
         kfree(map);
@@ -82,17 +96,36 @@ int Moca_NbElementInMap(hash_map map)
  * Returns -1 if key is not in map
  *         the position of key in the map if it is present
  */
-int Moca_PosInMap(hash_map map,void *key)
+int Moca_PosInMap(hash_map map,hash_entry e)
 {
     unsigned long h;
     int ind=0;
     if(!map)
         return -1;
-    h=hash_ptr(key, map->hash_bits);
+    h=hash_ptr(e->key, map->hash_bits);
     ind=map->hashs[h];
-    while(ind>=0 && tableElt(map,ind)->key!=key )
+    while(ind>=0 && map->comp(tableElt(map,ind),e)!=0 )
         ind=tableElt(map,ind)->next;
     return ind;
+}
+
+/*
+ * Return the hash entry corresponding to key,
+ *        NULL if key is not in the map
+ */
+hash_entry Moca_EntryFromKey(hash_map map, hash_entry e)
+{
+    unsigned long h;
+    int ind=0;
+    if(!map)
+        return NULL;
+    h=hash_ptr(e->key, map->hash_bits);
+    ind=map->hashs[h];
+    while(ind>=0 && map->comp(tableElt(map,ind),e)!=0 )
+        ind=tableElt(map,ind)->next;
+    if(ind >=0)
+        return tableElt(map,ind);
+    return NULL;
 }
 
 /*
@@ -106,7 +139,7 @@ int Moca_PosInMap(hash_map map,void *key)
  *          MOCA_HASHMAP_FULL
  *          MOCA_HASHMAP_ERROR
  */
-hash_entry Moca_AddToMap(hash_map map, void *key, int *status)
+hash_entry Moca_AddToMap(hash_map map, hash_entry e, int *status)
 {
     unsigned long h;
     int ind=0, nextPos;
@@ -120,41 +153,47 @@ hash_entry Moca_AddToMap(hash_map map, void *key, int *status)
         *status=MOCA_HASHMAP_FULL;
         return NULL;
     }
+    //Do the insertion
     nextPos=Moca_FindNextAvailPosMap(map);
-    MOCA_DEBUG_PRINT("Moca Inserting %p in map %p\n", key, map);
-
-    h=hash_ptr(key, map->hash_bits);
+    MOCA_DEBUG_PRINT("Moca inserting %p ind %d/%lu\n",
+            e->key,nextPos,map->tableSize);
+    if((unsigned)nextPos >= map->tableSize)
+    {
+        *status=MOCA_HASHMAP_ERROR;
+        Moca_Panic("Moca hashmap BUG in AddToMap");
+        return NULL;
+    }
+    //Update the link
+    h=hash_ptr(e->key, map->hash_bits);
     ind=map->hashs[h];
+    //TODO refactor here
     if(ind<0)
     {
+        memcpy(tableElt(map,nextPos),e,map->elt_size);
+        tableElt(map,nextPos)->next=MOCA_HASHMAP_END;
         map->hashs[h]=nextPos;
     }
     else
     {
-        while(tableElt(map,ind)->key!=key && tableElt(map,ind)->next>=0)
+        while(map->comp(tableElt(map,ind),e)!=0 &&
+                tableElt(map,ind)->next>=0)
             ind=tableElt(map,ind)->next;
-        if(tableElt(map,ind)->key==key)
+        if(map->comp(tableElt(map,ind),e)==0)
         {
-            MOCA_DEBUG_PRINT("Moca %p already in map %p\n", key, map);
+            MOCA_DEBUG_PRINT("Moca %p already in map %p\n", e->key, map);
             *status=MOCA_HASHMAP_ALREADY_IN_MAP;
+            //This seems useless
+            tableElt(map,nextPos)->key=NULL;
             return tableElt(map,ind);
         }
-        MOCA_DEBUG_PRINT("Moca collision in map %p key %p\n", key, map);
+        MOCA_DEBUG_PRINT("Moca collision in map %p key %p\n", e->key, map);
+        //TODO: Use Memcpy
+        memcpy(tableElt(map,nextPos),e,map->elt_size);
+        tableElt(map,nextPos)->next=MOCA_HASHMAP_END;
         tableElt(map,ind)->next=nextPos;
     }
-
-    MOCA_DEBUG_PRINT("Moca inserting %p ind %d/%lu\n",
-            key,nextPos,map->tableSize);
-    if((unsigned)nextPos >= map->tableSize)
-    {
-        *status=MOCA_HASHMAP_ERROR;
-        Moca_Panic("BUG in findavailposmap");
-        return NULL;
-    }
-    map->nbentry++;
-    tableElt(map,nextPos)->key=key;
-    tableElt(map,nextPos)->next=MOCA_HASHMAP_END;
-    MOCA_DEBUG_PRINT("Moca Inserted %p in map %p\n", key, map);
+    ++map->nbentry;
+    MOCA_DEBUG_PRINT("Moca Inserted %p in map %p\n", e->key, map);
     *status=nextPos;
     return tableElt(map,nextPos);
 }
@@ -181,30 +220,35 @@ hash_entry Moca_EntryAtPos(hash_map map, unsigned int pos)
 hash_entry Moca_NextEntryPos(hash_map map, unsigned int *pos)
 {
     unsigned int i=*pos;
+    MOCA_DEBUG_PRINT("Moca Searching element in map %p after %d /%d\n",
+            map, i, Moca_NbElementInMap(map));
     while(i< map->tableSize && tableElt(map,i)->next==MOCA_HASHMAP_UNUSED)
         ++i;
     *pos=i+1;
+    MOCA_DEBUG_PRINT("Moca found  %p at %d\n",
+            i>=map->tableSize?NULL:tableElt(map,i),i);
     if(i >=map->tableSize)
         return NULL;
     return tableElt(map,i);
 }
 
 
-hash_entry Moca_RemoveFromMap(hash_map map,void *key)
+hash_entry Moca_RemoveFromMap(hash_map map,hash_entry e)
 {
     unsigned long h;
     int ind, ind_prev=MOCA_HASHMAP_END;
     if(!map)
         return NULL;
-    MOCA_DEBUG_PRINT("Moca removing %p from %p\n", key, map);
-    h=hash_ptr(key, map->hash_bits);
+    MOCA_DEBUG_PRINT("Moca removing %p from %p\n", e->key, map);
+    h=hash_ptr(e->key, map->hash_bits);
     ind=map->hashs[h];
-    while(ind>=0 && tableElt(map,ind)->key!=key )
+    while(ind>=0 && map->comp(tableElt(map,ind),e)!=0 )
     {
         ind_prev=ind;
         ind=tableElt(map,ind)->next;
     }
-    MOCA_DEBUG_PRINT("Moca removing %p from %p ind %d prev %d\n", key, map, ind, ind_prev);
+    MOCA_DEBUG_PRINT("Moca removing %p from %p ind %d prev %d\n", e->key, map,
+            ind, ind_prev);
     //key wasn't in map
     if(ind<0 )
         return NULL;
@@ -219,7 +263,7 @@ hash_entry Moca_RemoveFromMap(hash_map map,void *key)
     }
     tableElt(map,ind)->next=MOCA_HASHMAP_UNUSED;
     --map->nbentry;
-    MOCA_DEBUG_PRINT("Moca removing %p from %p ind %d ok\n", key, map, ind);
+    MOCA_DEBUG_PRINT("Moca removing %p from %p ind %d ok\n", e->key, map, ind);
     return tableElt(map,ind);
 }
 

@@ -3,6 +3,7 @@
 #define __MOCA_H__
 
 #include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
 // printf
 #define printk(...) printf(__VA_ARGS__)
