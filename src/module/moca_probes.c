@@ -10,7 +10,7 @@
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
-#define MOCA_DEBUG
+//#define MOCA_DEBUG
 
 #include <linux/kprobes.h>
 #include "moca.h"
@@ -20,15 +20,6 @@
 #include "moca_page.h"
 #include "moca_false_pf.h"
 
-void Moca_FixPte(pte_t *pte)
-{
-    if (pte && MOCA_FALSE_PF(*pte))
-    {
-        MOCA_CLEAR_FALSE_PF(*pte);
-        MOCA_DEBUG_PRINT("Moca fixing pte %p flags %x page %lx\n",pte,
-                (unsigned int)pte_flags(*pte), (*(unsigned long*)pte)&PTE_PFN_MASK);
-    }
-}
 
 void Moca_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
         unsigned long address, unsigned int flags)
@@ -48,42 +39,21 @@ void Moca_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
     if(!MOCA_USEFULL_PTE(pte))
         jprobe_return();
     MOCA_DEBUG_PRINT("Moca Pte fault task %p\n", current);
-    MOCA_PRINT_FLAGS(pte);
-    Moca_AddToChunk(data,(void *)(address&PAGE_MASK),get_cpu());
-    Moca_FixPte(pte);
+    Moca_AddToChunk(data,(void *)(__pa(address)),get_cpu());
+    //Moca_FixFalsePf(mm,pte);
     Moca_UpdateClock();
     jprobe_return();
 
 }
 
-static int Moca_ExitHandler(struct kprobe *p, struct pt_regs *regs)
+void Moca_UnmapPageHandler(struct mmu_gather *tlb,
+        struct vm_area_struct *vma,
+        unsigned long addr, unsigned long end,
+        struct zap_details *details)
 {
-    int i,j,k,l;
-    pgd_t *pgd;
-    pmd_t *pmd;
-    pud_t *pud;
-    pte_t *pte;
-    if(!Moca_GetData(current))
-        return 0;
-    MOCA_DEBUG_PRINT("Moca in do exit task %p\n", current);
-    pgd=current->mm->pgd;//pgd_offset(current->mm,0);
-
-    for (i=0;i<PTRS_PER_PGD;++i)
-        if(!pgd_none(pgd[i]) && pgd_present(pgd[i]))
-        {
-            pud=pud_offset(pgd+i,0);
-            for (j=0;j<PTRS_PER_PUD;++j)
-                pmd=pmd_offset(pud +i, 0);
-            for (k=0;k<PTRS_PER_PMD;++k)
-                if(!pmd_none(pmd[k]) && pmd_present(pmd[k]))
-                {
-                    pte=(pte_t *)(pmd+k);//pte_offset(pmd+i,0);
-                    for(l=0;l<PTRS_PER_PTE;++l)
-                        if(MOCA_USEFULL_PTE(pte) && MOCA_FALSE_PF(*pte))
-                            MOCA_CLEAR_FALSE_PF(*pte);
-                }
-        }
-    return 0;
+    //if(Moca_GetData(current))
+    //    Moca_FixAllFalsePf(vma->vm_mm);
+    jprobe_return();
 }
 
 
@@ -92,15 +62,15 @@ static struct jprobe Moca_PteFaultjprobe = {
     .kp.symbol_name = "handle_mm_fault",
 };
 
-static struct kprobe Moca_Exitprobe = {
-    .symbol_name = "do_exit",
+static struct jprobe Moca_UnmapPageProbe = {
+    .entry = Moca_UnmapPageHandler,
+    .kp.symbol_name = "unmap_page_range",
 };
 
 int Moca_RegisterProbes(void)
 {
     int ret;
-    Moca_Exitprobe.pre_handler = Moca_ExitHandler;
-    if ((ret=register_kprobe(&Moca_Exitprobe)))
+    if ((ret=register_jprobe(&Moca_UnmapPageProbe)))
         Moca_Panic("Unable to register do exit probe");
     if ((ret=register_jprobe(&Moca_PteFaultjprobe)))
         Moca_Panic("Moca Unable to register pte fault probe");
@@ -111,5 +81,5 @@ int Moca_RegisterProbes(void)
 void Moca_UnregisterProbes(void)
 {
     unregister_jprobe(&Moca_PteFaultjprobe);
-    unregister_kprobe(&Moca_Exitprobe);
+    unregister_jprobe(&Moca_UnmapPageProbe);
 }

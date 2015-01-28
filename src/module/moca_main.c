@@ -18,6 +18,7 @@
 #include "moca_page.h"
 #include "moca_probes.h"
 #include "moca_tasks.h"
+#include "moca_false_pf.h"
 
 #define MOCA_DEFAULT_SCHED_PRIO 99
 
@@ -35,6 +36,7 @@ extern int Moca_wakeupInterval;
 extern int Moca_taskDataHashBits;
 extern int Moca_taskDataChunkSize;
 extern int Moca_nbChunks;
+extern int Moca_use_false_pf;
 // Priority for FIFO scheduler
 int Moca_schedulerPriority=MOCA_DEFAULT_SCHED_PRIO;
 
@@ -44,6 +46,7 @@ module_param(Moca_schedulerPriority,int,0);
 module_param(Moca_taskDataHashBits,int,0);
 module_param(Moca_taskDataChunkSize,int,0);
 module_param(Moca_nbChunks,int,0);
+module_param(Moca_use_false_pf,int,0);
 
 // Thread task representation
 struct task_struct *Moca_threadTask=NULL;
@@ -107,6 +110,8 @@ static int __init Moca_Init(void)
     if(Moca_InitProcessManagment(Moca_mainPid)!=0)
         return -1;
     MOCA_DEBUG_PRINT("Moca common data ready \n");
+    Moca_InitFalsePf();
+    MOCA_DEBUG_PRINT("Moca false Pf ready \n");
     if(Moca_InitThreads()!=0)
         return -2;
     MOCA_DEBUG_PRINT("Moca threads ready \n");

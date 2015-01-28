@@ -1,5 +1,5 @@
 obj-m := moca.o
-moca-objs := moca_main.o  moca_hashmap.o moca_tasks.o moca_taskdata.o moca_page.o moca_probes.o
+moca-objs := moca_main.o  moca_hashmap.o moca_false_pf.o moca_tasks.o moca_taskdata.o moca_page.o moca_probes.o
 ccflags-m += -Wall -Werror
 
 all: module

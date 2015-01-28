@@ -72,17 +72,7 @@ void Moca_MonitorPage(task_data data)
                 addr, pte, i,tsk->on_cpu, data);
         if(pte)
         {
-            if(pte_present(*pte) && MOCA_USEFULL_PTE(pte))
-            {
-                MOCA_PRINT_FLAGS(pte);
-                MOCA_SET_FALSE_PF(*pte);
-                MOCA_PRINT_FLAGS(pte);
-                MOCA_DEBUG_PRINT("Moca FLAGS CLEARED pte %p\n", pte);
-                if(!MOCA_FALSE_PF(*pte))
-                {
-                    MOCA_DEBUG_PRINT("MOCA false PF isn't recognised !!!!\n");
-                }
-            }
+            //Moca_AddFalsePf(tsk->mm, pte);
             // Set R/W status
             //TODO: count perfctr
             if(pte_young(*pte))
