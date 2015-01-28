@@ -56,20 +56,20 @@ hash_map Moca_InitHashMap(unsigned long hash_bits, int nb_elt, size_t elt_size,
 int Moca_NbElementInMap(hash_map map);
 
 /*
- * Returns -1 if key is not in map
- *         the position of key in the map if it is present
+ * Returns -1 if e is not in map
+ *         the position of e in the map if it is present
  */
-int Moca_PosInMap(hash_map map,void *key);
+int Moca_PosInMap(hash_map map,hash_entry e);
 
 /*
- * Return the hash entry corresponding to key,
- *        NULL if key is not in the map
+ * Return the hash entry corresponding to e,
+ *        NULL if e is not in the map
  */
-hash_entry Moca_EntryFromKey(hash_map map, void *key);
+hash_entry Moca_EntryFromKey(hash_map map, hash_entry e);
 
 /*
- * Insert key in map
- * Returns A pointer to the hash_entry corresponding to key
+ * Insert e (by copy) in map.
+ * Returns A pointer to the hash_entry corresponding to e
  *         Null in case of error
  * status is set to:
  *         The position of hash_entry in case of success
@@ -78,7 +78,7 @@ hash_entry Moca_EntryFromKey(hash_map map, void *key);
  *          MOCA_HASHMAP_FULL
  *          MOCA_HASHMAP_ERROR
  */
-hash_entry Moca_AddToMap(hash_map map, void *key, int *status);
+hash_entry Moca_AddToMap(hash_map map, hash_entry e, int *status);
 /*
  * Returns the hash entry at position pos
  *         Null if pos is invalid or there is no entry at this position
@@ -90,8 +90,8 @@ hash_entry Moca_EntryAtPos(hash_map map, unsigned int pos);
  */
 hash_entry Moca_NextEntryPos(hash_map map, unsigned int *pos);
 
-// Remove key from the map
-hash_entry Moca_RemoveFromMap(hash_map map,void *key);
+// Remove e from the map
+hash_entry Moca_RemoveFromMap(hash_map map,hash_entry e);
 // Reset the map, be carefull with this one
 void Moca_ClearMap(hash_map map);
 void Moca_FreeMap(hash_map map);

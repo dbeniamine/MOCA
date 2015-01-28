@@ -214,6 +214,7 @@ void Moca_UnlockChunk(task_data data)
 int Moca_AddToChunk(task_data data, void *addr, int cpu)
 {
     int status, cur;
+    struct _chunk_entry tmp;
     chunk_entry e;
     cur=Moca_CurrentChunk(data);
     spin_lock(&data->chunks[cur]->lock);
@@ -224,7 +225,8 @@ int Moca_AddToChunk(task_data data, void *addr, int cpu)
     }
     MOCA_DEBUG_PRINT("Moca hashmap adding %p to chunk %d %p data %p cpu %d\n",
             addr, cur, data->chunks[cur],data, cpu);
-    e=(chunk_entry)Moca_AddToMap(data->chunks[cur]->map,addr, &status);
+    tmp.key=addr;
+    e=(chunk_entry)Moca_AddToMap(data->chunks[cur]->map,(hash_entry)&tmp, &status);
     switch(status)
     {
         case MOCA_HASHMAP_FULL :
@@ -357,6 +359,7 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
     ssize_t len=0,sz;
     int chunkid, ind, nelt, complete=1;
     char *MYBUFF;
+    struct _chunk_entry tmpch;
     chunk_entry e;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
     task_data data=(task_data)PDE_DATA(file_inode(filp));
@@ -448,7 +451,8 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
                     if(!copy_to_user(buffer+len,MYBUFF,sz))
                         len+=sz;
                     //Re init data
-                    Moca_RemoveFromMap(data->chunks[chunkid]->map,e->key);
+                    tmpch.key=e->key;
+                    Moca_RemoveFromMap(data->chunks[chunkid]->map,(hash_entry)&tmpch);
                     e->countR=0;
                     e->countW=0;
                     e->cpu=0;
