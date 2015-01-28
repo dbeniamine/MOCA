@@ -12,12 +12,21 @@ typedef struct _foo
     int other_val;
 }*foo;
 
+int multicomp(hash_entry e1, hash_entry e2)
+{
+    foo f1=(foo)e1, f2=(foo)e2;
+    if(f1->key==f2->key && f1->val==f2->val && f1->other_val ==f2->other_val)
+        return 0;
+    return 1;
+//    return (unsigned long)f1->key-(unsigned long)f2->key;
+}
+
 int main()
 {
     //Init
     int i, nbAdd, *ptr,st, j, k;
     foo e, keys;
-    hash_map map=Moca_InitHashMap(14,2*(1UL<<14), sizeof(struct _foo),NULL);
+    hash_map map=Moca_InitHashMap(14,2*(1UL<<14), sizeof(struct _foo),multicomp);
     srand(time(NULL));
 
     nbAdd=1000;
@@ -71,6 +80,10 @@ int main()
                     e->val, e->other_val);
             Moca_RemoveFromMap(map,(hash_entry)(e));
             free(e->key);
+            j=0;
+            while(multicomp((hash_entry)e, (hash_entry)(keys+j))!=0)
+                ++j;
+            keys[j].key=NULL;
         }
         printf("All remove done, table size :%d\n", Moca_NbElementInMap(map));
     }
