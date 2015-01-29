@@ -38,7 +38,7 @@ int Moca_InitProcessManagment(int id)
     struct pid *pid;
     spin_lock_init(&Moca_tasksLock);
     Moca_tasksMap=Moca_InitHashMap(Moca_tasksHashBits,
-            2*(1<<Moca_tasksHashBits), sizeof(struct _moca_task));
+            2*(1<<Moca_tasksHashBits), sizeof(struct _moca_task), NULL);
     rcu_read_lock();
     pid=find_vpid(id);
     if(!pid)
@@ -67,13 +67,15 @@ void Moca_CleanProcessData(void)
 // Add pid to the monitored process if pid is a monitored process
 moca_task Moca_AddTaskIfNeeded(struct task_struct *t)
 {
-    moca_task tsk=NULL;
+    struct _moca_task tsk;
+    moca_task res=NULL;
+    tsk.key=t->real_parent;
     spin_lock(&Moca_tasksLock);
     if(t->real_parent == Moca_initTask  ||
-            Moca_EntryFromKey(Moca_tasksMap, t->real_parent)!=NULL )
-        tsk=Moca_AddTask(t);
+            Moca_EntryFromKey(Moca_tasksMap, (hash_entry)&tsk)!=NULL )
+        res=Moca_AddTask(t);
     spin_unlock(&Moca_tasksLock);
-    return tsk;
+    return res;
 }
 
 // Current number of monitored pids
@@ -100,9 +102,11 @@ moca_task Moca_NextTask(int *pos)
 task_data Moca_GetData(struct task_struct *t)
 {
     int pos;
+    struct _moca_task tsk;
     task_data ret=NULL;
+    tsk.key=t;
     spin_lock(&Moca_tasksLock);
-    if((pos=Moca_PosInMap(Moca_tasksMap ,t))!=-1)
+    if((pos=Moca_PosInMap(Moca_tasksMap ,(hash_entry)&tsk))!=-1)
         ret=((moca_task)Moca_EntryAtPos(Moca_tasksMap,pos))->data;
     spin_unlock(&Moca_tasksLock);
     return ret;
@@ -114,6 +118,7 @@ moca_task Moca_AddTask(struct task_struct *t)
 {
     task_data data;
     moca_task tsk;
+    struct _moca_task tmptsk;
     int status;
     MOCA_DEBUG_PRINT("Moca Adding task %p\n",t );
 
@@ -124,7 +129,9 @@ moca_task Moca_AddTask(struct task_struct *t)
     if(!data)
         return NULL;
 
-    tsk=(moca_task)Moca_AddToMap(Moca_tasksMap,t,&status);
+    tmptsk.key=t;
+    tmptsk.data=data;
+    tsk=(moca_task)Moca_AddToMap(Moca_tasksMap,(hash_entry)&tmptsk,&status);
     switch(status)
     {
         case MOCA_HASHMAP_FULL:
@@ -138,7 +145,6 @@ moca_task Moca_AddTask(struct task_struct *t)
             break;
         default:
             //normal add
-            tsk->data=data;
             MOCA_DEBUG_PRINT("Moca Added task %p at pos %d \n", t, status);
             break;
     }
@@ -147,8 +153,10 @@ moca_task Moca_AddTask(struct task_struct *t)
 
 void Moca_RemoveTask(struct task_struct *t)
 {
+    struct _moca_task tsk;
+    tsk.key=t;
     spin_lock(&Moca_tasksLock);
-    Moca_RemoveFromMap(Moca_tasksMap, t);
+    Moca_RemoveFromMap(Moca_tasksMap, (hash_entry)&tsk);
     spin_unlock(&Moca_tasksLock);
     put_task_struct(t);
 }

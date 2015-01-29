@@ -13,6 +13,7 @@
 #ifndef __MOCA_FALSE_PF__
 #define __MOCA_FALSE_PF__
 
+//TODO:FIXME
 #define MOCA_USEFULL_PTE(pte) ((pte) && !pte_none(*(pte)) \
         && !pte_special(*(pte)))
 

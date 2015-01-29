@@ -52,14 +52,35 @@ void Moca_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
 
 }
 
+/* void Moca_UnmapPageHandler(struct mmu_gather *tlb, */
+/*         struct vm_area_struct *vma, */
+/*         unsigned long addr, unsigned long end, */
+/*         struct zap_details *details) */
+/* { */
+/*     if(Moca_GetData(current)) */
+/*     { */
+/*         Moca_FixAllFalsePf(vma->vm_mm); */
+/*         MOCA_DEBUG_PRINT("Unamp page handler task %p, mm %p\n", NULL, NULL); */
+/*     } */
+/*     jprobe_return(); */
+/* } */
+
+
 static struct jprobe Moca_PteFaultjprobe = {
     .entry = Moca_MmFaultHandler,
     .kp.symbol_name = "handle_mm_fault",
 };
 
+/* static struct jprobe Moca_UnmapPageProbe = { */
+/*     .entry = Moca_UnmapPageHandler, */
+/*     .kp.symbol_name = "unmap_page_range", */
+/* }; */
+
 int Moca_RegisterProbes(void)
 {
     int ret;
+    /* if ((ret=register_jprobe(&Moca_UnmapPageProbe))) */
+    /*     Moca_Panic("Unable to register do exit probe"); */
     if ((ret=register_jprobe(&Moca_PteFaultjprobe)))
         Moca_Panic("Moca Unable to register pte fault probe");
     return ret;
@@ -68,5 +89,6 @@ int Moca_RegisterProbes(void)
 
 void Moca_UnregisterProbes(void)
 {
+    /* unregister_jprobe(&Moca_UnmapPageProbe); */
     unregister_jprobe(&Moca_PteFaultjprobe);
 }
