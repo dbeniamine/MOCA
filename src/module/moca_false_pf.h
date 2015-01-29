@@ -9,17 +9,11 @@
  * Copyright (C) 2010 David Beniamine
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
-#define __NO_VERSION__
 #ifndef __MOCA_FALSE_PF__
 #define __MOCA_FALSE_PF__
-//#include <linux/mm.h>
-#include <asm/pgtable.h>
-//#include <linux/swap.h>
-//#include <linux/swapops.h>
-//#include <linux/mm_types.h>
+#define __NO_VERSION__
 
-#define MOCA_USEFULL_PTE(pte) ( (pte) && !pte_none(*(pte))  )
-        /* !pte_special(*(pte)) ) */
+#include <asm/pgtable.h>
 
 // Init data struct required for managing false pf hack
 void Moca_InitFalsePf(void);

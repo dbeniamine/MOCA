@@ -72,7 +72,7 @@ void Moca_MonitorPage(task_data data)
                 addr, pte, i,tsk->on_cpu, data);
         if(pte)
         {
-            //Moca_AddFalsePf(tsk->mm, pte);
+            Moca_AddFalsePf(tsk->mm, pte);
             // Set R/W status
             //TODO: count perfctr
             if(pte_young(*pte))

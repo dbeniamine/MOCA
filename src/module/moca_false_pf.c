@@ -10,7 +10,7 @@
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
-//#define MOCA_DEBUG_PRINT
+#define MOCA_DEBUG
 
 #include <linux/spinlock.h>
 #include "moca_false_pf.h"
@@ -23,7 +23,7 @@
  * If Moca_use_false_pf == 0, all of these functions directly returns without
  * doing anything. It can be set via the module parameter
  */
-int Moca_use_false_pf=0;
+int Moca_use_false_pf=1;
 
 
 typedef struct _Moca_falsePf
@@ -38,7 +38,7 @@ spinlock_t Moca_falsePfLock;
 
 int Moca_FalsePfComparator(hash_entry e1, hash_entry e2)
 {
-    Moca_FalsePf p1=(Moca_FalsePf)e1,p2=(Moca_FalsePf)p2;
+    Moca_FalsePf p1=(Moca_FalsePf)e1,p2=(Moca_FalsePf)e2;
     if(p1->key==p2->key && p1->mm==p2->mm )
         return 0;
     return 1;
@@ -107,6 +107,7 @@ int Moca_FixFalsePf(struct mm_struct *mm, pte_t *pte)
     if(Moca_RemoveFromMap(Moca_falsePfMap,(hash_entry)&tmpPf))
     {
         pte_set_flags(*pte,_PAGE_PRESENT);
+        MOCA_DEBUG_PRINT("Moca fixing false pte_fault %p mm %p\n",pte,mm);
         res=0;
     }
     spin_unlock(&Moca_falsePfLock);
@@ -130,6 +131,7 @@ void Moca_FixAllFalsePf(struct mm_struct *mm)
         if(p->mm==mm)
         {
             pte_set_flags(*( pte_t *)(p->key),_PAGE_PRESENT);
+            MOCA_DEBUG_PRINT("Moca fixing false pte_fault %p mm %p\n",p->key,mm);
             Moca_RemoveFromMap(Moca_falsePfMap,(hash_entry)p);
         }
     }
