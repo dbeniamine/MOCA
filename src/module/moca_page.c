@@ -24,6 +24,10 @@
 #include <linux/pid.h>
 #include <asm/pgtable.h>
 
+#define MOCA_MAX_ENTRY 1<<14
+
+pte_t **buff;
+
 // Wakeup period in ms
 int Moca_wakeupInterval=MOCA_DEFAULT_WAKEUP_INTERVAL;
 
@@ -57,9 +61,9 @@ pte_t *Moca_PteFromAdress(unsigned long address, struct mm_struct *mm)
 }
 
 // Walk through the current chunk
-void Moca_MonitorPage(task_data data)
+static inline int Moca_MonitorPage(task_data data)
 {
-    int i=0,countR, countW;
+    int i=0,countR, countW, nbEntry=0;
     struct task_struct *tsk=Moca_GetTaskFromData(data);
     pte_t *pte;
     void *addr;
@@ -72,7 +76,13 @@ void Moca_MonitorPage(task_data data)
                 addr, pte, i,tsk->on_cpu, data);
         if(pte)
         {
-            Moca_AddFalsePf(tsk->mm, pte);
+            if(nbEntry<MOCA_MAX_ENTRY)
+                buff[nbEntry++]=pte;
+            else
+            {
+                Moca_AddFalsePf(tsk->mm, buff, nbEntry);
+                nbEntry=0;
+            }
             // Set R/W status
             //TODO: count perfctr
             if(pte_young(*pte))
@@ -89,6 +99,7 @@ void Moca_MonitorPage(task_data data)
     Moca_NextChunks(data);
     MOCA_DEBUG_PRINT("Moca pagewalk pte cpu %d data %p end\n",
             tsk->on_cpu,data);
+    return nbEntry;
 }
 
 
@@ -101,8 +112,9 @@ int Moca_MonitorThread(void * arg)
     moca_task t;
     struct task_struct * task;
     //Init tlb walk data
-    unsigned int i;
+    unsigned int i, nbEntry;
     unsigned long long lastwake=0;
+    buff=(pte_t **)kcalloc(MOCA_MAX_ENTRY,sizeof(pte_t *),GFP_KERNEL);
 
     while(!kthread_should_stop())
     {
@@ -121,7 +133,9 @@ int Moca_MonitorThread(void * arg)
                 // important lock therefore we can stop it
                 kill_pid(task_pid(task), SIGSTOP, 1);
                 Moca_UnlockChunk(data);
-                Moca_MonitorPage(data);
+                nbEntry=Moca_MonitorPage(data);
+                if(nbEntry > 0)
+                    Moca_AddFalsePf(task->mm,buff,nbEntry);
                 kill_pid(task_pid(task), SIGCONT, 1);
             }
         }
@@ -131,6 +145,7 @@ int Moca_MonitorThread(void * arg)
         msleep(Moca_wakeupInterval);
     }
     MOCA_DEBUG_PRINT("Moca monitor thread finished\n");
+    kfree(buff);
     return 0;
 }
 
