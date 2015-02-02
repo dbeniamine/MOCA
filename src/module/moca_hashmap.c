@@ -64,7 +64,7 @@ hash_map Moca_InitHashMap(unsigned long hash_bits, int nb_elt,
     if(comp)
         map->comp=comp;
     else
-        map->comp=Moca_DefaultHashMapComp;
+        map->comp=&Moca_DefaultHashMapComp;
 
     MOCA_DEBUG_PRINT("Moca allocationg hash size %lu\n", map->size);
     if(!(map->hashs=kmalloc(sizeof(int)*map->size,GFP_ATOMIC)))
