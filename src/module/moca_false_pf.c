@@ -60,6 +60,7 @@ void Moca_DeleteBadFpf(void)
 {
     int i=0;
     Moca_FalsePf p;
+    return ;
     while((p=(Moca_FalsePf)Moca_NextEntryPos(Moca_falsePfMap, &i))!=NULL)
         if(p->status==MOCA_FALSE_PF_BAD)
             Moca_RemoveFromMap(Moca_falsePfMap,(hash_entry)p);
@@ -71,11 +72,23 @@ void Moca_InitFalsePf(void)
         return;
     Moca_falsePfMap=Moca_InitHashMap(MOCA_FALSE_PF_HASH_BITS,
             2*(1<<MOCA_FALSE_PF_HASH_BITS),sizeof(struct _Moca_falsePf),
-            Moca_FalsePfComparator);
+            &Moca_FalsePfComparator);
     spin_lock_init(&Moca_fpfWLock);
 }
 
-void Moca_DoAddFalsePf(struct mm_struct *mm, pte_t *pte)
+void Moca_ClearFalsePfData(void)
+{
+    int i;
+    Moca_FalsePf p;
+    while((p=(Moca_FalsePf)Moca_NextEntryPos(Moca_falsePfMap, &i))!=NULL)
+    {
+        if(p->status==MOCA_FALSE_PF_VALID)
+            *(pte_t *)(p->key)=pte_set_flags(*(pte_t *)p->key,_PAGE_PRESENT);
+        Moca_RemoveFromMap(Moca_falsePfMap,(hash_entry)p);
+    }
+}
+
+void Moca_AddFalsePf(struct mm_struct *mm, pte_t *pte)
 {
     int status, try=0;
     struct _Moca_falsePf tmpPf;
@@ -86,7 +99,9 @@ void Moca_DoAddFalsePf(struct mm_struct *mm, pte_t *pte)
     tmpPf.key=pte;
     tmpPf.mm=mm;
     do{
+        Moca_FpfPreWrite();
         p=(Moca_FalsePf)Moca_AddToMap(Moca_falsePfMap,(hash_entry)&tmpPf,&status);
+        Moca_FpfPostWrite();
         switch(status)
         {
             case MOCA_HASHMAP_FULL:
@@ -118,16 +133,20 @@ void Moca_DoAddFalsePf(struct mm_struct *mm, pte_t *pte)
 }
 
 // Mark pte as not present, and save it as the false page fault
-void Moca_AddFalsePf(struct mm_struct *mm, pte_t **buf, int nb)
-{
-    int i;
-    if(!Moca_use_false_pf)
-        return;
-    Moca_FpfPreWrite();
-    for(i=0;i<nb;++i)
-        Moca_DoAddFalsePf(mm,buf[i]);
-    Moca_FpfPostWrite();
-}
+//void Moca_AddFalsePf(struct mm_struct *mm, pte_t **buf, int nb)
+//{
+//    int i;
+//    if(!Moca_use_false_pf)
+//        return;
+//    Moca_FpfPreWrite();
+//    MOCA_DEBUG_PRINT("Moca Insterting %d pte faults buf %p\n",nb, buf);
+//    for(i=0;i<nb;++i)
+//    {
+//        MOCA_DEBUG_PRINT("Moca Insterting pte fault %d %p\n",i, buf[i]);
+//        Moca_DoAddFalsePf(mm,buf[i]);
+//    }
+//    Moca_FpfPostWrite();
+//}
 
 /*
  * Try to fix false pte fault on pte.
@@ -140,7 +159,7 @@ int Moca_FixFalsePf(struct mm_struct *mm, pte_t *pte)
     struct _Moca_falsePf tmpPf;
     Moca_FalsePf p;
     int res=1;
-    if(!Moca_use_false_pf)
+    if(1 || !Moca_use_false_pf)
         return 0;
 
     Moca_FpfPreRead();
@@ -174,7 +193,7 @@ void Moca_FixAllFalsePf(struct mm_struct *mm)
     {
         if(p->mm==mm)
         {
-            pte_set_flags(*( pte_t *)(p->key),_PAGE_PRESENT);
+            /* pte_set_flags(*( pte_t *)(p->key),_PAGE_PRESENT); */
             MOCA_DEBUG_PRINT("Moca fixing false pte_fault %p mm %p\n",p->key,mm);
             Moca_RemoveFromMap(Moca_falsePfMap,(hash_entry)p);
         }
@@ -194,24 +213,28 @@ void Moca_ActiveWait(void)
 
 void Moca_FpfPreRead(void)
 {
-    while(atomic_read(&Moca_fpfNbW))
-        Moca_ActiveWait();
-    atomic_inc(&Moca_fpfNbR);
+    /* while(atomic_read(&Moca_fpfNbW)) */
+    /*     Moca_ActiveWait(); */
+    /* atomic_inc(&Moca_fpfNbR); */
+    //TODO remove
+    spin_lock(&Moca_fpfWLock);
 }
 void Moca_FpfPostRead(void)
 {
-    atomic_dec(&Moca_fpfNbR);
+    /* atomic_dec(&Moca_fpfNbR); */
+    //TODO remove
+    spin_unlock(&Moca_fpfWLock);
 }
 void Moca_FpfPreWrite(void)
 {
-    atomic_inc(&Moca_fpfNbW);
-    while(atomic_read(&Moca_fpfNbR) )
-        Moca_ActiveWait();
+    /* atomic_inc(&Moca_fpfNbW); */
+    /* while(atomic_read(&Moca_fpfNbR) ) */
+    /*     Moca_ActiveWait(); */
     spin_lock(&Moca_fpfWLock);
 }
 void Moca_FpfPostWrite(void)
 {
     spin_unlock(&Moca_fpfWLock);
-    atomic_dec(&Moca_fpfNbW);
+    /* atomic_dec(&Moca_fpfNbW); */
 }
 

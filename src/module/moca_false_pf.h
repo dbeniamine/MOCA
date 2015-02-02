@@ -17,9 +17,10 @@
 
 // Init data struct required for managing false pf hack
 void Moca_InitFalsePf(void);
+void Moca_ClearFalsePfData(void);
 
-// Marks the nb pte in buf as not present and save them as false page fault
-void Moca_AddFalsePf(struct mm_struct *mm, pte_t **buf, int nb);
+// Marks the nb pte as not present and save them as false page fault
+void Moca_AddFalsePf(struct mm_struct *mm, pte_t *pte);
 
 
 /*

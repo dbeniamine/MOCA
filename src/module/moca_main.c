@@ -98,6 +98,7 @@ void Moca_CleanUp(void)
     //Clean memory
     MOCA_DEBUG_PRINT("Moca Removing shared data\n");
     Moca_CleanProcessData();
+    Moca_ClearFalsePfData();
 }
 
 
@@ -106,12 +107,12 @@ static int __init Moca_Init(void)
 {
     printk(KERN_NOTICE "Moca started monitoring pid %d\n",
             Moca_mainPid);
+    Moca_InitFalsePf();
+    MOCA_DEBUG_PRINT("Moca false Pf ready \n");
     //Remove previous Moca entries
     if(Moca_InitProcessManagment(Moca_mainPid)!=0)
         return -1;
     MOCA_DEBUG_PRINT("Moca common data ready \n");
-    Moca_InitFalsePf();
-    MOCA_DEBUG_PRINT("Moca false Pf ready \n");
     if(Moca_InitThreads()!=0)
         return -2;
     MOCA_DEBUG_PRINT("Moca threads ready \n");

@@ -24,7 +24,7 @@
 #include <linux/pid.h>
 #include <asm/pgtable.h>
 
-#define MOCA_MAX_ENTRY 1<<14
+#define MOCA_MAX_ENTRY 2000
 
 pte_t **buff;
 
@@ -61,9 +61,9 @@ pte_t *Moca_PteFromAdress(unsigned long address, struct mm_struct *mm)
 }
 
 // Walk through the current chunk
-static inline int Moca_MonitorPage(task_data data)
+void Moca_MonitorPage(task_data data)
 {
-    int i=0,countR, countW, nbEntry=0;
+    int i=0,countR, countW;
     struct task_struct *tsk=Moca_GetTaskFromData(data);
     pte_t *pte;
     void *addr;
@@ -74,15 +74,10 @@ static inline int Moca_MonitorPage(task_data data)
         pte=Moca_PteFromAdress((unsigned long)addr,Moca_GetTaskFromData(data)->mm);
         MOCA_DEBUG_PRINT("Moca pagewalk addr : %p pte %p ind %d cpu %d data %p\n",
                 addr, pte, i,tsk->on_cpu, data);
+        dump_stack()
         if(pte)
         {
-            if(nbEntry<MOCA_MAX_ENTRY)
-                buff[nbEntry++]=pte;
-            else
-            {
-                Moca_AddFalsePf(tsk->mm, buff, nbEntry);
-                nbEntry=0;
-            }
+            Moca_AddFalsePf(tsk->mm, pte);
             // Set R/W status
             //TODO: count perfctr
             if(pte_young(*pte))
@@ -99,7 +94,6 @@ static inline int Moca_MonitorPage(task_data data)
     Moca_NextChunks(data);
     MOCA_DEBUG_PRINT("Moca pagewalk pte cpu %d data %p end\n",
             tsk->on_cpu,data);
-    return nbEntry;
 }
 
 
@@ -112,9 +106,8 @@ int Moca_MonitorThread(void * arg)
     moca_task t;
     struct task_struct * task;
     //Init tlb walk data
-    unsigned int i, nbEntry;
+    unsigned int i;
     unsigned long long lastwake=0;
-    buff=(pte_t **)kcalloc(MOCA_MAX_ENTRY,sizeof(pte_t *),GFP_KERNEL);
 
     while(!kthread_should_stop())
     {
@@ -133,9 +126,7 @@ int Moca_MonitorThread(void * arg)
                 // important lock therefore we can stop it
                 kill_pid(task_pid(task), SIGSTOP, 1);
                 Moca_UnlockChunk(data);
-                nbEntry=Moca_MonitorPage(data);
-                if(nbEntry > 0)
-                    Moca_AddFalsePf(task->mm,buff,nbEntry);
+                Moca_MonitorPage(data);
                 kill_pid(task_pid(task), SIGCONT, 1);
             }
         }
@@ -145,7 +136,6 @@ int Moca_MonitorThread(void * arg)
         msleep(Moca_wakeupInterval);
     }
     MOCA_DEBUG_PRINT("Moca monitor thread finished\n");
-    kfree(buff);
     return 0;
 }
 
