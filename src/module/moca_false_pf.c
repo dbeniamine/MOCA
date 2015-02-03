@@ -27,7 +27,7 @@
  * If Moca_use_false_pf == 0, all of these functions directly returns without
  * doing anything. It can be set via the module parameter
  */
-int Moca_use_false_pf=1;
+int Moca_use_false_pf=0;
 
 
 typedef struct _Moca_falsePf
@@ -41,6 +41,9 @@ typedef struct _Moca_falsePf
 hash_map Moca_falsePfMap;
 
 //Synchronization stuff
+
+atomic_t Moca_fpfNbR=ATOMIC_INIT(0);
+atomic_t Moca_fpfNbW=ATOMIC_INIT(0);
 spinlock_t Moca_fpfWLock;
 void Moca_FpfPreRead(void);
 void Moca_FpfPostRead(void);
@@ -60,7 +63,8 @@ void Moca_DeleteBadFpf(void)
 {
     int i=0;
     Moca_FalsePf p;
-    return ;
+    if(!Moca_use_false_pf)
+        return;
     while((p=(Moca_FalsePf)Moca_NextEntryPos(Moca_falsePfMap, &i))!=NULL)
         if(p->status==MOCA_FALSE_PF_BAD)
             Moca_RemoveFromMap(Moca_falsePfMap,(hash_entry)p);
@@ -80,12 +84,15 @@ void Moca_ClearFalsePfData(void)
 {
     int i;
     Moca_FalsePf p;
+    if(!Moca_use_false_pf)
+        return;
     while((p=(Moca_FalsePf)Moca_NextEntryPos(Moca_falsePfMap, &i))!=NULL)
     {
         if(p->status==MOCA_FALSE_PF_VALID)
             *(pte_t *)(p->key)=pte_set_flags(*(pte_t *)p->key,_PAGE_PRESENT);
         Moca_RemoveFromMap(Moca_falsePfMap,(hash_entry)p);
     }
+    Moca_FreeMap(Moca_falsePfMap);
 }
 
 void Moca_AddFalsePf(struct mm_struct *mm, pte_t *pte)
@@ -93,11 +100,12 @@ void Moca_AddFalsePf(struct mm_struct *mm, pte_t *pte)
     int status, try=0;
     struct _Moca_falsePf tmpPf;
     Moca_FalsePf p;
-    if(!pte || pte_none(*pte) || !pte_present(*pte))
+    if(!Moca_use_false_pf || !pte || pte_none(*pte) || !pte_present(*pte))
         return;
 
     tmpPf.key=pte;
     tmpPf.mm=mm;
+    tmpPf.status=MOCA_FALSE_PF_VALID;
     do{
         Moca_FpfPreWrite();
         p=(Moca_FalsePf)Moca_AddToMap(Moca_falsePfMap,(hash_entry)&tmpPf,&status);
@@ -122,7 +130,6 @@ void Moca_AddFalsePf(struct mm_struct *mm, pte_t *pte)
                 MOCA_DEBUG_PRINT("Moca Reusing bad false PF %p %p\n", pte, mm);
             default:
                 //normal add
-                p->status=MOCA_FALSE_PF_VALID;
                 pte_clear_flags(*pte,_PAGE_PRESENT);
                 MOCA_DEBUG_PRINT("Moca Added false PF %p %p\n", pte, mm);
                 return;
@@ -159,8 +166,8 @@ int Moca_FixFalsePf(struct mm_struct *mm, pte_t *pte)
     struct _Moca_falsePf tmpPf;
     Moca_FalsePf p;
     int res=1;
-    if(1 || !Moca_use_false_pf)
-        return 0;
+    if(!Moca_use_false_pf || !pte || pte_none(*pte) || pte_present(*pte))
+        return res;
 
     Moca_FpfPreRead();
     MOCA_DEBUG_PRINT("Moca testing pte fault %p mm %p\n",pte,mm);
@@ -186,7 +193,7 @@ void Moca_FixAllFalsePf(struct mm_struct *mm)
 {
     int i=0;
     Moca_FalsePf p;
-    if(!Moca_use_false_pf)
+    if(!Moca_use_false_pf || !mm)
         return;
     Moca_FpfPreWrite();
     while((p=(Moca_FalsePf)Moca_NextEntryPos(Moca_falsePfMap, &i))!=NULL)
@@ -201,8 +208,6 @@ void Moca_FixAllFalsePf(struct mm_struct *mm)
     Moca_FpfPostWrite();
 }
 
-atomic_t Moca_fpfNbR=ATOMIC_INIT(0);
-atomic_t Moca_fpfNbW=ATOMIC_INIT(0);
 
 //Ugly but here we really can't yield the proc
 void Moca_ActiveWait(void)
@@ -213,28 +218,24 @@ void Moca_ActiveWait(void)
 
 void Moca_FpfPreRead(void)
 {
-    /* while(atomic_read(&Moca_fpfNbW)) */
-    /*     Moca_ActiveWait(); */
-    /* atomic_inc(&Moca_fpfNbR); */
-    //TODO remove
-    spin_lock(&Moca_fpfWLock);
+    while(atomic_read(&Moca_fpfNbW))
+        Moca_ActiveWait();
+    atomic_inc(&Moca_fpfNbR);
 }
 void Moca_FpfPostRead(void)
 {
-    /* atomic_dec(&Moca_fpfNbR); */
-    //TODO remove
-    spin_unlock(&Moca_fpfWLock);
+    atomic_dec(&Moca_fpfNbR);
 }
 void Moca_FpfPreWrite(void)
 {
-    /* atomic_inc(&Moca_fpfNbW); */
-    /* while(atomic_read(&Moca_fpfNbR) ) */
-    /*     Moca_ActiveWait(); */
+    atomic_inc(&Moca_fpfNbW);
+    while(atomic_read(&Moca_fpfNbR) )
+        Moca_ActiveWait();
     spin_lock(&Moca_fpfWLock);
 }
 void Moca_FpfPostWrite(void)
 {
+    atomic_dec(&Moca_fpfNbW);
     spin_unlock(&Moca_fpfWLock);
-    /* atomic_dec(&Moca_fpfNbW); */
 }
 
