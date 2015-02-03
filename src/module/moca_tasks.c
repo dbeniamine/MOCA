@@ -10,7 +10,7 @@
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
-//#define MOCA_DEBUG
+#define MOCA_DEBUG
 
 #include <linux/pid.h>
 #include <linux/sched.h>
@@ -106,7 +106,7 @@ task_data Moca_GetData(struct task_struct *t)
     task_data ret=NULL;
     tsk.key=t;
     spin_lock(&Moca_tasksLock);
-    if((pos=Moca_PosInMap(Moca_tasksMap ,(hash_entry)&tsk))!=-1)
+    if((pos=Moca_PosInMap(Moca_tasksMap ,(hash_entry)&tsk))>=0)
         ret=((moca_task)Moca_EntryAtPos(Moca_tasksMap,pos))->data;
     spin_unlock(&Moca_tasksLock);
     return ret;
