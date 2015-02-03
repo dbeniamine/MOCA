@@ -10,7 +10,7 @@
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
-//#define MOCA_DEBUG
+#define MOCA_DEBUG
 
 #include <linux/slab.h> //malloc
 #include <linux/hash.h>
@@ -186,7 +186,7 @@ hash_entry Moca_AddToMap(hash_map map, hash_entry e, int *status)
             tableElt(map,nextPos)->key=NULL;
             return tableElt(map,ind);
         }
-        MOCA_DEBUG_PRINT("Moca collision in map %p key %p\n", e->key, map);
+        MOCA_DEBUG_PRINT("Moca collision in map %p key %p\n", map, e->key);
         //TODO: Use Memcpy
         memcpy(tableElt(map,nextPos),e,map->elt_size);
         tableElt(map,nextPos)->next=MOCA_HASHMAP_END;
