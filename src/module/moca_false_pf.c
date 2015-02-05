@@ -50,6 +50,15 @@ void Moca_FpfPostRead(void);
 void Moca_FpfPreWrite(void);
 void Moca_FpfPostWrite(void);
 
+void Moca_FixPte(pte_t *pte, struct mm_struct *mm)
+{
+    if(pte  && !pte_none(*pte) && !pte_present(*pte))
+    {
+        *pte=pte_set_flags(*pte, _PAGE_PRESENT);
+        MOCA_DEBUG_PRINT("Moca fixing false pte_fault %p mm %p\n",pte,mm);
+    }
+}
+
 int Moca_FalsePfComparator(hash_entry e1, hash_entry e2)
 {
     Moca_FalsePf p1=(Moca_FalsePf)e1,p2=(Moca_FalsePf)e2;
@@ -89,7 +98,7 @@ void Moca_ClearFalsePfData(void)
     while((p=(Moca_FalsePf)Moca_NextEntryPos(Moca_falsePfMap, &i))!=NULL)
     {
         if(p->status==MOCA_FALSE_PF_VALID)
-            *(pte_t *)(p->key)=pte_set_flags(*(pte_t *)p->key,_PAGE_PRESENT);
+            Moca_FixPte((pte_t *)p->key, NULL);
         Moca_RemoveFromMap(Moca_falsePfMap,(hash_entry)p);
     }
     Moca_FreeMap(Moca_falsePfMap);
@@ -118,15 +127,9 @@ void Moca_AddFalsePf(struct mm_struct *mm, pte_t *pte)
                 ++try;
                 break;
             case MOCA_HASHMAP_ERROR:
-                Moca_Panic("Moca unhandeled hashmap error");
+                Moca_Panic("Moca unhandled hashmap error");
                 return;
             case  MOCA_HASHMAP_ALREADY_IN_MAP:
-                //TODO update status
-                if(p->status!=MOCA_FALSE_PF_BAD)
-                {
-                    Moca_Panic("Moca adding false pf already in map");
-                    return;
-                }
                 MOCA_DEBUG_PRINT("Moca Reusing bad false PF %p %p\n", pte, mm);
             default:
                 //normal add
@@ -175,9 +178,8 @@ int Moca_FixFalsePf(struct mm_struct *mm, pte_t *pte)
     tmpPf.mm=mm;
     if((p=(Moca_FalsePf)Moca_EntryFromKey(Moca_falsePfMap,(hash_entry)&tmpPf)))
     {
+        Moca_FixPte(pte, mm);
         p->status=MOCA_FALSE_PF_BAD;
-        pte_set_flags(*pte,_PAGE_PRESENT);
-        MOCA_DEBUG_PRINT("Moca fixing false pte_fault %p mm %p\n",pte,mm);
         res=0;
     }
     Moca_FpfPostRead();
@@ -200,8 +202,7 @@ void Moca_FixAllFalsePf(struct mm_struct *mm)
     {
         if(p->mm==mm)
         {
-            /* pte_set_flags(*( pte_t *)(p->key),_PAGE_PRESENT); */
-            MOCA_DEBUG_PRINT("Moca fixing false pte_fault %p mm %p\n",p->key,mm);
+            Moca_FixPte((pte_t *)p->key, mm);
             Moca_RemoveFromMap(Moca_falsePfMap,(hash_entry)p);
         }
     }
