@@ -35,7 +35,8 @@ void Moca_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
         data=tsk->data;
     }
     MOCA_DEBUG_PRINT("Moca Pte fault task %p\n", current);
-    if((pte=Moca_PteFromAdress(address,mm)))
+    pte=Moca_PteFromAdress(address,mm);
+    if(pte && !pte_none(*pte))
         Moca_FixFalsePf(mm,pte);
     Moca_AddToChunk(data,(void *)(address&PAGE_MASK),get_cpu());
     Moca_UpdateClock();
@@ -72,8 +73,10 @@ int Moca_RegisterProbes(void)
     int ret;
     /* if ((ret=register_jprobe(&Moca_UnmapPageProbe))) */
     /*     Moca_Panic("Unable to register do exit probe"); */
+    MOCA_DEBUG_PRINT("Moca registering probes\n");
     if ((ret=register_jprobe(&Moca_PteFaultjprobe)))
         Moca_Panic("Moca Unable to register pte fault probe");
+    MOCA_DEBUG_PRINT("Moca registered probes\n");
     return ret;
 }
 

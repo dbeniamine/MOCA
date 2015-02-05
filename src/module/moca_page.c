@@ -24,10 +24,6 @@
 #include <linux/pid.h>
 #include <asm/pgtable.h>
 
-#define MOCA_MAX_ENTRY 2000
-
-pte_t **buff;
-
 // Wakeup period in ms
 int Moca_wakeupInterval=MOCA_DEFAULT_WAKEUP_INTERVAL;
 
@@ -74,7 +70,6 @@ void Moca_MonitorPage(task_data data)
         pte=Moca_PteFromAdress((unsigned long)addr,Moca_GetTaskFromData(data)->mm);
         MOCA_DEBUG_PRINT("Moca pagewalk addr : %p pte %p ind %d cpu %d data %p\n",
                 addr, pte, i,tsk->on_cpu, data);
-        dump_stack()
         if(pte)
         {
             Moca_AddFalsePf(tsk->mm, pte);
@@ -106,20 +101,21 @@ int Moca_MonitorThread(void * arg)
     moca_task t;
     struct task_struct * task;
     //Init tlb walk data
-    unsigned int i;
+    int pos;
     unsigned long long lastwake=0;
 
+    MOCA_DEBUG_PRINT("Moca monitor thread alive \n");
     while(!kthread_should_stop())
     {
-        i=0;
-        while((t=Moca_NextTask(&i)))
+        pos=0;
+        while((t=Moca_NextTask(&pos)))
         {
             data=t->data;
-            task=(struct task_struct *)t->key;
+            task=(struct task_struct *)(t->key);
             MOCA_DEBUG_PRINT("Moca monitor thread testing task %p\n", task);
-            if(pid_alive(task) && task->sched_info.last_arrival > lastwake)
+            if(pid_alive(task) && task->sched_info.last_arrival >= lastwake)
             {
-                lastwake=MAX(lastwake,task->sched_info.last_arrival);
+                lastwake=task->sched_info.last_arrival;
                 MOCA_DEBUG_PRINT("Moca monitor thread found task %p\n",task);
                 Moca_LockChunk(data);
                 // Here we are sure that the monitored task does not held an

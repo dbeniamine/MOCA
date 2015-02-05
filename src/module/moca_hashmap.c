@@ -155,8 +155,8 @@ hash_entry Moca_AddToMap(hash_map map, hash_entry e, int *status)
     }
     //Do the insertion
     nextPos=Moca_FindNextAvailPosMap(map);
-    MOCA_DEBUG_PRINT("Moca inserting %p ind %d/%lu\n",
-            e->key,nextPos,map->tableSize);
+    MOCA_DEBUG_PRINT("Moca inserting %p ind %d/%lu total %d\n",
+            e->key,nextPos,map->tableSize, map->nbentry);
     if((unsigned)nextPos >= map->tableSize)
     {
         *status=MOCA_HASHMAP_ERROR;
