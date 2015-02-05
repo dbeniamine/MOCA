@@ -9,7 +9,7 @@
  * Copyright (C) 2010 David Beniamine
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
-//#define MOCA_DEBUG
+#define MOCA_DEBUG
 
 #include <linux/init.h>
 #include <linux/kthread.h>
@@ -39,6 +39,7 @@ extern int Moca_nbChunks;
 extern int Moca_use_false_pf;
 // Priority for FIFO scheduler
 int Moca_schedulerPriority=MOCA_DEFAULT_SCHED_PRIO;
+int Moca_Activated=0;
 
 module_param(Moca_mainPid, int, 0);
 module_param(Moca_wakeupInterval,int,0);
@@ -87,6 +88,8 @@ int Moca_InitThreads(void)
 
 void Moca_CleanUp(void)
 {
+    if(!Moca_Activated)
+        return;
     MOCA_DEBUG_PRINT("Moca Unregistering probes\n");
     Moca_UnregisterProbes();
     if(Moca_threadTask && current != Moca_threadTask)
@@ -98,7 +101,11 @@ void Moca_CleanUp(void)
     //Clean memory
     MOCA_DEBUG_PRINT("Moca Removing shared data\n");
     Moca_CleanProcessData();
+    MOCA_DEBUG_PRINT("Moca Removed shared data\n");
+    MOCA_DEBUG_PRINT("Moca Removing falsepf\n");
     Moca_ClearFalsePfData();
+    MOCA_DEBUG_PRINT("Moca Removed falsepf\n");
+    Moca_Activated=0;
 }
 
 
@@ -120,7 +127,7 @@ static int __init Moca_Init(void)
         return -3;
     MOCA_DEBUG_PRINT("Moca probes ready \n");
     printk(KERN_NOTICE "Moca correctly intialized \n");
-    //Send signal to son process
+    Moca_Activated=1;
     return 0;
 }
 
