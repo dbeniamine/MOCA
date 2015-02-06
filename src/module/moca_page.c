@@ -67,7 +67,7 @@ void Moca_MonitorPage(task_data data)
             data, tsk, tsk->mm);
     while((addr=Moca_AddrInChunkPos(data,i))!=NULL)
     {
-        pte=Moca_PteFromAdress((unsigned long)addr,Moca_GetTaskFromData(data)->mm);
+        pte=Moca_PteFromAdress((unsigned long)addr,tsk->mm);
         MOCA_DEBUG_PRINT("Moca pagewalk addr : %p pte %p ind %d cpu %d data %p\n",
                 addr, pte, i,tsk->on_cpu, data);
         if(pte)

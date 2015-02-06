@@ -38,7 +38,7 @@ typedef struct _hash_map
 int Moca_DefaultHashMapComp(hash_entry e1, hash_entry e2)
 {
     unsigned long k1=(unsigned long)(e1->key),k2=(unsigned long)(e2->key);
-    return k1==k2?0:(k1>k2?1:-1);
+    return k1-k2;
 }
 
 unsigned int Moca_FindNextAvailPosMap(hash_map map)

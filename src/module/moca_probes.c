@@ -34,12 +34,12 @@ void Moca_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
             jprobe_return();
         data=tsk->data;
     }
+    Moca_AddToChunk(data,(void *)address,get_cpu());
     MOCA_DEBUG_PRINT("Moca Pte fault task %p\n", current);
     pte=Moca_PteFromAdress(address,mm);
     if(pte && !pte_none(*pte))
         /* Moca_FixFalsePf(mm,pte); */
         *pte=pte_set_flags(*pte, _PAGE_PRESENT);
-    Moca_AddToChunk(data,(void *)(address&PAGE_MASK),get_cpu());
     Moca_UpdateClock();
     jprobe_return();
 
