@@ -10,7 +10,7 @@
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
-/* #define MOCA_DEBUG */
+#define MOCA_DEBUG
 
 #include <linux/kprobes.h>
 #include "moca.h"
@@ -38,8 +38,11 @@ void Moca_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
     MOCA_DEBUG_PRINT("Moca Pte fault task %p\n", current);
     pte=Moca_PteFromAdress(address,mm);
     if(pte && !pte_none(*pte))
-        /* Moca_FixFalsePf(mm,pte); */
-        *pte=pte_set_flags(*pte, _PAGE_PRESENT);
+    {
+        Moca_FixFalsePf(mm,pte);
+        /* *pte=pte_set_flags(*pte, _PAGE_PRESENT); */
+        /* MOCA_DEBUG_PRINT("Moca fixed pte flags %p\n", pte); */
+    }
     Moca_UpdateClock();
     jprobe_return();
 

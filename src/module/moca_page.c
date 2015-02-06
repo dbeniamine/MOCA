@@ -72,9 +72,12 @@ void Moca_MonitorPage(task_data data)
                 addr, pte, i,tsk->on_cpu, data);
         if(pte)
         {
-            /* Moca_AddFalsePf(tsk->mm, pte); */
-            if(!pte_none(*pte) && pte_present(*pte))
-                *pte=pte_set_flags(*pte,_PAGE_PRESENT);
+            Moca_AddFalsePf(tsk->mm, pte);
+            /* if(!pte_none(*pte) && pte_present(*pte)) */
+            /* { */
+            /*     *pte=pte_set_flags(*pte,_PAGE_PRESENT); */
+            /*     MOCA_DEBUG_PRINT("Moca clear pte flags %p\n", pte); */
+            /* } */
             // Set R/W status
             //TODO: count perfctr
             if(pte_young(*pte))
@@ -106,10 +109,12 @@ int Moca_MonitorThread(void * arg)
     int pos;
     unsigned long long lastwake=0;
 
+    dump_stack();
     MOCA_DEBUG_PRINT("Moca monitor thread alive \n");
     while(!kthread_should_stop())
     {
         pos=0;
+        dump_stack();
         while((t=Moca_NextTask(&pos)))
         {
             data=t->data;

@@ -39,6 +39,7 @@ int Moca_nbChunks=20;
 #include "moca_tasks.h"
 #include "moca_hashmap.h"
 #include "moca_page.h"
+#include "moca_false_pf.h"
 
 
 
@@ -362,6 +363,7 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
     char *MYBUFF;
     struct _chunk_entry tmpch;
     chunk_entry e;
+    pte_t *pte;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
     task_data data=(task_data)PDE_DATA(file_inode(filp));
 #else
@@ -443,6 +445,8 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
                         break;
                     }
                     //Access @Virt @Phy countread countwrite cpumask
+                    if((pte=Moca_PteFromAdress((unsigned long)e->key, data->task->mm)))
+                        Moca_AddFalsePf(data->task->mm,pte);
                     sz=snprintf(MYBUFF,MOCA_BUF_SIZE,"Access %p %p %d %d ",
                             e->key, e->key,
                             //Moca_PhyFromVirt(e->key, data->task->mm),
