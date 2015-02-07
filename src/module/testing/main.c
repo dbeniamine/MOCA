@@ -12,6 +12,7 @@ typedef struct _foo
     int other_val;
 }*foo;
 
+
 int multicomp(hash_entry e1, hash_entry e2)
 {
     foo f1=(foo)e1, f2=(foo)e2;
@@ -26,12 +27,13 @@ int main()
     //Init
     int i, nbAdd, *ptr,st, j, k;
     foo e, keys;
-    hash_map map=Moca_InitHashMap(14,2*(1UL<<14), sizeof(struct _foo),multicomp);
+    struct _foo tmp;
+    hash_map map=Moca_InitHashMap(14,2*(1UL<<14), sizeof(struct _foo),&multicomp);
     srand(time(NULL));
 
-    nbAdd=1000;
+    nbAdd=10;
     keys=calloc(nbAdd, sizeof(struct _foo));
-    for(k=0;k<10;++k)
+    for(k=0;k<1;++k)
     {
         printf("Inserting %d elements\n", nbAdd);
         for(i=0;i<nbAdd;i++)
@@ -45,9 +47,12 @@ int main()
             keys[j].key=ptr;
             keys[j].val=rand()%10;
             keys[j].other_val=rand()%10;
+            tmp.key=ptr;
+            tmp.val=keys[j].val;
+            tmp.other_val=keys[j].other_val;
             printf("inserting e %p, k %p, n: %d, v %d, ov %d\n", keys+j, keys[j].key,
                     keys[j].next,keys[j].val, keys[j].other_val);
-            e= (foo)Moca_AddToMap(map,(hash_entry)(keys+j), &st);
+            e= (foo)Moca_AddToMap(map,(hash_entry)(&tmp), &st);
             /* printf("inserting %p, %d/%d res: %p / %d\n", ptr, i, nbAdd, e, st); */
             printf("inserted e %p, k %p, n: %d, v %d, ov %d\n", e, e->key,
                     e->next,e->val, e->other_val);

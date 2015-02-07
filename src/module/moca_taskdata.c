@@ -10,7 +10,7 @@
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
-//#define MOCA_DEBUG
+/* #define MOCA_DEBUG */
 
 #define MOCA_BUF_SIZE 4096
 #define MOCA_DATA_STATUS_NORMAL 0
@@ -38,7 +38,6 @@ int Moca_nbChunks=20;
 #include "moca_taskdata.h"
 #include "moca_tasks.h"
 #include "moca_hashmap.h"
-#include "moca_page.h"
 
 
 
@@ -166,6 +165,7 @@ void Moca_ClearAllData(void)
         MOCA_DEBUG_PRINT("Moca asking data %d %p %p to end\n",i, t->data, t->key);
         t->data->status=MOCA_DATA_STATUS_NEEDFLUSH;
     }
+    MOCA_DEBUG_PRINT("Moca flushing\n");
     i=0;
     while((t=Moca_NextTask(&i)))
     {

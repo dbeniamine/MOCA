@@ -10,7 +10,7 @@
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
-#define MOCA_DEBUG
+/* #define MOCA_DEBUG */
 
 #include "moca.h"
 #include "moca_page.h"
@@ -43,8 +43,13 @@ pte_t *Moca_PteFromAdress(unsigned long address, struct mm_struct *mm)
     pgd_t *pgd;
     pmd_t *pmd;
     pud_t *pud;
+    if(!mm)
+    {
+        MOCA_DEBUG_PRINT("Moca mm null !\n");
+        return NULL;
+    }
     pgd = pgd_offset(mm, address);
-    if (!pgd || pgd_none(*pgd) || pgd_bad(*pgd))
+    if (!pgd || pgd_none(*pgd) || pgd_bad(*pgd) )
         return NULL;
     pud = pud_offset(pgd, address);
     if(!pud || pud_none(*pud) || pud_bad(*pud))
@@ -67,22 +72,17 @@ void Moca_MonitorPage(task_data data)
             data, tsk, tsk->mm);
     while((addr=Moca_AddrInChunkPos(data,i))!=NULL)
     {
-        pte=Moca_PteFromAdress((unsigned long)addr,Moca_GetTaskFromData(data)->mm);
+        pte=Moca_PteFromAdress((unsigned long)addr,tsk->mm);
         MOCA_DEBUG_PRINT("Moca pagewalk addr : %p pte %p ind %d cpu %d data %p\n",
                 addr, pte, i,tsk->on_cpu, data);
         if(pte)
         {
-            if(pte_present(*pte) && MOCA_USEFULL_PTE(pte))
-            {
-                MOCA_PRINT_FLAGS(pte);
-                MOCA_SET_FALSE_PF(*pte);
-                MOCA_PRINT_FLAGS(pte);
-                MOCA_DEBUG_PRINT("Moca FLAGS CLEARED pte %p\n", pte);
-                if(!MOCA_FALSE_PF(*pte))
-                {
-                    MOCA_DEBUG_PRINT("MOCA false PF isn't recognised !!!!\n");
-                }
-            }
+            Moca_AddFalsePf(tsk->mm, pte);
+            /* if(!pte_none(*pte) && pte_present(*pte)) */
+            /* { */
+            /*     *pte=pte_set_flags(*pte,_PAGE_PRESENT); */
+            /*     MOCA_DEBUG_PRINT("Moca clear pte flags %p\n", pte); */
+            /* } */
             // Set R/W status
             //TODO: count perfctr
             if(pte_young(*pte))
@@ -111,20 +111,23 @@ int Moca_MonitorThread(void * arg)
     moca_task t;
     struct task_struct * task;
     //Init tlb walk data
-    unsigned int i;
+    int pos;
     unsigned long long lastwake=0;
 
+    /* dump_stack(); */
+    MOCA_DEBUG_PRINT("Moca monitor thread alive \n");
     while(!kthread_should_stop())
     {
-        i=0;
-        while((t=Moca_NextTask(&i)))
+        pos=0;
+        /* dump_stack(); */
+        while((t=Moca_NextTask(&pos)))
         {
             data=t->data;
-            task=(struct task_struct *)t->key;
+            task=(struct task_struct *)(t->key);
             MOCA_DEBUG_PRINT("Moca monitor thread testing task %p\n", task);
-            if(pid_alive(task) && task->sched_info.last_arrival > lastwake)
+            if(pid_alive(task) && task->sched_info.last_arrival >= lastwake)
             {
-                lastwake=MAX(lastwake,task->sched_info.last_arrival);
+                lastwake=task->sched_info.last_arrival;
                 MOCA_DEBUG_PRINT("Moca monitor thread found task %p\n",task);
                 Moca_LockChunk(data);
                 // Here we are sure that the monitored task does not held an
