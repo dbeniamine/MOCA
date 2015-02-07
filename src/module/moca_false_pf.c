@@ -149,22 +149,6 @@ void Moca_AddFalsePf(struct mm_struct *mm, pte_t *pte)
             pte, mm);
 }
 
-// Mark pte as not present, and save it as the false page fault
-//void Moca_AddFalsePf(struct mm_struct *mm, pte_t **buf, int nb)
-//{
-//    int i;
-//    if(!Moca_use_false_pf)
-//        return;
-//    Moca_FpfPreWrite();
-//    MOCA_DEBUG_PRINT("Moca Insterting %d pte faults buf %p\n",nb, buf);
-//    for(i=0;i<nb;++i)
-//    {
-//        MOCA_DEBUG_PRINT("Moca Insterting pte fault %d %p\n",i, buf[i]);
-//        Moca_DoAddFalsePf(mm,buf[i]);
-//    }
-//    Moca_FpfPostWrite();
-//}
-
 /*
  * Try to fix false pte fault on pte.
  * Does nothing if pte isn't in the false pte list
