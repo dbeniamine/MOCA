@@ -9,7 +9,7 @@
  * Copyright (C) 2010 David Beniamine
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
-#define MOCA_DEBUG
+/* #define MOCA_DEBUG */
 
 #include <linux/init.h>
 #include <linux/kthread.h>

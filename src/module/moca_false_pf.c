@@ -10,7 +10,7 @@
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
-#define MOCA_DEBUG
+/* #define MOCA_DEBUG */
 
 #include <linux/spinlock.h>
 #include <asm/atomic.h>
@@ -90,8 +90,7 @@ void Moca_InitFalsePf(void)
         return;
     Moca_falsePfMap=Moca_InitHashMap(MOCA_FALSE_PF_HASH_BITS,
             2*(1<<MOCA_FALSE_PF_HASH_BITS),sizeof(struct _Moca_falsePf),
-            NULL);
-    /* &Moca_FalsePfComparator); */
+            &Moca_FalsePfComparator);
     spin_lock_init(&Moca_fpfWLock);
 }
 

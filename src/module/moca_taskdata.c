@@ -10,7 +10,7 @@
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
-#define MOCA_DEBUG
+/* #define MOCA_DEBUG */
 
 #define MOCA_BUF_SIZE 4096
 #define MOCA_DATA_STATUS_NORMAL 0

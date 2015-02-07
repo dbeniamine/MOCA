@@ -10,7 +10,7 @@
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
-#define MOCA_DEBUG
+/* #define MOCA_DEBUG */
 
 #include "moca.h"
 #include "moca_page.h"
@@ -114,12 +114,12 @@ int Moca_MonitorThread(void * arg)
     int pos;
     unsigned long long lastwake=0;
 
-    dump_stack();
+    /* dump_stack(); */
     MOCA_DEBUG_PRINT("Moca monitor thread alive \n");
     while(!kthread_should_stop())
     {
         pos=0;
-        dump_stack();
+        /* dump_stack(); */
         while((t=Moca_NextTask(&pos)))
         {
             data=t->data;
