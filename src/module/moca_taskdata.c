@@ -389,7 +389,7 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
         MOCA_DEBUG_PRINT("Moca first flush for data %p\n", data);
 
         //Task id pid
-        if(data->internalId==0)
+        if(data->internalId!=0)
             sz=snprintf(MYBUFF,MOCA_BUF_SIZE,"Task %d %d\n",
                     data->internalId,task_pid_nr(data->task));
         else
