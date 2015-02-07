@@ -142,7 +142,8 @@ hash_entry Moca_EntryFromKey(hash_map map, hash_entry e)
 hash_entry Moca_AddToMap(hash_map map, hash_entry e, int *status)
 {
     unsigned long h;
-    int ind=0, nextPos;
+    int ind=0;
+    unsigned int nextPos;
     if(!map)
     {
         *status=MOCA_HASHMAP_ERROR;
@@ -157,7 +158,7 @@ hash_entry Moca_AddToMap(hash_map map, hash_entry e, int *status)
     nextPos=Moca_FindNextAvailPosMap(map);
     MOCA_DEBUG_PRINT("Moca inserting %p ind %d/%lu total %d\n",
             e->key,nextPos,map->tableSize, map->nbentry);
-    if((unsigned)nextPos >= map->tableSize)
+    if(nextPos >= map->tableSize)
     {
         *status=MOCA_HASHMAP_ERROR;
         Moca_Panic("Moca hashmap BUG in AddToMap");
