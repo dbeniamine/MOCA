@@ -43,8 +43,13 @@ pte_t *Moca_PteFromAdress(unsigned long address, struct mm_struct *mm)
     pgd_t *pgd;
     pmd_t *pmd;
     pud_t *pud;
+    if(!mm)
+    {
+        MOCA_DEBUG_PRINT("Moca mm null !\n");
+        return NULL;
+    }
     pgd = pgd_offset(mm, address);
-    if (!pgd || pgd_none(*pgd) || pgd_bad(*pgd))
+    if (!pgd || pgd_none(*pgd) || pgd_bad(*pgd) )
         return NULL;
     pud = pud_offset(pgd, address);
     if(!pud || pud_none(*pud) || pud_bad(*pud))

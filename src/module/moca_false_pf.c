@@ -27,7 +27,7 @@
  * If Moca_use_false_pf == 0, all of these functions directly returns without
  * doing anything. It can be set via the module parameter
  */
-int Moca_use_false_pf=0;
+int Moca_use_false_pf=1;
 
 
 typedef struct _Moca_falsePf
@@ -50,13 +50,15 @@ void Moca_FpfPostRead(void);
 void Moca_FpfPreWrite(void);
 void Moca_FpfPostWrite(void);
 
-void Moca_FixPte(pte_t *pte, struct mm_struct *mm)
+int Moca_FixPte(pte_t *pte, struct mm_struct *mm)
 {
-    if(pte  && !pte_none(*pte) && !pte_present(*pte))
-    {
-        *pte=pte_set_flags(*pte, _PAGE_PRESENT);
-        MOCA_DEBUG_PRINT("Moca fixing false pte_fault %p mm %p\n",pte,mm);
-    }
+    int res=1;
+    if(!pte)
+        return res;
+    *pte=pte_set_flags(*pte, _PAGE_PRESENT);
+    MOCA_DEBUG_PRINT("Moca fixing false pte_fault %p mm %p\n",pte,mm);
+    res=0;
+    return res;
 }
 
 int Moca_FalsePfComparator(hash_entry e1, hash_entry e2)
@@ -76,7 +78,10 @@ void Moca_DeleteBadFpf(void)
         return;
     while((p=(Moca_FalsePf)Moca_NextEntryPos(Moca_falsePfMap, &i))!=NULL)
         if(p->status==MOCA_FALSE_PF_BAD)
+        {
+            MOCA_DEBUG_PRINT("Moca removed bad pf %p %p\n", p->key, p->mm);
             Moca_RemoveFromMap(Moca_falsePfMap,(hash_entry)p);
+        }
 }
 
 void Moca_InitFalsePf(void)
@@ -85,7 +90,8 @@ void Moca_InitFalsePf(void)
         return;
     Moca_falsePfMap=Moca_InitHashMap(MOCA_FALSE_PF_HASH_BITS,
             2*(1<<MOCA_FALSE_PF_HASH_BITS),sizeof(struct _Moca_falsePf),
-            &Moca_FalsePfComparator);
+            NULL);
+    /* &Moca_FalsePfComparator); */
     spin_lock_init(&Moca_fpfWLock);
 }
 
@@ -95,6 +101,7 @@ void Moca_ClearFalsePfData(void)
     Moca_FalsePf p;
     if(!Moca_use_false_pf)
         return;
+    MOCA_DEBUG_PRINT("Moca removing all false pf\n");
     while((p=(Moca_FalsePf)Moca_NextEntryPos(Moca_falsePfMap, &i))!=NULL)
     {
         if(p->status==MOCA_FALSE_PF_VALID)
@@ -114,10 +121,11 @@ void Moca_AddFalsePf(struct mm_struct *mm, pte_t *pte)
 
     tmpPf.key=pte;
     tmpPf.mm=mm;
-    tmpPf.status=MOCA_FALSE_PF_VALID;
     do{
         Moca_FpfPreWrite();
         p=(Moca_FalsePf)Moca_AddToMap(Moca_falsePfMap,(hash_entry)&tmpPf,&status);
+        p->status=MOCA_FALSE_PF_VALID;
+        *pte=pte_clear_flags(*pte,_PAGE_PRESENT);
         Moca_FpfPostWrite();
         switch(status)
         {
@@ -133,8 +141,8 @@ void Moca_AddFalsePf(struct mm_struct *mm, pte_t *pte)
                 MOCA_DEBUG_PRINT("Moca Reusing bad false PF %p %p\n", pte, mm);
             default:
                 //normal add
-                pte_clear_flags(*pte,_PAGE_PRESENT);
-                MOCA_DEBUG_PRINT("Moca Added false PF %p %p\n", pte, mm);
+                MOCA_DEBUG_PRINT("Moca Added false PF %p %p at %d/%d \n", pte, 
+                        mm,(unsigned)status, Moca_NbElementInMap(Moca_falsePfMap));
                 return;
         }
     }while(try<2);
@@ -169,7 +177,7 @@ int Moca_FixFalsePf(struct mm_struct *mm, pte_t *pte)
     struct _Moca_falsePf tmpPf;
     Moca_FalsePf p;
     int res=1;
-    if(!Moca_use_false_pf || !pte || pte_none(*pte) || pte_present(*pte))
+    if(!Moca_use_false_pf || !pte || pte_none(*pte))
         return res;
 
     Moca_FpfPreRead();
@@ -178,9 +186,9 @@ int Moca_FixFalsePf(struct mm_struct *mm, pte_t *pte)
     tmpPf.mm=mm;
     if((p=(Moca_FalsePf)Moca_EntryFromKey(Moca_falsePfMap,(hash_entry)&tmpPf)))
     {
-        Moca_FixPte(pte, mm);
+        MOCA_DEBUG_PRINT("Moca found false pte %p mm %p\n",p->key,p->mm);
+        res=Moca_FixPte(pte, mm);
         p->status=MOCA_FALSE_PF_BAD;
-        res=0;
     }
     Moca_FpfPostRead();
     return res;
