@@ -184,6 +184,7 @@ void Moca_ClearAllData(void)
             Moca_FreeMap(t->data->chunks[chunkid]->map);
             kfree(t->data->chunks[chunkid]);
         }
+        kfree(t->data->chunks);
         kfree(t->data);
         Moca_RemoveTask(t->key);
         MOCA_DEBUG_PRINT("Memap Freed data %d \n", i);
