@@ -79,20 +79,14 @@ void Moca_MonitorPage(task_data data)
                 addr, pte, i,tsk->on_cpu, data);
         if(pte)
         {
-            if(buffUse < MOCA_FPF_BUFF_SIZE)
-            {
                 Moca_fpfBuff[buffUse]=pte;
-                MOCA_DEBUG_PRINT("Moca adding to buff pte %p \n", pte);
+                MOCA_DEBUG_PRINT("Moca adding to buff pte %p at %d \n", pte,buffUse);
                 ++buffUse;
-
-            }
-            else
+            if(buffUse >= MOCA_FPF_BUFF_SIZE)
             {
                 Moca_AddFalsePf(tsk->mm, Moca_fpfBuff, buffUse);
-                Moca_fpfBuff[0]=pte;
-                MOCA_DEBUG_PRINT("Moca adding to buff pte %p\n", pte);
-                buffUse=1;
-
+                buffUse=0;
+                MOCA_DEBUG_PRINT("Moca flush pte buff %p\n", pte);
             }
             /* if(!pte_none(*pte) && pte_present(*pte)) */
             /* { */
@@ -111,7 +105,8 @@ void Moca_MonitorPage(task_data data)
             MOCA_DEBUG_PRINT("Moca no pte for adress %p\n", addr);
         ++i;
     }
-    Moca_AddFalsePf(tsk->mm, Moca_fpfBuff, buffUse);
+    if(buffUse>0)
+        Moca_AddFalsePf(tsk->mm, Moca_fpfBuff, buffUse);
     // Goto to next chunk
     Moca_NextChunks(data);
     MOCA_DEBUG_PRINT("Moca pagewalk pte cpu %d data %p end\n",
