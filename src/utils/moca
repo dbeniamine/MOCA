@@ -197,3 +197,19 @@ line=$(grep -n "Moca started" /var/log/kern.log | tail -n 1 | cut -d ':' -f 1)
 line=$(($line-1))
 line+='d'
 sed 1,$line /var/log/kern.log | grep -i "moca" > $logdir/$Moca_log
+# Create the event poducers log (required by framesoc)
+fields=('2' '3')
+fieldsName=('Physical' 'Virtual')
+cd $logdir
+for i in ${!fields[*]}
+do
+    f=${fields[$i]}
+    name=${fieldsName[$i]}
+    grep "Access" -RH | cut -d ' ' -f 1,$f | \
+        sed -e 's/.*Moca-\([^\.]*\).log/\1/' -e 's/:Access//' \
+        -e 's/\([^ ]*\) \(.*\)/\2 \1/' | sort | uniq | \
+        awk {'if(ADD==$1) {ACC=ACC" "$2} else {print ADD,ACC;ADD=$1;ACC=$2}'} \
+        > Moca-$name.log
+
+done
+cd -
