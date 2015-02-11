@@ -77,11 +77,13 @@ void Moca_DeleteBadFpf(void)
     if(!Moca_use_false_pf)
         return;
     while((p=(Moca_FalsePf)Moca_NextEntryPos(Moca_falsePfMap, &i))!=NULL)
+    {
         if(p->status==MOCA_FALSE_PF_BAD)
         {
             MOCA_DEBUG_PRINT("Moca removed bad pf %p %p\n", p->key, p->mm);
             Moca_RemoveFromMap(Moca_falsePfMap,(hash_entry)p);
         }
+    }
 }
 
 void Moca_InitFalsePf(void)
@@ -103,10 +105,11 @@ void Moca_ClearFalsePfData(void)
     MOCA_DEBUG_PRINT("Moca removing all false pf\n");
     while((p=(Moca_FalsePf)Moca_NextEntryPos(Moca_falsePfMap, &i))!=NULL)
     {
+        MOCA_DEBUG_PRINT("Moca removing all false pfi %p %d\n", p->key, p->status==MOCA_FALSE_PF_VALID);
         if(p->status==MOCA_FALSE_PF_VALID)
             Moca_FixPte((pte_t *)p->key, NULL);
-        Moca_RemoveFromMap(Moca_falsePfMap,(hash_entry)p);
     }
+    MOCA_DEBUG_PRINT("Moca removing all false map%p\n",Moca_falsePfMap);
     Moca_FreeMap(Moca_falsePfMap);
 }
 

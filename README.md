@@ -53,6 +53,8 @@ chunksize or reduce the wakeup interval. Please note that, as memory is quite
 restricted in the kernel, it might be a better idea to play on the wakeup
 interval the priority than on the storage related parameters.
 
+**TODO : rewrite**
+
 To do so, the following parameters are available:
 
     -w ms           Set the wakeup interval for Moca to interval ms
@@ -82,6 +84,8 @@ visualised into framesoc[3] (see next section).
 All files starts with a Line giving the internalID and the system processID:
 
     Task internalId ProcessId
+
+The Task 0 first line ends with a page_size of your machine.
 
 The second is always the beginning of a chunk:
 

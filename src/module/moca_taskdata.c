@@ -184,6 +184,7 @@ void Moca_ClearAllData(void)
             Moca_FreeMap(t->data->chunks[chunkid]->map);
             kfree(t->data->chunks[chunkid]);
         }
+        kfree(t->data->chunks);
         kfree(t->data);
         Moca_RemoveTask(t->key);
         MOCA_DEBUG_PRINT("Memap Freed data %d \n", i);
@@ -368,6 +369,12 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
 #endif
     MOCA_DEBUG_PRINT("Moca_Flushing data %p allowed len %lu\n", data, length);
 
+    if(MOCA_DATA_STATUS_DYING_OR_ZOMBIE(data))
+    {
+        //Data already flush, do noting and wait for kfreedom
+        data->status=MOCA_DATA_STATUS_ZOMBIE;
+        return 0;
+    }
 
     MYBUFF=kmalloc(MOCA_BUF_SIZE,GFP_ATOMIC);
     if(!MYBUFF)
@@ -376,12 +383,7 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
         printk(KERN_WARNING "Moca unable to allocate buffer in flush data\n");
         data->status=MOCA_DATA_STATUS_DYING;
     }
-    if(MOCA_DATA_STATUS_DYING_OR_ZOMBIE(data))
-    {
-        //Data already flush, do noting and wait for kfreedom
-        data->status=MOCA_DATA_STATUS_ZOMBIE;
-        return 0;
-    }
+
 
     if(data->nbflush==0)
     {
