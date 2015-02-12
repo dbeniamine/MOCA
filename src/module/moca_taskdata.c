@@ -12,7 +12,6 @@
 #define __NO_VERSION__
 /* #define MOCA_DEBUG */
 
-#define MOCA_BUF_SIZE 4096
 #define MOCA_DATA_STATUS_NORMAL 0
 //Data won't be written anymore, but need to be saved to file
 #define MOCA_DATA_STATUS_NEEDFLUSH 1
@@ -357,9 +356,8 @@ int Moca_CpuMask(int cpu, char *buf, size_t size)
 static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
         size_t length, loff_t * offset)
 {
-    ssize_t len=0,sz;
+    ssize_t  sz=0;
     int chunkid, ind, nelt, complete=1;
-    char *MYBUFF;
     struct _chunk_entry tmpch;
     chunk_entry e;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
@@ -376,15 +374,6 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
         return 0;
     }
 
-    MYBUFF=kmalloc(MOCA_BUF_SIZE,GFP_ATOMIC);
-    if(!MYBUFF)
-    {
-        //We might already be in a panic: don't panic, just free stuff
-        printk(KERN_WARNING "Moca unable to allocate buffer in flush data\n");
-        data->status=MOCA_DATA_STATUS_DYING;
-    }
-
-
     if(data->nbflush==0)
     {
         //First flush
@@ -392,14 +381,11 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
 
         //Task id pid
         if(data->internalId!=0)
-            sz=snprintf(MYBUFF,MOCA_BUF_SIZE,"Task %d %d\n",
+            sz+=snprintf(buffer,length,"Task %d %d\n",
                     data->internalId,task_pid_nr(data->task));
         else
-            sz=snprintf(MYBUFF,MOCA_BUF_SIZE,"Task %d %d %lu\n",
+            sz+=snprintf(buffer,length,"Task %d %d %lu\n",
                     data->internalId,task_pid_nr(data->task), PAGE_SIZE);
-        MOCA_DEBUG_PRINT("Moca buf size %lu\n", sz);
-        if(!copy_to_user(buffer, MYBUFF,sz))
-            len+=sz;
         MOCA_DEBUG_PRINT("Moca user size %lu\n", len);
     }
 
@@ -421,16 +407,14 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
                     if(chunkid==data->cur)
                         data->chunks[chunkid]->endClock=Moca_GetClock();
                     //Chunk id  nb element startclock endclock cpumask
-                    sz=snprintf(MYBUFF,MOCA_BUF_SIZE,"Chunk %d %d %lu %lu ",
+                    sz+=snprintf(buffer+sz,length-sz,"Chunk %d %d %lu %lu ",
                             chunkid+data->nbflush*Moca_nbChunks,
                             Moca_NbElementInMap(data->chunks[chunkid]->map),
                             data->chunks[chunkid]->startClock,
                             data->chunks[chunkid]->endClock);
-                    sz+=Moca_CpuMask(data->chunks[chunkid]->cpu, MYBUFF+sz,
-                            MOCA_BUF_SIZE-sz);
-                    MYBUFF[sz++]='\n';
-                    if(!copy_to_user(buffer+len,MYBUFF,sz))
-                        len+=sz;
+                    sz+=Moca_CpuMask(data->chunks[chunkid]->cpu, buffer+sz,
+                            length-sz);
+                    buffer[sz++]='\n';
                 }
                 else
                     MOCA_DEBUG_PRINT("Moca resuming flush chunk %d, available space %lu\n",
@@ -438,20 +422,18 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
                 ind=0;
                 while((e=(chunk_entry)Moca_NextEntryPos(data->chunks[chunkid]->map,&ind)))
                 {
-                    if(len+LINE_SZ >= length)
+                    if(sz+LINE_SZ >= length)
                     {
                         complete=0;
                         break;
                     }
                     //Access @Virt @Phy countread countwrite cpumask
-                    sz=snprintf(MYBUFF,MOCA_BUF_SIZE,"Access %p %p %d %d ",
+                    sz+=snprintf(buffer+sz,length-sz,"Access %p %p %d %d ",
                             e->key, e->key,
                             //Moca_PhyFromVirt(e->key, data->task->mm),
                             e->countR, e->countW);
-                    sz+=Moca_CpuMask(e->cpu,MYBUFF+sz,MOCA_BUF_SIZE-sz);
-                    MYBUFF[sz++]='\n';
-                    if(!copy_to_user(buffer+len,MYBUFF,sz))
-                        len+=sz;
+                    sz+=Moca_CpuMask(e->cpu,buffer+sz,length-sz);
+                    buffer[sz++]='\n';
                     //Re init data
                     tmpch.key=e->key;
                     Moca_RemoveFromMap(data->chunks[chunkid]->map,(hash_entry)&tmpch);
@@ -491,8 +473,6 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
             data->status=MOCA_DATA_STATUS_DYING;
         data->currentlyFlushed=-1;
     }
-    //Free buffers
-    kfree(MYBUFF);
-    MOCA_DEBUG_PRINT("Moca Flushing size %lu for data %p\n", len, data);
-    return len;
+    MOCA_DEBUG_PRINT("Moca Flushing size %lu for data %p\n", sz, data);
+    return sz;
 }
