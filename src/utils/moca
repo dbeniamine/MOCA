@@ -113,16 +113,17 @@ then
     usage
     exit 1
 fi
+program=$(basename $cmd)
 
 if [ -z "$logdir" ]
 then
-    logdir="Moca-$(basename $cmd)-$(date +%Y-%m-%d_%H-%M-%S)"
+    logdir="Moca-$program-$(date +%Y-%m-%d_%H-%M-%S)"
 fi
 mkdir $logdir
 
 if [ -z "$logfile" ]
 then
-    logfile="$logdir/Moca-$cmd.log"
+    logfile="$logdir/Moca-$program.log"
 fi
 kernLogFile="$logdir/$kernLogFile"
 
@@ -208,7 +209,7 @@ do
     grep "Access" -RH | cut -d ' ' -f 1,$f | \
         sed -e 's/.*Moca-\([^\.]*\).log/\1/' -e 's/:Access//' \
         -e 's/\([^ ]*\) \(.*\)/\2 \1/' | sort | uniq | \
-        awk {'if(ADD==$1) {ACC=ACC" "$2} else {print ADD,ACC;ADD=$1;ACC=$2}'} \
+        awk '{if(ADD==$1) {ACC=ACC" "$2} else {print ADD,ACC;ADD=$1;ACC=$2}} END {print ADD ACC }' \
         > Moca-$name.log
 
 done
