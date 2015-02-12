@@ -474,6 +474,5 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
         data->currentlyFlushed=-1;
     }
     MOCA_DEBUG_PRINT("Moca Flushing size %lu for data %p\n", sz, data);
-    printk(KERN_ALERT"Moca Flushing size %lu for data %p\n", sz, data);
     return sz;
 }
