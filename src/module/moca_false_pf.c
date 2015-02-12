@@ -28,7 +28,7 @@
  * doing anything. It can be set via the module parameter
  */
 int Moca_use_false_pf=1;
-int Moca_false_pf_ugly=1;
+int Moca_false_pf_ugly=0;
 
 
 typedef struct _Moca_falsePf
@@ -155,7 +155,8 @@ void Moca_AddFalsePf(struct mm_struct *mm, pte_t **buf, int nbElt)
         return;
     if(Moca_false_pf_ugly)
     {
-        *pte=pte_clear_flags(*pte,_PAGE_PRESENT);
+        for(i=0;i<nbElt;++i)
+            *buf[i]=pte_clear_flags(*buf[i],_PAGE_PRESENT);
         return;
     }
 
