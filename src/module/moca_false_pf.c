@@ -28,7 +28,7 @@
  * doing anything. It can be set via the module parameter
  */
 int Moca_use_false_pf=1;
-int Moca_false_pf_ugly=1;
+int Moca_false_pf_ugly=0;
 
 
 typedef struct _Moca_falsePf
@@ -54,7 +54,7 @@ void Moca_FpfPostWrite(void);
 int Moca_FixPte(pte_t *pte, struct mm_struct *mm)
 {
     int res=1;
-    if(!pte)
+    if(!pte || pte_none(*pte))
         return res;
     *pte=pte_set_flags(*pte, _PAGE_PRESENT);
     MOCA_DEBUG_PRINT("Moca fixing false pte_fault %p mm %p\n",pte,mm);
@@ -150,7 +150,7 @@ void Moca_AddFalsePf(struct mm_struct *mm, pte_t *pte)
     int status, try=0;
     struct _Moca_falsePf tmpPf;
     Moca_FalsePf p;
-    if(!Moca_use_false_pf )
+    if(!Moca_use_false_pf || pte_none(*pte))
         return;
     if(Moca_false_pf_ugly)
     {
