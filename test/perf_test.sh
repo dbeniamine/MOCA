@@ -1,16 +1,18 @@
 #!/bin/bash
-INTERVALS=('10' '30' '50' '70' '90' '110')
+#INTERVALS=('10' '30' '50' '70' '90' '110' '0')
+INTERVALS=('10' '0')
 START_TIME=$(date +%y%m%d_%H%M%S)
 CMDLINE="$0 $@"
 EXP_NAME=$(basename $0)
 OUTPUT="log"
-RUN=30
+RUN=1
 COMPI="-n"
 SEED=1550
 ALGO=par_modulo
 VERIF=""
 THREADS=2
 SIZE=1000
+NBCHUNKS=40
 TARGET=matrix
 #report error if needed
 function testAndExitOnError
@@ -103,16 +105,23 @@ do
     for int in ${INTERVALS[@]}
     do
         echo "Wakeup Interval: $int"
-        mkdir -p $EXP_DIR/$int
         LOGDIR="$EXP_DIR/interval-$int/run-$run"
         mkdir -p $LOGDIR
         #Actual experiment
         free -h
-        EXECCMD="make COMPI=$COMPI LOGDIR=$LOGDIR SEED=$SEED SIZE=$SIZE \
+        if [ $int -ne 0 ]
+        then
+            EXECCMD="make COMPI=$COMPI LOGDIR=$LOGDIR SEED=$SEED SIZE=$SIZE \
                 ALGO=$ALGO THREADS=$THREADS VERIF=$VERIF INTERVAL=$int \
-                LOG_FILE=$LOGDIR/app-log INTERVAL=$int $TARGET"
+                LOG_FILE=$LOGDIR/app-log INTERVAL=$int NB_CHUNKS=$NBCHUNKS \
+                $TARGET"
+                EXEC_LOG=make-log
+        else
+            EXECCMD="matrix/matrix -S $SIZE -s $SEED -a $ALGO -n $THREADS"
+            EXEC_LOG=app-log
+        fi
         echo "$EXECCMD"
-        $EXECCMD > $LOGDIR/make-log
+        $EXECCMD > $LOGDIR/$EXEC_LOG
         testAndExitOnError "run number $run"
         free -h
     done
