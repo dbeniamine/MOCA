@@ -136,11 +136,7 @@ void Moca_ClearFalsePfData(void)
         return;
     MOCA_DEBUG_PRINT("Moca removing all false pf\n");
     while((p=(Moca_FalsePf)Moca_NextEntryPos(Moca_falsePfMap, &i))!=NULL)
-    {
-        MOCA_DEBUG_PRINT("Moca removing all false pfi %p %d\n", p->key, p->status==MOCA_FALSE_PF_VALID);
-        if(p->status==MOCA_FALSE_PF_VALID)
-            Moca_FixPte((pte_t *)p->key, NULL);
-    }
+        Moca_FixPte((pte_t *)p->key, NULL);
     MOCA_DEBUG_PRINT("Moca removing all false map%p\n",Moca_falsePfMap);
     Moca_FreeMap(Moca_falsePfMap);
 }
