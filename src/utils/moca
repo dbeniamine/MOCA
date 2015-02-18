@@ -12,6 +12,7 @@ usage()
     echo "  -d dir            Path to the Moca dir. Default: $install_dir"
     echo "  -f file           Log cmd into file. Default: Moca-cmd.log"
     echo "  -l file           Log module output into file. Default: cmd-date"
+    echo "  -n                Do not compile the module"
     echo "  -D dirname        Set the output directory. Default: $logdir"
     echo -e "\n  The following parameters allows you to do fine tuning on the
     module. By default you shouldn't need to use them.
@@ -45,8 +46,9 @@ procdir="/proc/Moca"
 log_thread_interval=.5
 Moca_log="Moca-output.log"
 name=$(basename $0)
+compi=true
 
-while getopts "c:ha:d:f:l:w:p:b:S:C:D:" opt
+while getopts "c:ha:d:f:l:w:p:b:S:C:D:n" opt
 do
     case $opt in
         c)
@@ -93,6 +95,9 @@ do
             ;;
         C)
             moca_chunks="Moca_nbChunks=$OPTARG"
+            ;;
+        n)
+            compi=false;
             ;;
         *)
             usage
@@ -175,8 +180,11 @@ then
     schedtool -F -p $user_prio $pid
 fi
 cd $install_dir/src/module/
-make clean && make
-abort_on_error $? "make fail"
+if $compi
+then
+    make clean && make
+    abort_on_error $? "make fail"
+fi
 # make install
 # abort_on_error $? "Install fail"
 insmod moca.ko Moca_mainPid=$pid $moca_interval $moca_bits $moca_factor \
@@ -201,6 +209,7 @@ sed 1,$line /var/log/kern.log | grep -i "moca" > $logdir/$Moca_log
 # Create the event poducers log (required by framesoc)
 fields=('2' '3')
 fieldsName=('Physical' 'Virtual')
+pgsize=$(head -n 1 $kernLogFile-task0.log  | cut -d ' ' -f 4)
 cd $logdir
 for i in ${!fields[*]}
 do
@@ -211,6 +220,6 @@ do
         -e 's/\([^ ]*\) \(.*\)/\2 \1/' | sort | uniq | \
         awk '{if(ADD==$1) {ACC=ACC" "$2} else {print ADD,ACC;ADD=$1;ACC=$2}} END {print ADD ACC }' \
         > Moca-$name.log
-
+    sed -i "1 s/\(.*\)/\1 $pgsize/" Moca-$name.log
 done
 cd -

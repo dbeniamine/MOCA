@@ -2,15 +2,20 @@
 INSTALL_DIR=/home/david/Work/Moca
 LOG_FILE=$(INSTALL_DIR)/log
 MOCA=sudo ../src/utils/moca -d $(INSTALL_DIR) -p $(PRIO) -f $(LOG_FILE) \
-	   -w 50 -C 20
+	   -w $(INTERVAL) -C 20 $(COMPI) -D $(LOGDIR)
 #-b 14 -F 2
 # Testing config
 PRIO=99
-SIZE=500
-SEED=$(shell head /dev/urandom | tr -cd '[:digit:]' | sed 's/\([0-9]\{1,4\}\).*/\1/')
+SIZE=1000
+INTERVAL=50
+COMPI=
+LOGDIR=
+#SEED=$(shell head /dev/urandom | tr -cd '[:digit:]' | sed 's/\([0-9]\{1,4\}\).*/\1/')
+SEED=1550
 ALGO=par_modulo
 THREADS=2
-MAT_ARG="-S $(SIZE) -s $(SEED) -a $(ALGO) -n $(THREADS) -v -V"
+VERIF="-v -V"
+MAT_ARG="-S $(SIZE) -s $(SEED) -a $(ALGO) -n $(THREADS) $(VERIF)"
 
 all: fork matrix
 
