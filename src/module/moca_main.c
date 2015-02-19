@@ -37,6 +37,7 @@ extern int Moca_taskDataHashBits;
 extern int Moca_taskDataChunkSize;
 extern int Moca_nbChunks;
 extern int Moca_use_false_pf;
+extern int Moca_false_pf_ugly;
 // Priority for FIFO scheduler
 int Moca_schedulerPriority=MOCA_DEFAULT_SCHED_PRIO;
 int Moca_Activated=0;
@@ -48,6 +49,7 @@ module_param(Moca_taskDataHashBits,int,0);
 module_param(Moca_taskDataChunkSize,int,0);
 module_param(Moca_nbChunks,int,0);
 module_param(Moca_use_false_pf,int,0);
+module_param(Moca_false_pf_ugly,int,0);
 
 // Thread task representation
 struct task_struct *Moca_threadTask=NULL;
@@ -62,6 +64,16 @@ unsigned long Moca_GetClock(void)
 {
     unsigned long ret=atomic_long_read(&Moca_threadClock);
     return ret;
+}
+
+void Moca_PrintConfig(void)
+{
+    printk("Moca parameters:\nMoca_mainPid\t%d\nMoca_wakeupInterval\t%d\nMoca_SchedulerPriority\t%d\n"
+            "Moca_taskDataHashBits\t%d\nMoca_taskDataChunkSize\t%d\n"
+            "Moca_nbChunks\t%d\nMoca_use_false_pf\t%dMoca_false_pf_ugly\t%d\n",
+            Moca_mainPid, Moca_wakeupInterval,Moca_schedulerPriority,
+            Moca_taskDataHashBits, Moca_taskDataChunkSize,Moca_nbChunks,
+            Moca_use_false_pf, Moca_false_pf_ugly);
 }
 
 // Initializes threads data structures
@@ -112,8 +124,8 @@ void Moca_CleanUp(void)
 // Fuction called by insmod
 static int __init Moca_Init(void)
 {
-    printk(KERN_NOTICE "Moca started monitoring pid %d\n",
-            Moca_mainPid);
+    printk(KERN_NOTICE "Moca started\n");
+    Moca_PrintConfig();
     Moca_InitFalsePf();
     MOCA_DEBUG_PRINT("Moca false Pf ready \n");
     //Remove previous Moca entries

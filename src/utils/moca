@@ -220,6 +220,6 @@ do
         -e 's/\([^ ]*\) \(.*\)/\2 \1/' | sort | uniq | \
         awk '{if(ADD==$1) {ACC=ACC" "$2} else {print ADD,ACC;ADD=$1;ACC=$2}} END {print ADD ACC }' \
         > Moca-$name.log
-    sed -i "1 s/\(.*\)/\1 $pgsize/" Moca-$name.log
+    sed -i "1 s/\(.*\)/$pgsize\n\1/" Moca-$name.log
 done
 cd -
