@@ -141,18 +141,19 @@ void Moca_ClearFalsePfData(void)
     Moca_FreeMap(Moca_falsePfMap);
 }
 
-void Moca_AddFalsePf(struct mm_struct *mm, pte_t *pte)
+void Moca_AddFalsePf(struct mm_struct *mm, pte_t **buf, int nbElt)
 {
     int status, try,i,ok;
     pte_t *pte;
     struct _Moca_falsePf tmpPf;
     Moca_FalsePf p;
-    if(!Moca_use_false_pf || pte_none(*pte))
+    if(!Moca_use_false_pf )
         return;
     if(Moca_false_pf_ugly)
     {
         for(i=0;i<nbElt;++i)
-            *buf[i]=pte_clear_flags(*buf[i],_PAGE_PRESENT);
+            if(!pte_none(*buf[i]))
+                *buf[i]=pte_clear_flags(*buf[i],_PAGE_PRESENT);
         return;
     }
 
