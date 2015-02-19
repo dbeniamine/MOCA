@@ -1,11 +1,10 @@
 #!/bin/bash
-#INTERVALS=('10' '30' '50' '70' '90' '110' '0')
-INTERVALS=('10' '0')
+INTERVALS=('20' '0' '30' '40' '50' '60' '70' '80' '90' '100' '110')
 START_TIME=$(date +%y%m%d_%H%M%S)
 CMDLINE="$0 $@"
 EXP_NAME=$(basename $0)
 OUTPUT="log"
-RUN=1
+RUN=30
 COMPI="-n"
 SEED=1550
 ALGO=par_modulo
