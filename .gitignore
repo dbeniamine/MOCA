@@ -2,3 +2,5 @@
 *.ko
 cscope.*
 tags
+report/*
+perf/*
