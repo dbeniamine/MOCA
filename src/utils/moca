@@ -53,7 +53,7 @@ Moca_log="Moca-output.log"
 name=$(basename $0)
 compi=true
 
-while getopts "c:ha:d:f:l:w:p:b:S:C:D:nuf" opt
+while getopts "c:ha:d:f:l:w:p:b:S:C:D:nuF" opt
 do
     case $opt in
         c)
