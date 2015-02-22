@@ -105,6 +105,7 @@ do
             compi=false;
             ;;
         u)
+            Moca_false_pf="Moca_use_false_pf=1"
             Moca_ugly="Moca_false_pf_ugly=1"
             ;;
         F)
@@ -199,7 +200,7 @@ fi
 # make install
 # abort_on_error $? "Install fail"
 insmod moca.ko Moca_mainPid=$pid $moca_interval $moca_bits $moca_factor \
-    $moca_chunks $moca_prio
+    $Moca_false_pf $Moca_ugly $moca_chunks $moca_prio
 abort_on_error $? "unable to load module"
 cd -
 log &
