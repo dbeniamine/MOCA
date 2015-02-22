@@ -14,7 +14,7 @@
 #define __MOCA_PAGE__
 
 
-#define MOCA_DEFAULT_WAKEUP_INTERVAL 50
+#define MOCA_DEFAULT_WAKEUP_INTERVAL 40
 
 /* Main function for TLB walkthrough
  * Check accessed page every Memmap_wakeupsIinterval ms
