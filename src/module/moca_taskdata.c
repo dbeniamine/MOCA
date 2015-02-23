@@ -130,8 +130,6 @@ task_data Moca_InitData(struct task_struct *t)
             Moca_Panic("Moca unable to allocate data chunk");
             return NULL;
         }
-        data->chunks[i]->startClock=0;
-        data->chunks[i]->endClock=0;
         data->chunks[i]->cpu=0;
         data->chunks[i]->used=0;
         data->chunks[i]->map=Moca_InitHashMap(Moca_taskDataHashBits,
@@ -403,8 +401,6 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
                 //If we are resuming, no need to output this line again
                 if(chunkid!=data->currentlyFlushed)
                 {
-                    if(chunkid==data->cur)
-                        data->chunks[chunkid]->endClock=Moca_GetClock();
                     //Chunk id  nb element startclock endclock cpumask
                     sz+=snprintf(buffer+sz,length-sz,"Chunk %d %d %lu %lu ",
                             chunkid+data->nbflush*Moca_nbChunks,
@@ -445,8 +441,6 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
             {
                 data->chunks[chunkid]->cpu=0;
                 data->chunks[chunkid]->used=0;
-                //data->chunks[chunkid]->startClock=Moca_GetClock();
-                //data->chunks[chunkid]->endClock=Moca_GetClock();
             }
         }
         if(complete)

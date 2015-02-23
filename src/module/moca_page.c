@@ -11,7 +11,6 @@
  */
 #define __NO_VERSION__
 /* #define MOCA_DEBUG */
-#define MOCA_FPF_BUFF_SIZE 1024
 
 #include "moca.h"
 #include "moca_page.h"
@@ -27,7 +26,6 @@
 
 // Wakeup period in ms
 int Moca_wakeupInterval=MOCA_DEFAULT_WAKEUP_INTERVAL;
-pte_t **Moca_fpfBuff;
 
 void *Moca_PhyFromVirt(void *addr, struct mm_struct *mm)
 {
@@ -66,7 +64,7 @@ pte_t *Moca_PteFromAdress(unsigned long address, struct mm_struct *mm)
 // Walk through the current chunk
 void Moca_MonitorPage(task_data data)
 {
-    int i=0,countR, countW, buffUse=0;
+    int i=0,countR, countW;
     struct task_struct *tsk=Moca_GetTaskFromData(data);
     pte_t *pte;
     void *addr;
@@ -79,15 +77,7 @@ void Moca_MonitorPage(task_data data)
                 addr, pte, i,tsk->on_cpu, data);
         if(pte)
         {
-                Moca_fpfBuff[buffUse]=pte;
-                MOCA_DEBUG_PRINT("Moca adding to buff pte %p at %d \n", pte,buffUse);
-                ++buffUse;
-            if(buffUse >= MOCA_FPF_BUFF_SIZE)
-            {
-                Moca_AddFalsePf(tsk->mm, Moca_fpfBuff, buffUse);
-                buffUse=0;
-                MOCA_DEBUG_PRINT("Moca flush pte buff %p\n", pte);
-            }
+            Moca_AddFalsePf(tsk->mm, pte);
             /* if(!pte_none(*pte) && pte_present(*pte)) */
             /* { */
             /*     *pte=pte_set_flags(*pte,_PAGE_PRESENT); */
@@ -105,8 +95,6 @@ void Moca_MonitorPage(task_data data)
             MOCA_DEBUG_PRINT("Moca no pte for adress %p\n", addr);
         ++i;
     }
-    if(buffUse>0)
-        Moca_AddFalsePf(tsk->mm, Moca_fpfBuff, buffUse);
     // Goto to next chunk
     Moca_NextChunks(data);
     MOCA_DEBUG_PRINT("Moca pagewalk pte cpu %d data %p end\n",
@@ -128,11 +116,6 @@ int Moca_MonitorThread(void * arg)
 
     /* dump_stack(); */
     MOCA_DEBUG_PRINT("Moca monitor thread alive \n");
-    if(!(Moca_fpfBuff=kcalloc(MOCA_FPF_BUFF_SIZE,sizeof(pte_t *),GFP_KERNEL)))
-    {
-        Moca_Panic("Moca can't alloc fpf buffer");
-        return 1;
-    }
     while(!kthread_should_stop())
     {
         pos=0;
@@ -160,7 +143,6 @@ int Moca_MonitorThread(void * arg)
                 Moca_wakeupInterval);
         msleep(Moca_wakeupInterval);
     }
-    kfree(Moca_fpfBuff);
     MOCA_DEBUG_PRINT("Moca monitor thread finished\n");
     return 0;
 }

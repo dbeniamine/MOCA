@@ -141,61 +141,48 @@ void Moca_ClearFalsePfData(void)
     Moca_FreeMap(Moca_falsePfMap);
 }
 
-void Moca_AddFalsePf(struct mm_struct *mm, pte_t **buf, int nbElt)
+void Moca_AddFalsePf(struct mm_struct *mm, pte_t *pte)
 {
-    int status, try,i,ok;
-    pte_t *pte;
+    int status, try=0;
     struct _Moca_falsePf tmpPf;
     Moca_FalsePf p;
-    if(!Moca_use_false_pf )
+    if(!Moca_use_false_pf || pte_none(*pte))
         return;
     if(Moca_false_pf_ugly)
     {
-        for(i=0;i<nbElt;++i)
-            if(!pte_none(*buf[i]))
-                *buf[i]=pte_clear_flags(*buf[i],_PAGE_PRESENT);
+        *pte=pte_clear_flags(*pte,_PAGE_PRESENT);
         return;
     }
 
-    Moca_FpfPreWrite();
-    for(i=0;i<nbElt;++i)
-    {
-        pte=buf[i];
-        MOCA_DEBUG_PRINT("Moca adding pte %p, mm %p\n", pte, mm);
-        if( !pte || pte_none(*pte) || !pte_present(*pte))
-            continue;
-        tmpPf.key=pte;
-        tmpPf.mm=mm;
-        try=0;
-        ok=1;
-        do{
-            p=(Moca_FalsePf)Moca_AddToMap(Moca_falsePfMap,(hash_entry)&tmpPf,&status);
-            switch(status)
-            {
-                case MOCA_HASHMAP_FULL:
-                    Moca_DeleteBadFpf();
-                    ++try;
-                    break;
-                case MOCA_HASHMAP_ERROR:
-                    Moca_Panic("Moca unhandled hashmap error");
-                    Moca_FpfPostWrite();
-                    return;
-                case  MOCA_HASHMAP_ALREADY_IN_MAP:
-                    MOCA_DEBUG_PRINT("Moca Reusing bad false PF %p %p\n", pte, mm);
-                default:
-                    //normal add
-                    p->status=MOCA_FALSE_PF_VALID;
-                    *pte=pte_clear_flags(*pte,_PAGE_PRESENT);
-                    ok=0;
-                    MOCA_DEBUG_PRINT("Moca Added false PF %p %p at %d/%d \n", pte,
-                            mm,(unsigned)status, Moca_NbElementInMap(Moca_falsePfMap));
-                    break;
-            }
-        }while(ok!=0 && try<2);
-        MOCA_DEBUG_PRINT("Moca more than two try to add false pf pte %p, mm %p\n",
-                pte, mm);
-    }
-    Moca_FpfPostWrite();
+    tmpPf.key=pte;
+    tmpPf.mm=mm;
+    do{
+        Moca_FpfPreWrite();
+        p=(Moca_FalsePf)Moca_AddToMap(Moca_falsePfMap,(hash_entry)&tmpPf,&status);
+        p->status=MOCA_FALSE_PF_VALID;
+        *pte=pte_clear_flags(*pte,_PAGE_PRESENT);
+        Moca_FpfPostWrite();
+        switch(status)
+        {
+            case MOCA_HASHMAP_FULL:
+                //TODO: clean BAD
+                Moca_DeleteBadFpf();
+                ++try;
+                break;
+            case MOCA_HASHMAP_ERROR:
+                Moca_Panic("Moca unhandled hashmap error");
+                return;
+            case  MOCA_HASHMAP_ALREADY_IN_MAP:
+                MOCA_DEBUG_PRINT("Moca Reusing bad false PF %p %p\n", pte, mm);
+            default:
+                //normal add
+                MOCA_DEBUG_PRINT("Moca Added false PF %p %p at %d/%d \n", pte, 
+                        mm,(unsigned)status, Moca_NbElementInMap(Moca_falsePfMap));
+                return;
+        }
+    }while(try<2);
+    MOCA_DEBUG_PRINT("Moca more than two try to add false pf pte %p, mm %p\n",
+            pte, mm);
 }
 
 /*
@@ -237,7 +224,7 @@ void Moca_FixAllFalsePf(struct mm_struct *mm)
 {
     int i=0;
     Moca_FalsePf p;
-    if(!Moca_use_false_pf || !mm)
+    if(!Moca_use_false_pf || Moca_false_pf_ugly || !mm)
         return;
     if(Moca_false_pf_ugly)
     {
