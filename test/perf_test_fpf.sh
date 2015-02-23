@@ -1,10 +1,9 @@
 #!/bin/bash
-INTERVALS=('20' '0' '30' '40' '50' '60' '70' '80' '90' '100' '110')
 START_TIME=$(date +%y%m%d_%H%M%S)
 CMDLINE="$0 $@"
 EXP_NAME=$(basename $0)
 OUTPUT="log"
-RUN=30
+RUN=1
 SEED=1550
 ALGO=par_modulo
 VERIF=""
@@ -15,6 +14,10 @@ TARGET=matrix
 INSTALL_DIR=/home/david/Work/Moca
 PRIO=99
 EXEC_LOG=app-log
+INTERVAL=40
+FPFS=('none' 'nomonitor' 'normal' 'ugly')
+declare -A  FPFARGS
+FPFARGS=([none]="-F" [normal]="" [ugly]="-u")
 #report error if needed
 function testAndExitOnError
 {
@@ -105,29 +108,30 @@ for run in $(seq 1 $RUN)
 do
     echo "RUN : $run"
     #Actual exp
-    for int in ${INTERVALS[@]}
+    for pf in ${FPFS[@]}
     do
-        echo "Wakeup Interval: $int"
-        LOGDIR="$EXP_DIR/interval-$int/run-$run"
+        echo "False page faults: $pf"
+        LOGDIR="$EXP_DIR/fpf-$pf/run-$run"
         mkdir -p $LOGDIR
         #Actual experiment
         free -h
-        if [ $int -ne 0 ]
+        if [ "$pf" != "nomonitor" ]
         then
             set -x
-            sudo ../src/utils/moca -d $INSTALL_DIR -p $PRIO -f  \
-                $LOGDIR/app-log -w $int -C $NBCHUNKS -D $LOGDIR -n \
+            echo ../src/utils/moca -d $INSTALL_DIR -p $PRIO ${FPFARGS[$pf]} -f \
+                $LOGDIR/app-log -w $INTERVAL -C $NBCHUNKS -D $LOGDIR -n \
                 -c matrix/matrix -a " -S $SIZE -s $SEED -a $ALGO \
-                -n $THREADS " > $LOGDIR/$EXEC_LOG
+                -n $THREADS " #> $LOGDIR/$EXEC_LOG
             testAndExitOnError "run number $run"
             set +x
         else
             set -x
-            matrix/matrix -S $SIZE -s $SEED -a $ALGO  -n $THREADS > $LOGDIR/$EXEC_LOG
+            echo matrix/matrix -S $SIZE -s $SEED -a $ALGO  -n $THREADS #> $LOGDIR/$EXEC_LOG
             testAndExitOnError "run number $run"
             set +x
         fi
         free -h
+        sleep 2 #avoid to kill ssh session
     done
 done
 

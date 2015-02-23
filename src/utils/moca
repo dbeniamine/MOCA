@@ -38,6 +38,11 @@ usage()
     therefore the number of adresses needed per chunks.
     Default: 2*2^14."
     echo "  -C nbChunks       Set the number of chunks kept in memory. Default: 20."
+    echo "  -F                Disable false page faults. If you set this flag,
+    a lot of memory event will be missed, you really shouldn't use it ..."
+    echo "  -u                Use ugly false page faults hack, this can
+    reduce MOCA's overhead, however you must be sure that your application
+    won't swap or it will crash !"
 }
 
 install_dir="~/install/Moca"
@@ -48,7 +53,7 @@ Moca_log="Moca-output.log"
 name=$(basename $0)
 compi=true
 
-while getopts "c:ha:d:f:l:w:p:b:S:C:D:n" opt
+while getopts "c:ha:d:f:l:w:p:b:S:C:D:nuF" opt
 do
     case $opt in
         c)
@@ -98,6 +103,13 @@ do
             ;;
         n)
             compi=false;
+            ;;
+        u)
+            Moca_false_pf="Moca_use_false_pf=1"
+            Moca_ugly="Moca_false_pf_ugly=1"
+            ;;
+        F)
+            Moca_false_pf="Moca_use_false_pf=0"
             ;;
         *)
             usage
@@ -188,7 +200,7 @@ fi
 # make install
 # abort_on_error $? "Install fail"
 insmod moca.ko Moca_mainPid=$pid $moca_interval $moca_bits $moca_factor \
-    $moca_chunks $moca_prio
+    $Moca_false_pf $Moca_ugly $moca_chunks $moca_prio
 abort_on_error $? "unable to load module"
 cd -
 log &
@@ -218,7 +230,7 @@ do
     grep "Access" -RH | cut -d ' ' -f 1,$f | \
         sed -e 's/.*Moca-\([^\.]*\).log/\1/' -e 's/:Access//' \
         -e 's/\([^ ]*\) \(.*\)/\2 \1/' | sort | uniq | \
-        awk '{if(ADD==$1) {ACC=ACC" "$2} else {print ADD,ACC;ADD=$1;ACC=$2}} END {print ADD ACC }' \
+        awk '{if(ADD==$1) {ACC=ACC" "$2} else {print ADD,ACC;ADD=$1;ACC=$2}} END {print ADD" "ACC }' \
         > Moca-$name.log
     sed -i "1 s/\(.*\)/$pgsize\n\1/" Moca-$name.log
 done

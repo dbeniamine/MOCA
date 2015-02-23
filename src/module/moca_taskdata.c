@@ -140,7 +140,6 @@ task_data Moca_InitData(struct task_struct *t)
     }
     data->task=t;
     data->cur=0;
-    data->chunks[0]->startClock=Moca_GetClock();
     data->internalId=Moca_nextTaskId++;
     data->nbflush=0;
     data->status=MOCA_DATA_STATUS_NORMAL;
@@ -252,6 +251,9 @@ int Moca_AddToChunk(task_data data, void *addr, int cpu)
     }
     e->cpu|=1<<cpu;
     data->chunks[cur]->cpu|=1<<cpu;
+    data->chunks[cur]->endClock=Moca_GetClock();
+    if(Moca_NbElementInMap(data->chunks[cur]->map)==1)
+        data->chunks[cur]->startClock=Moca_GetClock();
     spin_unlock(&data->chunks[cur]->lock);
     MOCA_DEBUG_PRINT("Moca inserted %p\n", addr);
     return 0;
@@ -291,7 +293,6 @@ int Moca_NextChunks(task_data data)
     spin_lock(&data->lock);
     cur=data->cur;
     spin_lock(&data->chunks[cur]->lock);
-    data->chunks[cur]->endClock=Moca_GetClock();
     data->chunks[cur]->used=1;
     data->cur=(cur+1)%Moca_nbChunks;
     spin_unlock(&data->chunks[cur]->lock);
@@ -304,8 +305,6 @@ int Moca_NextChunks(task_data data)
                 data->internalId);
         return 1;
     }
-    else
-        data->chunks[data->cur]->startClock=Moca_GetClock();
     return 0;
 }
 
@@ -446,12 +445,8 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
             {
                 data->chunks[chunkid]->cpu=0;
                 data->chunks[chunkid]->used=0;
-                //TODO: remove the following lines
-                if((nelt=Moca_NbElementInMap(data->chunks[chunkid]->map))!=0)
-                    MOCA_DEBUG_PRINT("Moca Still %d elt, ch %d atfer complete flush\n",
-                            nelt, chunkid);
-                data->chunks[chunkid]->startClock=Moca_GetClock();
-                data->chunks[chunkid]->endClock=Moca_GetClock();
+                //data->chunks[chunkid]->startClock=Moca_GetClock();
+                //data->chunks[chunkid]->endClock=Moca_GetClock();
             }
         }
         if(complete)
@@ -464,8 +459,6 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
             break;
         }
     }
-    if(!data->chunks[0]->used)
-        data->chunks[0]->startClock=Moca_GetClock();
     if(complete)
     {
         ++data->nbflush;
