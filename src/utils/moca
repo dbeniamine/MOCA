@@ -228,7 +228,7 @@ do
     f=${fields[$i]}
     name=${fieldsName[$i]}
     grep "Access" -RH | cut -d ' ' -f 1,$f | \
-        sed -e 's/.*Moca-\([^\.]*\).log/\1/' -e 's/:Access//' \
+        sed -e '/null/ d'  -e 's/.*Moca-\([^\.]*\).log/\1/' -e 's/:Access//' \
         -e 's/\([^ ]*\) \(.*\)/\2 \1/' | sort | uniq | \
         awk '{if(ADD==$1) {ACC=ACC" "$2} else {print ADD,ACC;ADD=$1;ACC=$2}} END {print ADD" "ACC }' \
         > Moca-$name.log
