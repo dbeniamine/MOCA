@@ -166,7 +166,7 @@ log()
     do
         for f in $(\ls $procdir)
         do
-            cat $procdir/$f >> $kernLogFile-$f.log
+            cat $procdir/$f | sed 's/\s*(null)/ (null)/' >> $kernLogFile-$f.log
         done
         sleep $log_thread_interval
     done
@@ -228,10 +228,10 @@ do
     f=${fields[$i]}
     name=${fieldsName[$i]}
     echo $pgsize > Moca-$name.log
-    grep "Access" -RH | sed 's/\s*(null)/ (null)/' | cut -d ' ' -f 1,$f | \
+    grep "Access" -RH |  cut -d ' ' -f 1,$f | \
         sed -e '/null/ d'  -e 's/.*Moca-\([^\.]*\).log/\1/' -e 's/:Access//' \
         -e 's/\([^ ]*\) \(.*\)/\2 \1/' | sort | uniq | \
-        awk '{if(ADD==$1) {ACC=ACC" "$2} else {if(ADD!="") {print ADD,ACC};ADD=$1;ACC=$2} END {print ADD" "ACC }' \
+        awk '{if(ADD==$1) {ACC=ACC" "$2} else {if(ADD!="") {print ADD,ACC};ADD=$1;ACC=$2}} END {print ADD" "ACC }' \
         >> Moca-$name.log
 done
 cd -
