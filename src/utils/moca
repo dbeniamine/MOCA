@@ -26,7 +26,7 @@ usage()
     better idea to play on the wakeup interval the priority than on the storage
     related parameters.\n"
     echo "  -w ms             Set the wakeup interval for Moca to interval ms,
-    Default: 50ms"
+    Default: 40ms"
     echo "  -p prio           Schedtool priority for the kernel module, the program
     priority will be prio-1. You can increase this parameter
     to reduce the system noise. Default: $prio"
