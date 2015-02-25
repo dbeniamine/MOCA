@@ -70,7 +70,7 @@ void Moca_PrintConfig(void)
 {
     printk("Moca parameters:\nMoca_mainPid\t%d\nMoca_wakeupInterval\t%d\nMoca_SchedulerPriority\t%d\n"
             "Moca_taskDataHashBits\t%d\nMoca_taskDataChunkSize\t%d\n"
-            "Moca_nbChunks\t%d\nMoca_use_false_pf\t%dMoca_false_pf_ugly\t%d\n",
+            "Moca_nbChunks\t%d\nMoca_use_false_pf\t%d\nMoca_false_pf_ugly\t%d\n",
             Moca_mainPid, Moca_wakeupInterval,Moca_schedulerPriority,
             Moca_taskDataHashBits, Moca_taskDataChunkSize,Moca_nbChunks,
             Moca_use_false_pf, Moca_false_pf_ugly);
