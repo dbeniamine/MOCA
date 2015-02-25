@@ -147,9 +147,7 @@ kernLogFile="$logdir/$kernLogFile"
 # Wait for the kernel module to start
 child()
 {
-    #echo "Child $BASHPID waiting for a signal from my parent"
     kill -s SIGSTOP $BASHPID
-    #echo "Child $BASHPID awake"
     if [ -z "$logfile" ]
     then
         $cmd $args
@@ -157,7 +155,7 @@ child()
         $cmd $args > $logfile 2> $logfile.err
     fi
     ret=$?
-    echo "$cmd ended code $ret"
+    echo "$program ended code $ret"
     exit $ret
 }
 log()
@@ -209,16 +207,21 @@ if [ ! -z $prio ]
 then
     schedtool -F -p $prio $logpid
 fi
+echo "Moca correctly loaded, launching $program"
 kill -s SIGCONT $pid
-#echo "Parent $BASHPID waiting for child $pid in script $$"
 wait $pid
+echo "Unloading Moca module"
 rmmod moca
+echo "done"
+echo "Retrieving Moca log"
 # Create the log
 line=$(grep -n "Moca started" /var/log/kern.log | tail -n 1 | cut -d ':' -f 1)
 line=$(($line-1))
 line+='d'
 sed 1,$line /var/log/kern.log | grep -i "moca" > $logdir/$Moca_log
+echo "File $logdir/$Moca_log created with Moca output"
 # Create the event poducers log (required by framesoc)
+echo "Creating event producer files for Framesoc"
 fields=('2' '3')
 fieldsName=('Physical' 'Virtual')
 pgsize=$(head -n 1 $kernLogFile-task0.log  | cut -d ' ' -f 4)
@@ -227,11 +230,14 @@ for i in ${!fields[*]}
 do
     f=${fields[$i]}
     name=${fieldsName[$i]}
+    echo "Creating event producer file for $name addresses"
     echo $pgsize > Moca-$name.log
     grep "Access" -RH |  cut -d ' ' -f 1,$f | \
         sed -e '/null/ d'  -e 's/.*Moca-\([^\.]*\).log/\1/' -e 's/:Access//' \
         -e 's/\([^ ]*\) \(.*\)/\2 \1/' | sort | uniq | \
         awk '{if(ADD==$1) {ACC=ACC" "$2} else {if(ADD!="") {print ADD,ACC};ADD=$1;ACC=$2}} END {print ADD" "ACC }' \
         >> Moca-$name.log
+    echo "done"
 done
 cd -
+echo "Moca analysis done, log directory is $logdir\nBye!"
