@@ -31,7 +31,7 @@ void *Moca_PhyFromVirt(void *addr, struct mm_struct *mm)
 {
     pte_t *pte=Moca_PteFromAdress((unsigned long)addr,mm);
     if(!pte || pte_none(*pte))
-        return NULL;
+        return addr; //Kernel address no translation needed
     return (void *)__pa(pte_page(*pte));
 }
 
