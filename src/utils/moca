@@ -255,7 +255,7 @@ do
         -e 's/\([^ ]*\) \(.*\)/\2 \1/' | sort -u | \
         awk '{if(ADD==$1) {ACC=ACC" "$2} else {if(ADD!="") {print ADD,ACC};ADD=$1;ACC=$2}} END {print ADD" "ACC }' \
         >> Moca-$name.log
-    echo "done in $(timer $t)"
+    echo -e "\tdone in $(timer $t)"
     t=$(timer)
 done
 cd -
