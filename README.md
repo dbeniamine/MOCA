@@ -77,13 +77,13 @@ visualised into framesoc[3] (see next section).
 
 All files starts with a Line giving the internalID and the system processID:
 
-    Task internalId ProcessId
+    T internalId ProcessId
 
 The Task 0 first line ends with a page_size of your machine.
 
 The second is always the beginning of a chunk:
 
-    Chunk id N start end cpumask
+    C id N start end cpumask
 
 These lines contains the identifier of the chunk inside the task, the number N
 of access in this chunk, the timestamp of the beginning and end of the chunk
@@ -91,7 +91,7 @@ and a bitmask telling which processors have accessed to this chunk.
 
 Each Chunk line is followed by N access lines:
 
-    Access @Virt @Phy countread countwrite cpumas
+    A @Virt @Phy countread countwrite cpumas
 
 Each access lines correspond to one page, it gives the virtual and physical
 address of the page, the number of read and writes observed and a cpumask

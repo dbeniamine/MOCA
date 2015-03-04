@@ -248,11 +248,11 @@ for i in ${!fields[*]}
 do
     f=${fields[$i]}
     name=${fieldsName[$i]}
-    echo "Creating $name addresses file"
+    echo -e "\t$name addresses file"
     echo $pgsize > Moca-$name.log
-    grep "Access" -RH |  cut -d ' ' -f 1,$f | \
-        sed -e 's/.*Moca-\([^\.]*\).log/\1/' -e 's/:Access//' \
-        -e 's/\([^ ]*\) \(.*\)/\2 \1/' | sort | uniq | \
+    grep "^A" -RH |  cut -d ' ' -f 1,$f | \
+        sed -e 's/.*Moca-\([^\.]*\).log/\1/' -e 's/:A//' \
+        -e 's/\([^ ]*\) \(.*\)/\2 \1/' | sort -u | \
         awk '{if(ADD==$1) {ACC=ACC" "$2} else {if(ADD!="") {print ADD,ACC};ADD=$1;ACC=$2}} END {print ADD" "ACC }' \
         >> Moca-$name.log
     echo "done in $(timer $t)"

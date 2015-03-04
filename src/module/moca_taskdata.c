@@ -381,10 +381,10 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
 
         //Task id pid
         if(data->internalId!=0)
-            sz+=snprintf(buffer,length,"Task %d %d\n",
+            sz+=snprintf(buffer,length,"T %d %d\n",
                     data->internalId,task_pid_nr(data->task));
         else
-            sz+=snprintf(buffer,length,"Task %d %d %lu\n",
+            sz+=snprintf(buffer,length,"T %d %d %lu\n",
                     data->internalId,task_pid_nr(data->task), PAGE_SIZE);
         MOCA_DEBUG_PRINT("Moca user size %lu\n", len);
     }
@@ -407,7 +407,7 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
                     if(data->chunks[chunkid]->endClock==data->chunks[chunkid]->startClock)
                         ++data->chunks[chunkid]->endClock;
                     //Chunk id  nb element startclock endclock cpumask
-                    sz+=snprintf(buffer+sz,length-sz,"Chunk %d %d %lu %lu ",
+                    sz+=snprintf(buffer+sz,length-sz,"C %d %d %lu %lu ",
                             chunkid+data->nbflush*Moca_nbChunks,
                             Moca_NbElementInMap(data->chunks[chunkid]->map),
                             data->chunks[chunkid]->startClock,
@@ -439,7 +439,7 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
                         }
                     }
                     //Access @Virt @Phy countread countwrite cpumask
-                    sz+=snprintf(buffer+sz,length-sz,"Access %p %p %d %d ",
+                    sz+=snprintf(buffer+sz,length-sz,"A %p %p %d %d ",
                             e->key,
                             Moca_PhyFromVirt(e->key, data->task->mm),
                             e->countR, e->countW);
