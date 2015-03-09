@@ -252,7 +252,7 @@ do
     echo $pgsize > Moca-$name.log
     grep "^A" -RH |  cut -d ' ' -f 1,$f | \
         sed -e 's/.*Moca-\([^\.]*\).log/\1/' -e 's/:A//' \
-        -e 's/\([^ ]*\) \(.*\)/\2 \1/' | sort -u | \
+        -e 's/\([^ ]*\) \(.*\)/\2 \1/' | sort -nu | \
         awk '{if(ADD==$1) {ACC=ACC" "$2} else {if(ADD!="") {print ADD,ACC};ADD=$1;ACC=$2}} END {print ADD" "ACC }' \
         >> Moca-$name.log
     echo -e "\tdone in $(timer $t)"
