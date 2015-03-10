@@ -439,7 +439,7 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
                         }
                     }
                     //Access @Virt @Phy countread countwrite cpumask
-                    sz+=snprintf(buffer+sz,length-sz,"A 0x%p 0x%p %d %d ",
+                    sz+=snprintf(buffer+sz,length-sz,"A %p %p %d %d ",
                             e->key,
                             Moca_PhyFromVirt(e->key, data->task->mm),
                             e->countR, e->countW);

@@ -138,7 +138,7 @@ static int __init Moca_Init(void)
     if(Moca_RegisterProbes()!=0)
         return -3;
     MOCA_DEBUG_PRINT("Moca probes ready \n");
-    printk(KERN_NOTICE "Moca correctly intialized \n");
+    printk(KERN_NOTICE "Moca correctly intialized\n");
     Moca_Activated=1;
     return 0;
 }
