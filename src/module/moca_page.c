@@ -29,11 +29,10 @@ int Moca_wakeupInterval=MOCA_DEFAULT_WAKEUP_INTERVAL;
 
 void *Moca_PhyFromVirt(void *addr, struct mm_struct *mm)
 {
-    return addr;
-    /* pte_t *pte=Moca_PteFromAdress((unsigned long)addr,mm); */
-    /* if(!pte || pte_none(*pte)) */
-    /*     return addr; //Kernel address no translation needed */
-    /* return (void *)__pa(pte_page(*pte)); */
+    pte_t *pte=Moca_PteFromAdress((unsigned long)addr,mm);
+    if(!pte || pte_none(*pte))
+        return addr; //Kernel address no translation needed
+    return (void *)__pa(pte_page(*pte));
 }
 
 pte_t *Moca_PteFromAdress(unsigned long address, struct mm_struct *mm)
