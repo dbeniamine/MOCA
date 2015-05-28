@@ -1,5 +1,6 @@
 # Moca config
-INSTALL_DIR=/home/david/Work/Moca
+INSTALL_DIR=$(HOME)/Work/Moca
+BENCHDIR=$(HOME)/Work/Bench
 MOCA=sudo ../src/utils/moca -d $(INSTALL_DIR) -p $(PRIO) -w $(INTERVAL) -C $(NB_CHUNKS)
 #-b 14 -F 2
 # Testing config
@@ -18,13 +19,13 @@ all: fork matrix
 fork:
 	$(MOCA) -c ./fork.sh
 
-matrix: matrix/matrix
-	$(MOCA) -c matrix/matrix -a $(MAT_ARG)
+matrix: $(BENCHDIR)/matrix/matrix
+	$(MOCA) -c $(BENCHDIR)/matrix/matrix -a $(MAT_ARG)
 
-matrix/matrix: matrix/matrix_naif.c
-	make -C matrix/
+$(BENCHDIR)/matrix/matrix: $(BENCHDIR)/matrix/matrix_naif.c
+	$(MAKE) -C $(BENCHDIR)/matrix/
 
 .phony: clean
 
 clean:
-	make clean -C matrix
+	make clean -C $(BENCHDIR)/matrix

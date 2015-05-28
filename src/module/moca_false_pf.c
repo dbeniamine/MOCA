@@ -12,10 +12,10 @@
 #define __NO_VERSION__
 /* #define MOCA_DEBUG */
 
-#include <linux/spinlock.h>
-#include <asm/atomic.h>
 #include "moca_false_pf.h"
 #include "moca_hashmap.h"
+#include <linux/rwlock_types.h>
+#include <linux/rwlock.h>
 
 #define MOCA_FALSE_PF_HASH_BITS 14
 #define MOCA_FALSE_PF_VALID 0
@@ -40,16 +40,9 @@ typedef struct _Moca_falsePf
 }*Moca_FalsePf;
 
 hash_map Moca_falsePfMap;
+DEFINE_RWLOCK(Moca_fpfRWLock);
 
 //Synchronization stuff
-
-atomic_t Moca_fpfNbR=ATOMIC_INIT(0);
-atomic_t Moca_fpfNbW=ATOMIC_INIT(0);
-spinlock_t Moca_fpfWLock;
-void Moca_FpfPreRead(void);
-void Moca_FpfPostRead(void);
-void Moca_FpfPreWrite(void);
-void Moca_FpfPostWrite(void);
 
 int Moca_FixPte(pte_t *pte, struct mm_struct *mm)
 {
@@ -125,7 +118,7 @@ void Moca_InitFalsePf(void)
     Moca_falsePfMap=Moca_InitHashMap(MOCA_FALSE_PF_HASH_BITS,
             2*(1<<MOCA_FALSE_PF_HASH_BITS),sizeof(struct _Moca_falsePf),
             &Moca_FalsePfComparator);
-    spin_lock_init(&Moca_fpfWLock);
+    rwlock_init(&Moca_fpfRWLock);
 }
 
 void Moca_ClearFalsePfData(void)
@@ -156,7 +149,7 @@ void Moca_AddFalsePf(struct mm_struct *mm, pte_t *pte)
 
     tmpPf.key=pte;
     tmpPf.mm=mm;
-    Moca_FpfPreWrite();
+    write_lock(&Moca_fpfRWLock);
     do{
         p=(Moca_FalsePf)Moca_AddToMap(Moca_falsePfMap,(hash_entry)&tmpPf,&status);
         switch(status)
@@ -167,7 +160,7 @@ void Moca_AddFalsePf(struct mm_struct *mm, pte_t *pte)
                 ++try;
                 break;
             case MOCA_HASHMAP_ERROR:
-                Moca_FpfPostWrite();
+                write_unlock(&Moca_fpfRWLock);
                 Moca_Panic("Moca unhandled hashmap error");
                 return;
             case  MOCA_HASHMAP_ALREADY_IN_MAP:
@@ -178,13 +171,13 @@ void Moca_AddFalsePf(struct mm_struct *mm, pte_t *pte)
                         mm,(unsigned)status, Moca_NbElementInMap(Moca_falsePfMap));
                 p->status=MOCA_FALSE_PF_VALID;
                 *pte=pte_clear_flags(*pte,_PAGE_PRESENT);
-                Moca_FpfPostWrite();
+                write_unlock(&Moca_fpfRWLock);
                 return;
         }
     }while(try<2);
     MOCA_DEBUG_PRINT("Moca more than two try to add false pf pte %p, mm %p\n",
             pte, mm);
-    Moca_FpfPostWrite();
+    write_unlock(&Moca_fpfRWLock);
 }
 
 /*
@@ -203,7 +196,7 @@ int Moca_FixFalsePf(struct mm_struct *mm, pte_t *pte)
     if(Moca_false_pf_ugly)
         return Moca_FixPte(pte,mm);
 
-    Moca_FpfPreRead();
+    read_lock(&Moca_fpfRWLock);
     MOCA_DEBUG_PRINT("Moca testing pte fault %p mm %p\n",pte,mm);
     tmpPf.key=pte;
     tmpPf.mm=mm;
@@ -213,7 +206,7 @@ int Moca_FixFalsePf(struct mm_struct *mm, pte_t *pte)
         res=Moca_FixPte(pte, mm);
         p->status=MOCA_FALSE_PF_BAD;
     }
-    Moca_FpfPostRead();
+    read_unlock(&Moca_fpfRWLock);
     return res;
 }
 
@@ -233,7 +226,7 @@ void Moca_FixAllFalsePf(struct mm_struct *mm)
         Moca_FixAllPte(mm);
         return;
     }
-    Moca_FpfPreWrite();
+    write_lock(&Moca_fpfRWLock);
     while((p=(Moca_FalsePf)Moca_NextEntryPos(Moca_falsePfMap, &i))!=NULL)
     {
         if(p->mm==mm)
@@ -242,37 +235,5 @@ void Moca_FixAllFalsePf(struct mm_struct *mm)
             Moca_RemoveFromMap(Moca_falsePfMap,(hash_entry)p);
         }
     }
-    Moca_FpfPostWrite();
+    write_unlock(&Moca_fpfRWLock);
 }
-
-
-//Ugly but here we really can't yield the proc
-void Moca_ActiveWait(void)
-{
-    int i=0;
-    while(i<1000000000){++i;}
-}
-
-void Moca_FpfPreRead(void)
-{
-    while(atomic_read(&Moca_fpfNbW))
-        Moca_ActiveWait();
-    atomic_inc(&Moca_fpfNbR);
-}
-void Moca_FpfPostRead(void)
-{
-    atomic_dec(&Moca_fpfNbR);
-}
-void Moca_FpfPreWrite(void)
-{
-    atomic_inc(&Moca_fpfNbW);
-    while(atomic_read(&Moca_fpfNbR) )
-        Moca_ActiveWait();
-    spin_lock(&Moca_fpfWLock);
-}
-void Moca_FpfPostWrite(void)
-{
-    atomic_dec(&Moca_fpfNbW);
-    spin_unlock(&Moca_fpfWLock);
-}
-

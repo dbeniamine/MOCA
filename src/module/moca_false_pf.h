@@ -13,6 +13,7 @@
 #define __MOCA_FALSE_PF__
 #define __NO_VERSION__
 
+#include <linux/spinlock.h>
 #include <asm/pgtable.h>
 
 // Init data struct required for managing false pf hack
