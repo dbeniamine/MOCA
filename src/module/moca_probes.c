@@ -60,7 +60,7 @@ static struct jprobe Moca_PteFaultjprobe = {
 };
 
 static struct kprobe Moca_ExitProbe = {
-    .symbol_name = "do_exit",
+    .symbol_name = "unmap_vmas",
 };
 
 int Moca_RegisterProbes(void)

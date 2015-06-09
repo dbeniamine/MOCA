@@ -128,10 +128,12 @@ void Moca_ClearFalsePfData(void)
     if(!Moca_use_false_pf || Moca_false_pf_ugly)
         return;
     MOCA_DEBUG_PRINT("Moca removing all false pf\n");
+    //write_lock(&Moca_fpfRWLock);
     while((p=(Moca_FalsePf)Moca_NextEntryPos(Moca_falsePfMap, &i))!=NULL)
         Moca_FixPte((pte_t *)p->key, NULL);
     MOCA_DEBUG_PRINT("Moca removing all false map%p\n",Moca_falsePfMap);
     Moca_FreeMap(Moca_falsePfMap);
+    //write_unlock(&Moca_fpfRWLock);
 }
 
 void Moca_AddFalsePf(struct mm_struct *mm, pte_t *pte)
