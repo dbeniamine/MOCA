@@ -18,13 +18,13 @@
 #include <linux/slab.h>
 #include "moca.h"
 #include "moca_tasks.h"
-#include <linux/spinlock.h>
-
+#include <linux/rwlock_types.h>
+#include <linux/rwlock.h>
 
 // The first bits are not random enough, 14 bits should be enough for pids
 unsigned long Moca_tasksHashBits=14;
 int Moca_AddTaskWaiting=0;
-spinlock_t Moca_tasksLock;
+DEFINE_RWLOCK(Moca_tasksLock);
 
 // Monitored process
 hash_map Moca_tasksMap;
@@ -36,7 +36,7 @@ int Moca_InitProcessManagment(int id)
 {
     // Monitored pids
     struct pid *pid;
-    spin_lock_init(&Moca_tasksLock);
+    rwlock_init(&Moca_tasksLock);
     Moca_tasksMap=Moca_InitHashMap(Moca_tasksHashBits,
             2*(1<<Moca_tasksHashBits), sizeof(struct _moca_task), NULL);
     rcu_read_lock();
@@ -70,11 +70,17 @@ moca_task Moca_AddTaskIfNeeded(struct task_struct *t)
     struct _moca_task tsk;
     moca_task res=NULL;
     tsk.key=t->real_parent;
-    spin_lock(&Moca_tasksLock);
+    read_lock(&Moca_tasksLock);
     if(t->real_parent == Moca_initTask  ||
-            Moca_EntryFromKey(Moca_tasksMap, (hash_entry)&tsk)!=NULL )
+            Moca_EntryFromKey(Moca_tasksMap, (hash_entry)&tsk)!=NULL)
+    {
+        read_unlock(&Moca_tasksLock);
         res=Moca_AddTask(t);
-    spin_unlock(&Moca_tasksLock);
+    }
+    else
+    {
+        read_unlock(&Moca_tasksLock);
+    }
     return res;
 }
 
@@ -82,9 +88,9 @@ moca_task Moca_AddTaskIfNeeded(struct task_struct *t)
 int Moca_GetNumTasks(void)
 {
     int nb=0;
-    spin_lock(&Moca_tasksLock);
+    read_lock(&Moca_tasksLock);
     nb=Moca_NbElementInMap(Moca_tasksMap);
-    spin_unlock(&Moca_tasksLock);
+    read_unlock(&Moca_tasksLock);
     return nb;
 }
 
@@ -92,10 +98,10 @@ moca_task Moca_NextTask(int *pos)
 {
     moca_task ret=NULL;
     MOCA_DEBUG_PRINT("Moca Looking for task at %d\n", *pos);
-    spin_lock(&Moca_tasksLock);
+    read_lock(&Moca_tasksLock);
     ret=(moca_task)Moca_NextEntryPos(Moca_tasksMap,pos);
     MOCA_DEBUG_PRINT("Moca found task %p at %d\n", ret, *pos);
-    spin_unlock(&Moca_tasksLock);
+    read_unlock(&Moca_tasksLock);
     return ret;
 }
 
@@ -105,10 +111,10 @@ task_data Moca_GetData(struct task_struct *t)
     struct _moca_task tsk;
     task_data ret=NULL;
     tsk.key=t;
-    spin_lock(&Moca_tasksLock);
+    read_lock(&Moca_tasksLock);
     if((pos=Moca_PosInMap(Moca_tasksMap ,(hash_entry)&tsk))>=0)
         ret=((moca_task)Moca_EntryAtPos(Moca_tasksMap,pos))->data;
-    spin_unlock(&Moca_tasksLock);
+    read_unlock(&Moca_tasksLock);
     return ret;
 }
 
@@ -131,7 +137,9 @@ moca_task Moca_AddTask(struct task_struct *t)
 
     tmptsk.key=t;
     tmptsk.data=data;
+    write_lock(&Moca_tasksLock);
     tsk=(moca_task)Moca_AddToMap(Moca_tasksMap,(hash_entry)&tmptsk,&status);
+    write_unlock(&Moca_tasksLock);
     switch(status)
     {
         case MOCA_HASHMAP_FULL:
@@ -141,7 +149,7 @@ moca_task Moca_AddTask(struct task_struct *t)
             Moca_Panic("Moca unhandeled hashmap error");
             break;
         case  MOCA_HASHMAP_ALREADY_IN_MAP:
-            Moca_Panic("Moca Adding an already exixsting task");
+            MOCA_DEBUG_PRINT("Moca Adding an already exixsting task %p\n", t);
             break;
         default:
             //normal add
@@ -155,11 +163,8 @@ void Moca_RemoveTask(struct task_struct *t)
 {
     struct _moca_task tsk;
     tsk.key=t;
-    MOCA_DEBUG_PRINT("Moca Removing task %p\n",t);
-    spin_lock(&Moca_tasksLock);
+    write_lock(&Moca_tasksLock);
     Moca_RemoveFromMap(Moca_tasksMap, (hash_entry)&tsk);
-    spin_unlock(&Moca_tasksLock);
-    MOCA_DEBUG_PRINT("Moca Removed task %p, releasing task\n",t);
+    write_unlock(&Moca_tasksLock);
     put_task_struct(t);
-    MOCA_DEBUG_PRINT("Moca task %p realesed\n",t);
 }
