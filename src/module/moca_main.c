@@ -20,7 +20,7 @@
 #include "moca_tasks.h"
 #include "moca_false_pf.h"
 
-#define MOCA_DEFAULT_SCHED_PRIO 99
+#define MOCA_DEFAULT_SCHED_PRIO 0
 
 /* Informations about the module */
 MODULE_LICENSE("GPL");
@@ -79,8 +79,6 @@ void Moca_PrintConfig(void)
 // Initializes threads data structures
 int Moca_InitThreads(void)
 {
-    struct sched_param param;
-    param.sched_priority=Moca_schedulerPriority;
     //Creating the thread
     Moca_threadTask=kthread_create(Moca_MonitorThread, NULL,
             "Moca main thread");
@@ -92,7 +90,12 @@ int Moca_InitThreads(void)
     }
     get_task_struct(Moca_threadTask);
     // Set priority
-    sched_setscheduler(Moca_threadTask,SCHED_FIFO,&param);
+    if(Moca_schedulerPriority!=0)
+    {
+        struct sched_param param;
+        param.sched_priority=Moca_schedulerPriority;
+        sched_setscheduler(Moca_threadTask,SCHED_FIFO,&param);
+    }
     //And finally start it
     wake_up_process(Moca_threadTask);
     return 0;

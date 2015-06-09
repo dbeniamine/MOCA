@@ -1,10 +1,10 @@
 # Moca config
 INSTALL_DIR=$(HOME)/Work/Moca
 BENCHDIR=$(HOME)/Work/Bench
-MOCA=sudo ../src/utils/moca -d $(INSTALL_DIR) -p $(PRIO) -w $(INTERVAL) -C $(NB_CHUNKS)
+MOCA=sudo ../src/utils/moca -d $(INSTALL_DIR) $(PRIO) -w $(INTERVAL) -C $(NB_CHUNKS)
 #-b 14 -F 2
 # Testing config
-PRIO=99
+#PRIO=-p 99
 SIZE=1500
 INTERVAL=40
 NB_CHUNKS=30
