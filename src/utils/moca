@@ -15,6 +15,7 @@ usage()
     echo "  -n                Do not compile the module"
     echo "  -D dirname        Set the output directory MUST be an absolute path.
     Default: $logdir"
+    echo "  -G                Do not generate framesoc's files"
     echo -e "\n  The following parameters allows you to do fine tuning on the
     module. By default you shouldn't need to use them.
     + If you encounter performance issues, you can increase the wakeup
@@ -41,7 +42,7 @@ usage()
     echo "  -C nbChunks       Set the number of chunks kept in memory. Default: 20."
     echo "  -F                Disable false page faults. If you set this flag,
     a lot of memory event will be missed, you really shouldn't use it ..."
-    echo "  -u                Use ugly false page faults hack, this can
+    echo "  -H                Use hack false page faults hack, this can
     reduce MOCA's overhead, however you must be sure that your application
     won't swap or it will crash !"
 }
@@ -66,8 +67,9 @@ log_thread_interval=.5
 Moca_log="Moca-output.log"
 name=$(basename $0)
 compi=true
+framesoc=true
 
-while getopts "c:ha:d:f:l:w:p:b:S:C:D:nuF" opt
+while getopts "c:ha:d:f:l:w:p:b:S:C:D:nHFG" opt
 do
     case $opt in
         c)
@@ -118,12 +120,15 @@ do
         n)
             compi=false;
             ;;
-        u)
+        H)
             Moca_false_pf="Moca_use_false_pf=1"
             Moca_ugly="Moca_false_pf_ugly=1"
             ;;
         F)
             Moca_false_pf="Moca_use_false_pf=0"
+            ;;
+        G)
+            framesoc=false
             ;;
         *)
             usage
@@ -238,11 +243,18 @@ line=$(($line-1))
 line+='d'
 sed 1,$line /var/log/kern.log | grep -i "moca" > $logdir/$Moca_log
 echo "File $logdir/$Moca_log created with Moca output in $(timer $t)"
-# Create the event poducers log (required by framesoc)
-echo "Creating files for Framesoc"
-cd $logdir
 pgsize=$(head -n 1 $kernLogFile-task0.log  | cut -d ' ' -f 4)
-$install_dir/src/utils/create_event_producer.pl $pgsize $kernLogFile-task*
+if $framesoc
+then
+    # Create the event poducers log (required by framesoc)
+    echo "Creating files for Framesoc"
+    cd $logdir
+    $install_dir/src/utils/create_event_producer.pl $pgsize $kernLogFile-task*
     echo -e "\tdone in $(timer $t)"
-cd -
+    cd -
+else
+    echo "Not create framesoc files as requested"
+    echo "You can generate them later by running:"
+    echo "cd $logdir; $install_dir/src/utils/create_event_producer.pl $pgsize $kernLogFile-task*"
+fi
 echo -e "Moca analysis done\nTotal time: $(timer $initime)\nLog directory: $logdir\nBye!"
