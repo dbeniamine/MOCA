@@ -221,7 +221,7 @@ void Moca_FixAllFalsePf(struct mm_struct *mm)
 {
     int i=0;
     Moca_FalsePf p;
-    if(!Moca_use_false_pf || Moca_false_pf_ugly || !mm)
+    if(!Moca_use_false_pf || !mm)
         return;
     if(Moca_false_pf_ugly)
     {
