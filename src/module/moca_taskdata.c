@@ -351,7 +351,7 @@ int Moca_CpuMask(int cpu, char *buf, size_t size)
 }
 
 
-#define LINE_SZ 80
+#define LINE_SZ 160
 static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
         size_t length, loff_t * offset)
 {
