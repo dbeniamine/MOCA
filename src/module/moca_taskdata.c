@@ -137,6 +137,8 @@ task_data Moca_InitData(struct task_struct *t)
         data->chunks[i]->map=Moca_InitHashMap(Moca_taskDataHashBits,
                 Moca_taskDataChunkSize, sizeof(struct _chunk_entry), NULL);
         spin_lock_init(&data->chunks[i]->lock);
+        if(!data->chunks[i]->map)
+            Moca_Panic("Cannot allocate hash map for taskdata");
     }
     data->task=t;
     data->cur=0;
@@ -229,13 +231,14 @@ int Moca_AddToChunk(task_data data, void *addr, int cpu)
     switch(status)
     {
         case MOCA_HASHMAP_FULL :
-            Moca_Panic("Moca hashmap full");
             spin_unlock(&data->chunks[cur]->lock);
+            printk(KERN_ALERT "Moca hashmap full\n");
+            //Moca_Panic("Moca hashmap full");
             return -1;
             break;
         case MOCA_HASHMAP_ERROR :
-            Moca_Panic("Moca hashmap error");
             spin_unlock(&data->chunks[cur]->lock);
+            Moca_Panic("Moca hashmap error");
             return -1;
             break;
         case MOCA_HASHMAP_ALREADY_IN_MAP :
@@ -287,19 +290,25 @@ int Moca_UpdateData(task_data data,int pos, int countR, int countW, int cpu)
 
 int Moca_NextChunks(task_data data)
 {
-    int cur;
+    int cur,old;
     MOCA_DEBUG_PRINT("Moca Goto next chunks %p, %d\n", data, data->cur);
     //Global lock
     spin_lock(&data->lock);
-    cur=data->cur;
-    spin_lock(&data->chunks[cur]->lock);
-    data->chunks[cur]->used=1;
-    data->cur=(cur+1)%Moca_nbChunks;
+    old=data->cur;
+    spin_lock(&data->chunks[old]->lock);
+    data->chunks[old]->used=1;
+    cur=old;
+    do{
+        spin_unlock(&data->chunks[cur]->lock);
+        cur=(cur+1)%Moca_nbChunks;
+        spin_lock(&data->chunks[cur]->lock);
+    }while(data->chunks[cur]->used==1 && cur != old);
+    data->cur=cur;
     spin_unlock(&data->chunks[cur]->lock);
     spin_unlock(&data->lock);
     MOCA_DEBUG_PRINT("Moca Goto chunks  %p %d, %d\n", data, data->cur,
             Moca_nbChunks);
-    if(data->chunks[data->cur]->used)
+    if(cur==old)
     {
         printk(KERN_ALERT "Moca no more chunks, stopping trace for task %d\n You can fix that by relaunching Moca either with a higher number of chunks\n or by decreasing the logging daemon wakeupinterval\n",
                 data->internalId);

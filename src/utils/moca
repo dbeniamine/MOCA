@@ -29,6 +29,8 @@ usage()
     related parameters.\n"
     echo "  -w ms             Set the wakeup interval for Moca to interval ms,
     Default: 40ms"
+    echo "  -L s              Set the logging daemon wakeup interval, default
+    .5s"
     echo "  -p prio           Schedtool priority for the kernel module, the program
     priority will be prio-1. You can increase this parameter
     to reduce the system noise. Default: $prio"
@@ -69,7 +71,7 @@ name=$(basename $0)
 compi=true
 framesoc=true
 
-while getopts "c:ha:d:f:l:w:p:b:S:C:D:nHFG" opt
+while getopts "c:ha:d:f:l:w:p:b:S:C:D:L:nHFG" opt
 do
     case $opt in
         c)
@@ -93,6 +95,9 @@ do
             ;;
         l)
             Moca_log="$OPTARG"
+            ;;
+        L)
+            log_thread_interval=$OPTARG
             ;;
         w)
             moca_interval="Moca_wakeupInterval=$OPTARG"

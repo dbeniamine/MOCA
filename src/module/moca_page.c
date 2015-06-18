@@ -76,13 +76,8 @@ void Moca_MonitorPage(task_data data)
         if(pte)
         {
             Moca_AddFalsePf(tsk->mm, pte);
-            /* if(!pte_none(*pte) && pte_present(*pte)) */
-            /* { */
-            /*     *pte=pte_set_flags(*pte,_PAGE_PRESENT); */
-            /*     MOCA_DEBUG_PRINT("Moca clear pte flags %p\n", pte); */
-            /* } */
-            // Set R/W status
             //TODO: count perfctr
+            // Set R/W status
             if(pte_young(*pte))
                 countR=1;
             if(pte_dirty(*pte))

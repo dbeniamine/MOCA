@@ -117,7 +117,7 @@ hash_entry Moca_EntryFromKey(hash_map map, hash_entry e)
 {
     unsigned long h;
     int ind=0;
-    if(!map)
+    if(!map || !e)
         return NULL;
     h=hash_ptr(e->key, map->hash_bits);
     ind=map->hashs[h];

@@ -23,7 +23,6 @@
 
 // The first bits are not random enough, 14 bits should be enough for pids
 unsigned long Moca_tasksHashBits=14;
-int Moca_AddTaskWaiting=0;
 DEFINE_RWLOCK(Moca_tasksLock);
 
 // Monitored process
