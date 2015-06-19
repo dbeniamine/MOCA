@@ -110,7 +110,6 @@ void Moca_CleanUp(void)
     {
         MOCA_DEBUG_PRINT("Killing thread task %p\n",Moca_threadTask);
         kthread_stop(Moca_threadTask);
-        put_task_struct(Moca_threadTask);
     }
     MOCA_DEBUG_PRINT("Moca Removing falsepf\n");
     Moca_ClearFalsePfData();
@@ -121,6 +120,8 @@ void Moca_CleanUp(void)
     MOCA_DEBUG_PRINT("Moca Removing shared data\n");
     Moca_CleanProcessData();
     MOCA_DEBUG_PRINT("Moca Removed shared data\n");
+    if(Moca_threadTask && current != Moca_threadTask)
+        put_task_struct(Moca_threadTask);
 }
 
 
