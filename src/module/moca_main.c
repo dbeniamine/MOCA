@@ -105,22 +105,22 @@ void Moca_CleanUp(void)
 {
     if(!Moca_Activated)
         return;
-    MOCA_DEBUG_PRINT("Moca Unregistering probes\n");
-    Moca_UnregisterProbes();
+    Moca_Activated=0;
     if(Moca_threadTask && current != Moca_threadTask)
     {
         MOCA_DEBUG_PRINT("Killing thread task %p\n",Moca_threadTask);
         kthread_stop(Moca_threadTask);
         put_task_struct(Moca_threadTask);
     }
+    MOCA_DEBUG_PRINT("Moca Removing falsepf\n");
+    Moca_ClearFalsePfData();
+    MOCA_DEBUG_PRINT("Moca Removed falsepf\n");
+    MOCA_DEBUG_PRINT("Moca Unregistering probes\n");
+    Moca_UnregisterProbes();
     //Clean memory
     MOCA_DEBUG_PRINT("Moca Removing shared data\n");
     Moca_CleanProcessData();
     MOCA_DEBUG_PRINT("Moca Removed shared data\n");
-    MOCA_DEBUG_PRINT("Moca Removing falsepf\n");
-    Moca_ClearFalsePfData();
-    MOCA_DEBUG_PRINT("Moca Removed falsepf\n");
-    Moca_Activated=0;
 }
 
 
@@ -159,6 +159,11 @@ void Moca_Panic(const char *s)
 {
     printk(KERN_ALERT "Moca panic:\n%s\n", s);
     Moca_CleanUp();
+}
+
+int Moca_IsActivated(void)
+{
+    return Moca_Activated;
 }
 
 module_init(Moca_Init);

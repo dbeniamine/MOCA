@@ -31,6 +31,7 @@ void Moca_Panic(const char *s);
 //Clocks managment
 void Moca_UpdateClock(void);
 unsigned long Moca_GetClock(void);
+int Moca_IsActivated(void);
 
 
 #endif //__MOCA__

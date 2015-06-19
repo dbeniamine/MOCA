@@ -288,7 +288,9 @@ void Moca_FreeMap(hash_map map)
 {
     if(!map)
         return;
-    kfree(map->table);
-    kfree(map->hashs);
+    if(map->table)
+        kfree(map->table);
+    if(map->hashs)
+        kfree(map->hashs);
     kfree(map);
 }

@@ -30,11 +30,12 @@ void Moca_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
     moca_task tsk;
     if(!(data=Moca_GetData(current)))
     {
-        if(!(tsk=Moca_AddTaskIfNeeded(current)))
+        if(!Moca_IsActivated() || !(tsk=Moca_AddTaskIfNeeded(current)))
             jprobe_return();
         data=tsk->data;
     }
-    Moca_AddToChunk(data,(void *)(address&PAGE_MASK),get_cpu());
+    if(Moca_IsActivated())
+        Moca_AddToChunk(data,(void *)(address&PAGE_MASK),get_cpu());
     MOCA_DEBUG_PRINT("Moca Pte fault task %p\n", current);
     pte=Moca_PteFromAdress(address&PAGE_MASK,mm);
     if(Moca_FixFalsePf(mm,pte)!=0)
