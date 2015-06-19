@@ -10,7 +10,7 @@
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
-#define MOCA_DEBUG
+//#define MOCA_DEBUG
 
 //#include <linux/slab.h> //malloc
 //#include <linux/hash.h>
@@ -38,7 +38,7 @@ typedef struct _hash_map
 int Moca_DefaultHashMapComp(hash_entry e1, hash_entry e2)
 {
     unsigned long k1=(unsigned long)(e1->key),k2=(unsigned long)(e2->key);
-    return k1==k2?0:(k1>k2?1:-1);
+    return k1-k2;
 }
 
 unsigned int Moca_FindNextAvailPosMap(hash_map map)
@@ -117,7 +117,7 @@ hash_entry Moca_EntryFromKey(hash_map map, hash_entry e)
 {
     unsigned long h;
     int ind=0;
-    if(!map)
+    if(!map || !e)
         return NULL;
     h=hash_ptr(e->key, map->hash_bits);
     ind=map->hashs[h];
@@ -142,7 +142,8 @@ hash_entry Moca_EntryFromKey(hash_map map, hash_entry e)
 hash_entry Moca_AddToMap(hash_map map, hash_entry e, int *status)
 {
     unsigned long h;
-    int ind=0, nextPos;
+    int ind=0;
+    unsigned int nextPos;
     if(!map)
     {
         *status=MOCA_HASHMAP_ERROR;
@@ -155,9 +156,9 @@ hash_entry Moca_AddToMap(hash_map map, hash_entry e, int *status)
     }
     //Do the insertion
     nextPos=Moca_FindNextAvailPosMap(map);
-    MOCA_DEBUG_PRINT("Moca inserting %p ind %d/%lu\n",
-            e->key,nextPos,map->tableSize);
-    if((unsigned)nextPos >= map->tableSize)
+    MOCA_DEBUG_PRINT("Moca inserting %p ind %d/%lu total %d\n",
+            e->key,nextPos,map->tableSize, map->nbentry);
+    if(nextPos >= map->tableSize)
     {
         *status=MOCA_HASHMAP_ERROR;
         Moca_Panic("Moca hashmap BUG in AddToMap");
@@ -186,7 +187,7 @@ hash_entry Moca_AddToMap(hash_map map, hash_entry e, int *status)
             tableElt(map,nextPos)->key=NULL;
             return tableElt(map,ind);
         }
-        MOCA_DEBUG_PRINT("Moca collision in map %p key %p\n", e->key, map);
+        MOCA_DEBUG_PRINT("Moca collision in map %p key %p\n", map, e->key);
         //TODO: Use Memcpy
         memcpy(tableElt(map,nextPos),e,map->elt_size);
         tableElt(map,nextPos)->next=MOCA_HASHMAP_END;

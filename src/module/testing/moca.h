@@ -6,8 +6,20 @@
 #include <string.h>
 #include <stdio.h>
 // printf
-#define printk(...) printf(__VA_ARGS__)
+
+//#define DO_PRINT
+
+#ifdef DO_PRINT
+#define PRINT(...) printf(__VA_ARGS__)
 #define MOCA_DEBUG_PRINT(...) printf(__VA_ARGS__)
+#define printk(...) printf(__VA_ARGS__)
+#else
+#define PRINT(...)
+#define MOCA_DEBUG_PRINT(...)
+#define printk(...)
+#endif
+
+
 // Malloc
 #define kmalloc(A,B) malloc(A)
 #define kcalloc(A,B,C) calloc(A,B)
