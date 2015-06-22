@@ -45,17 +45,13 @@ void Moca_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
 
 }
 
-void Moca_ExitHandler(struct mm_struct *mm)
-
+int Moca_ExitHandler(struct kprobe* k, struct pt_regs* r)
 {
-    if(!Moca_GetData(mm->owner))
-        jprobe_return();
-    MOCA_DEBUG_PRINT("Moca Exit handler handler task %p, mm %p\n", mm->owner, mm);
-    if(atomic_read(&(mm->mm_users))<=1){
-        MOCA_DEBUG_PRINT("Moca Fixing false pf mm %p\n", mm);
-        Moca_FixAllFalsePf(mm);
-    }
-    jprobe_return();
+    if(!Moca_GetData(current))
+        return 0;
+    MOCA_DEBUG_PRINT("Exit handler handler task %p, mm %p\n", NULL, NULL);
+    Moca_FixAllFalsePf(current->mm);
+    return 0;
 }
 
 
@@ -64,15 +60,15 @@ static struct jprobe Moca_PteFaultjprobe = {
     .kp.symbol_name = "handle_mm_fault",
 };
 
-static struct jprobe Moca_ExitProbe = {
-    .entry=Moca_ExitHandler,
-    .kp.symbol_name = "mmput",
+static struct kprobe Moca_ExitProbe = {
+    .symbol_name = "unmap_vmas",
 };
 
 int Moca_RegisterProbes(void)
 {
     int ret;
-    if ((ret=register_jprobe(&Moca_ExitProbe)))
+    Moca_ExitProbe.pre_handler=Moca_ExitHandler;
+    if ((ret=register_kprobe(&Moca_ExitProbe)))
         Moca_Panic("Unable to register do exit probe");
     MOCA_DEBUG_PRINT("Moca registering probes\n");
     if ((ret=register_jprobe(&Moca_PteFaultjprobe)))
@@ -84,6 +80,6 @@ int Moca_RegisterProbes(void)
 
 void Moca_UnregisterProbes(void)
 {
-    unregister_jprobe(&Moca_ExitProbe);
+    unregister_kprobe(&Moca_ExitProbe);
     unregister_jprobe(&Moca_PteFaultjprobe);
 }
