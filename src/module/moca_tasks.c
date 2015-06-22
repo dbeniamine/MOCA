@@ -165,6 +165,6 @@ void Moca_RemoveTask(struct task_struct *t)
     write_lock(&Moca_tasksLock);
     Moca_RemoveFromMap(Moca_tasksMap, (hash_entry)&tsk);
     write_unlock(&Moca_tasksLock);
-    MOCA_DEBUG_PRINT("Moca removing task %p, mm \n",t);
+    MOCA_DEBUG_PRINT("Moca removing task %p\n",t);
     put_task_struct(t);
 }
