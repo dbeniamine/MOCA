@@ -17,6 +17,7 @@
 #include <linux/string.h> //memcpy
 #include "moca_hashmap.h"
 
+#define HASH(k,m) ((int)(hash_ptr((k),(m)->hash_bits))%(m)->size)
 
 #define MOCA_HASHMAP_END -1
 #define MOCA_HASHMAP_UNUSED -2
@@ -102,7 +103,7 @@ int Moca_PosInMap(hash_map map,hash_entry e)
     int ind=0;
     if(!map)
         return -1;
-    h=hash_ptr(e->key, map->hash_bits);
+    h=HASH(e->key, map);
     ind=map->hashs[h];
     while(ind>=0 && map->comp(tableElt(map,ind),e)!=0 )
         ind=tableElt(map,ind)->next;
@@ -119,7 +120,7 @@ hash_entry Moca_EntryFromKey(hash_map map, hash_entry e)
     int ind=0;
     if(!map || !e)
         return NULL;
-    h=hash_ptr(e->key, map->hash_bits);
+    h=HASH(e->key, map);
     ind=map->hashs[h];
     while(ind>=0 && map->comp(tableElt(map,ind),e)!=0 )
         ind=tableElt(map,ind)->next;
@@ -165,7 +166,7 @@ hash_entry Moca_AddToMap(hash_map map, hash_entry e, int *status)
         return NULL;
     }
     //Update the link
-    h=hash_ptr(e->key, map->hash_bits);
+    h=HASH(e->key, map);
     ind=map->hashs[h];
     //TODO refactor here
     if(ind<0)
@@ -241,7 +242,7 @@ hash_entry Moca_RemoveFromMap(hash_map map,hash_entry e)
     if(!map)
         return NULL;
     MOCA_DEBUG_PRINT("Moca removing %p from %p\n", e->key, map);
-    h=hash_ptr(e->key, map->hash_bits);
+    h=HASH(e->key, map);
     ind=map->hashs[h];
     while(ind>=0 && map->comp(tableElt(map,ind),e)!=0 )
     {
@@ -278,7 +279,7 @@ void Moca_ClearMap(hash_map map)
         return;
     for(i=0;i<map->nbentry;++i)
     {
-        h=hash_ptr(tableElt(map,i)->key, map->hash_bits);
+        h=HASH(tableElt(map,i)->key,map);
         map->hashs[h]=MOCA_HASHMAP_END;
         tableElt(map,i)->next=MOCA_HASHMAP_UNUSED;
     }
