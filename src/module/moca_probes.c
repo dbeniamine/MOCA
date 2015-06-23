@@ -45,14 +45,13 @@ void Moca_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
 
 }
 
-void Moca_ExitHandler(struct task_struct *tsk, struct mm_struct *mm)
-
+void Moca_ExitHandler(struct mmu_gather *tlb, struct vm_area_struct *start_vma,
+		unsigned long start, unsigned long end)
 {
-    if(Moca_GetData(tsk))
-    {
-        MOCA_DEBUG_PRINT("Moca Exit handler handler task %p, mm %p\n", tsk, mm);
+    struct mm_struct *mm=start_vma->vm_mm;
+    MOCA_DEBUG_PRINT("Moca Exit handler handler task %p, mm %p\n", mm->owner, mm);
+    if(Moca_IsTrackedMm(mm))
         Moca_FixAllFalsePf(mm);
-    }
     jprobe_return();
 }
 
@@ -64,7 +63,7 @@ static struct jprobe Moca_PteFaultjprobe = {
 
 static struct jprobe Moca_ExitProbe = {
     .entry=Moca_ExitHandler,
-    .kp.symbol_name = "mm_release",
+    .kp.symbol_name = "unmap_vmas",
 };
 
 int Moca_RegisterProbes(void)

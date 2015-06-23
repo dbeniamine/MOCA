@@ -168,3 +168,9 @@ void Moca_RemoveTask(struct task_struct *t)
     MOCA_DEBUG_PRINT("Moca removing task %p\n",t);
     put_task_struct(t);
 }
+
+int Moca_IsTrackedMm(struct mm_struct *mm)
+{
+    return ((mm->owner == NULL ) || (mm->owner == Moca_initTask) ||
+            Moca_GetData(mm->owner)!=NULL);
+}

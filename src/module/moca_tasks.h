@@ -38,4 +38,6 @@ moca_task Moca_NextTask(int *pos);
 task_data Moca_GetData(struct task_struct *t);
 
 void Moca_RemoveTask(struct task_struct *t);
+
+int Moca_IsTrackedMm(struct mm_struct *mm);
 #endif //__MOCA_TASKS__
