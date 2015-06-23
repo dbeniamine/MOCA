@@ -1,124 +1,117 @@
-Évaluation des performances de Moca
-===================================
+Analysis of Tabarnac optimization on IS
+=======================================
 
-Toutes les expériences présentées ici ont étés réalisée sur une multiplication
-de matrice parallèle "modulo" avec des matrices de tailles 1000*1000 doubles.
-Pour plus d'informations concernant les conditions expérimentales, voir le
-dépôt git:
 
-```{bash}
-git clone <user>@tipi.inrialpes.fr/~dbeniami/git/moca_perf.git
-```
-Dossier: perf_no_buff_150218_1612
-
-**Note importante :**
-Pour toutes les courbes présentées ici, un "wakeuup interval" de 0ms signifie
-une exécution non monitorée (sans MOCA).
-
-```{r parsing}
+```{r parsing ,echo=F}
 library(ggplot2)
 library(plyr)
-data<-data.frame(read.csv2(file="results.csv",sep=',',dec='.',col.names=c("interval","run","time")))
-events<-data.frame(read.csv2(file="events.csv",sep=',',dec='.',col.names=c("interval","run","events")))
-#show(events)
+data<-data.frame(read.csv2(file="results.csv",sep=',',dec='.'))
+#str(data)
 #show(data)
 ```
 
-Fréquence de monitoring
-------------------------
+Setup
+-----
 
-La première courbe montre l'évolution du temps d'exécution en fonction de la
-période de monitoring. Plus cette période est basse plus l'impact sur le
-temps d'exécution devrait être fort.
++ Experiment executed 2015-06-20 on *graphene* cluster (g5k nancy).
++ Benchmarks: All NAS bench but *dc*, CLASS A
 
-```{r WakeupInterval}
-stat<-ddply(data,"interval",summarise,
-            N=length(time),mean=mean(time),sd=sd(time),se=sd/sqrt(N))
+Expectations
+-------------
+
+Three groups:
++ Overhead factor > 30
+    + *is* and *mg*
++ 5 < Overhead factor < 15
+    +  *lu*,*ft*,*bt*
++ Overhead factor < 5
+    + *cg*,*ep*,*ua*
+
+Results similar to `perf_test_NAS_g5k_150620_1833`
+
+
+Results
+-------
+
+###   Execution time
+
+```{r ExecTime, echo=F}
+stat<-ddply(data,c("Bench", "Class", "Type"),summarise,
+            N=length(Time),mean=mean(Time),sd=sd(Time),se=sd/sqrt(N))
+p  <- ggplot(stat,aes(x=Bench,y=mean, fill=Type))
+#p  <- ggplot(stat,aes(x=Bench,y=speedup, fill=Type))
+p  <-  p + geom_bar(stat="identity", position=position_dodge(.9) )
+p  <-  p + geom_errorbar(aes(ymin=mean-se, ymax=mean+se),
+                  width=.2,                    # Width of the error bars
+                  position=position_dodge(.9))
+#p  <- p + facet_grid(Balancing ~ Interleave)
+p <- p + xlab("Benchmark")
+p <- p + ylab("Exec time (s)")
+p <- p + guides(fill=guide_legend(title="Execution type"))
+# BW theme
+#p <- p + theme_bw()
+p <-  p + theme(panel.grid.minor = element_line(colour = "black", linetype="dashed", size = 0.1),
+        panel.grid.major = element_line(colour = "black", size = 0.1),
+        legend.position="bottom")
+#p <- p + scale_fill_grey()
+#p <- p+ theme(legend.position="none")
+show(p)
+
+```
+
+### Slowdown Factor
+
+```{r Slowdown, echo=F}
+norm_vect <- rep(subset(data, data$Type=="Base")$Time,each=2)
+#show(norm_vect)
+data$slowdown <- data$Time / norm_vect
+stat<-ddply(data,c("Bench", "Class", "Type"),summarise,
+            N=length(slowdown),mean=mean(slowdown),sd=sd(slowdown),se=sd/sqrt(N))
+p  <- ggplot(stat,aes(x=Bench,y=mean, fill=Type))
+#p  <- ggplot(stat,aes(x=Bench,y=speedup, fill=Type))
+p  <-  p + geom_bar(stat="identity", position=position_dodge(.9) )
+p  <-  p + geom_errorbar(aes(ymin=mean-se, ymax=mean+se),
+                  width=.2,                    # Width of the error bars
+                  position=position_dodge(.9))
+#p  <- p + facet_grid(Balancing ~ Interleave)
+p <- p + xlab("Benchmark")
+p <- p + ylab("Slowdown factor")
+p <- p + guides(fill=guide_legend(title="Execution type"))
+# BW theme
+#p <- p + theme_bw()
+p <-  p + theme(panel.grid.minor = element_line(colour = "black", linetype="dashed", size = 0.1),
+        panel.grid.major = element_line(colour = "black", size = 0.1),
+        legend.position="bottom")
+#p <- p + scale_fill_grey()
+#p <- p+ theme(legend.position="none")
+show(p)
+#ggsave("figure/ExecutionTime.pdf", width=4, height=4)
+```
+
+Detailed Values:
+
+```{r DetailledValues, echo=F}
 show(stat)
-p<-ggplot(stat,aes(x=interval,y=mean, fill=interval)) + geom_histogram(stat="identity")
-p<- p + geom_errorbar(aes(ymin=mean+se,ymax=mean-se, width=.1))
-p<- p + xlab("Wakeup interval (ms)")
-p<- p + ylab("Time (ms)")
-show(p)
-ggsave('wakeupInterval.eps')
 ```
 
-Cette courbe montre clairement deux régimes :
-+ Avec un intervalle de réveil inférieur à 40ms, le temps d'exécution semble
-  augmenter de manière exponentielle.
-+ Si l'intervalle est >= 40ms, l'overhead tombe très vite en dessous de 1.5 fois
-  le temps de base, puis se stabilise (pour un interval > 60) autour d'un
-  facteur 1.3.
+Conclusions
+-----------
 
-Cette rupture s'explique par le quota de temps de scheduling de Linux: toutes les
-50ms, Linux choisit un processus a ordonnancer. Avec un intervalle de réveil
-inférieur au quota de temps, on prends ne laisse pratiquement pas de temps au
-processus observé pour s'exécuter normalement.
+## Comparison between benchmarks
 
-L'autre aspect a analyser de l'intervalle de reveil est le nombre d'evenements
-capturés, voici une petite courbe pour en discuter.
+## Comparison to other tools
 
-```{r nevt}
-evstat<-ddply(events,"interval",summarise,
-            N=length(events),mean=mean(events),sd=sd(events),se=sd/sqrt(N))
-show(evstat)
-p<-ggplot(evstat,aes(x=interval,y=mean, fill=interval)) + geom_histogram(stat="identity")
-p<- p + geom_errorbar(aes(ymin=mean+se,ymax=mean-se, width=.1))
-p<- p + xlab("Wakeup interval (ms)")
-p<- p + ylab("Number of captured events")
-show(p)
-ggsave('events.eps')
-```
+The same experiment was run for tabarnac:
 
-De manière logique, quand l'intervalle de réveil est très faible,
-l'application passe son temps a faire des (faux) défauts de pages ce qui
-explique aussi la lenteur de l'execution. On voit qe si on utilise un trop
-gros inerval > 80ms, on perd de l'information. 40ms semble être un bon
-compromis entre performances et quantité d'informations perdues.
+<img src="./tabarnac_ovh.png", alt="tabarnac_ovh" /, width=500, height=500>
 
+# Todo
 
-Impact du numéro de run
------------------------
++ Compare with MemProf
 
-Les courbes suivantes montrent pour chaque intervalle, l'évolution du temps
-d'exécution avec le numéro de run. Si un schéma clair d'augmentation de de
-diminution apparaît, nous avons un problème !
-*Note: a ce jour, il y à une fuite mémoire dans snprintf, ce qui pourrais
-causer ce genre de soucis.*
-
-```{r run1}
-p <- ggplot(data,  aes(group=interval, colour=interval,y=time, x=run)) + geom_line() +geom_point()
-p <- p + ylim(0,NA)
-p <- p + xlab("run id")
-p <- p + ylab("Time (ms)")
-show(p)
-```
-On ne voit pas apparaitre clairement de hausse ou de diminution du temps
-d'exécution, ce qui est plutôt rassurant. Il semblerais par contre que il y
-ait plusieurs working set avec des temps d'exécutions différents (très visible
-pour les intervalle de réveil faible, mais existant aussi sur les autres (cf
-courbes ci dessous)). Je ne sais pas d'où ça viens, il va
-probablement falloir enquêter la dessus plus tard ...
-
-Ci dessous les mêmes courbe sur des graphiques différents pour y voir plus
-clair.
-
-```{r run2}
-for(int in unique(data$interval))
-{
-p <- ggplot(subset(data,data$interval==int), aes(y=time, x=run)) + geom_line() +geom_point()
-p <- p + ylim(0,NA)
-p <- p + xlab("run id")
-p <- p + ylab("Time (ms)")
-p <- p + ggtitle(paste("WakeupInterval: ", int))
-show(p)
-}
-```
-
-```{r free}
+```{r free, echo=F}
 remove(p)
 remove(stat)
 remove(data)
-remove(evstat)
-remove(events)
+remove(norm_vect)
 ```
