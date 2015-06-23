@@ -49,9 +49,11 @@ void Moca_ExitHandler(struct mmu_gather *tlb, struct vm_area_struct *start_vma,
 		unsigned long start, unsigned long end)
 {
     struct mm_struct *mm=start_vma->vm_mm;
-    MOCA_DEBUG_PRINT("Moca Exit handler handler task %p, mm %p\n", mm->owner, mm);
-    if(Moca_IsTrackedMm(mm))
+    if(mm && Moca_IsTrackedMm(mm))
+    {
+        MOCA_DEBUG_PRINT("Moca Exit handler handler task %p, mm %p\n", mm->owner, mm);
         Moca_FixAllFalsePf(mm);
+    }
     jprobe_return();
 }
 
