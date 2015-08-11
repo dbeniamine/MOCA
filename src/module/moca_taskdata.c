@@ -33,6 +33,7 @@ int Moca_nbChunks=20;
 #include <linux/cpumask.h> //num_online_cpus
 #include <asm/uaccess.h>  /* for copy_*_user */
 #include <linux/delay.h>
+#include <asm/atomic.h>
 #include "moca.h"
 #include "moca_taskdata.h"
 #include "moca_tasks.h"
@@ -84,7 +85,7 @@ typedef struct _task_data
     struct proc_dir_entry *proc_entry;
 }*task_data;
 
-int Moca_nextTaskId=0;
+atomic_t Moca_nextTaskId=ATOMIC_INIT(0);
 
 int Moca_CurrentChunk(task_data data)
 {
@@ -142,7 +143,7 @@ task_data Moca_InitData(struct task_struct *t)
     }
     data->task=t;
     data->cur=0;
-    data->internalId=Moca_nextTaskId++;
+    data->internalId=atomic_inc_return(&Moca_nextTaskId)-1;
     data->nbflush=0;
     data->status=MOCA_DATA_STATUS_NORMAL;
     snprintf(buf,10,"task%d",data->internalId);
