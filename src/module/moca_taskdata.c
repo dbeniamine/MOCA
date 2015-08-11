@@ -134,6 +134,7 @@ task_data Moca_InitData(struct task_struct *t)
             return NULL;
         }
         data->chunks[i]->cpu=0;
+        data->chunks[i]->startClock=-1;
         data->chunks[i]->used=0;
         data->chunks[i]->map=Moca_InitHashMap(Moca_taskDataHashBits,
                 Moca_taskDataChunkSize, sizeof(struct _chunk_entry), NULL);
@@ -256,7 +257,7 @@ int Moca_AddToChunk(task_data data, void *addr, int cpu)
     e->cpu|=1<<cpu;
     data->chunks[cur]->cpu|=1<<cpu;
     data->chunks[cur]->endClock=Moca_GetClock();
-    if(Moca_NbElementInMap(data->chunks[cur]->map)==1)
+    if(data->chunks[cur]->startClock==-1)
         data->chunks[cur]->startClock=Moca_GetClock();
     spin_unlock(&data->chunks[cur]->lock);
     MOCA_DEBUG_PRINT("Moca inserted %p\n", addr);
@@ -466,6 +467,7 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
             if(complete)
             {
                 data->chunks[chunkid]->cpu=0;
+                data->chunks[chunkid]->startClock=-1;
                 data->chunks[chunkid]->used=0;
             }
         }
