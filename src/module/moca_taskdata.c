@@ -258,7 +258,7 @@ int Moca_AddToChunk(task_data data, void *addr, int cpu)
     data->chunks[cur]->cpu|=1<<cpu;
     data->chunks[cur]->endClock=Moca_GetClock();
     if(data->chunks[cur]->startClock==-1)
-        data->chunks[cur]->startClock=Moca_GetClock();
+        data->chunks[cur]->startClock=data->chunks[cur]->endClock;
     spin_unlock(&data->chunks[cur]->lock);
     MOCA_DEBUG_PRINT("Moca inserted %p\n", addr);
     return 0;

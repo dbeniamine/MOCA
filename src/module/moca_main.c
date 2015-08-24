@@ -9,7 +9,7 @@
  * Copyright (C) 2010 David Beniamine
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
-/* #define MOCA_DEBUG */
+#define MOCA_DEBUG
 
 #include <linux/init.h>
 #include <linux/kthread.h>
@@ -112,11 +112,12 @@ void Moca_CleanUp(void)
         kthread_stop(Moca_threadTask);
     }
     MOCA_DEBUG_PRINT("Moca Removing falsepf\n");
-    Moca_ClearFalsePfData();
+    Moca_ClearFalsePf();
     MOCA_DEBUG_PRINT("Moca Removed falsepf\n");
     MOCA_DEBUG_PRINT("Moca Unregistering probes\n");
     Moca_UnregisterProbes();
-    //Clean memory
+    MOCA_DEBUG_PRINT("Moca Removing False Pf data\n");
+    Moca_ClearFalsePfData();
     MOCA_DEBUG_PRINT("Moca Removing shared data\n");
     Moca_CleanProcessData();
     MOCA_DEBUG_PRINT("Moca Removed shared data\n");

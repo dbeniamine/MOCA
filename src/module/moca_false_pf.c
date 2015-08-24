@@ -10,7 +10,7 @@
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
-/* #define MOCA_DEBUG */
+#define MOCA_DEBUG
 
 #include "moca_false_pf.h"
 #include "moca_hashmap.h"
@@ -20,8 +20,6 @@
 #define MOCA_FALSE_PF_HASH_BITS 14
 #define MOCA_FALSE_PF_VALID 0
 #define MOCA_FALSE_PF_BAD 1
-
-
 
 /*
  * If Moca_use_false_pf == 0, all of these functions directly returns without
@@ -42,17 +40,18 @@ typedef struct _Moca_falsePf
 hash_map Moca_falsePfMap;
 DEFINE_RWLOCK(Moca_fpfRWLock);
 
-//Synchronization stuff
+static inline int Moca_BadPte(pte_t *pte)
+{
+    return (!pte || pte_none(*pte) || pte_special(*pte));
+}
 
 int Moca_FixPte(pte_t *pte, struct mm_struct *mm)
 {
-    int res=1;
-    if(!pte || pte_none(*pte))
-        return res;
+    if(Moca_BadPte(pte))
+        return 1;
     *pte=pte_set_flags(*pte, _PAGE_PRESENT);
     MOCA_DEBUG_PRINT("Moca fixing false pte_fault %p mm %p\n",pte,mm);
-    res=0;
-    return res;
+    return 0;
 }
 
 void Moca_FixAllPte(struct mm_struct *mm)
@@ -117,11 +116,12 @@ void Moca_InitFalsePf(void)
         return;
     Moca_falsePfMap=Moca_InitHashMap(MOCA_FALSE_PF_HASH_BITS,
             2*(1<<MOCA_FALSE_PF_HASH_BITS),sizeof(struct _Moca_falsePf),
-            &Moca_FalsePfComparator);
+            NULL);
+            //&Moca_FalsePfComparator);
     rwlock_init(&Moca_fpfRWLock);
 }
 
-void Moca_ClearFalsePfData(void)
+void Moca_ClearFalsePf(void)
 {
     int i;
     Moca_FalsePf p;
@@ -130,7 +130,18 @@ void Moca_ClearFalsePfData(void)
     MOCA_DEBUG_PRINT("Moca removing all false pf\n");
     write_lock(&Moca_fpfRWLock);
     while((p=(Moca_FalsePf)Moca_NextEntryPos(Moca_falsePfMap, &i))!=NULL)
+    {
         Moca_FixPte((pte_t *)p->key, NULL);
+        Moca_RemoveFromMap(Moca_falsePfMap,(hash_entry)p);
+    }
+    write_unlock(&Moca_fpfRWLock);
+}
+
+void Moca_ClearFalsePfData(void)
+{
+    if(!Moca_use_false_pf || Moca_false_pf_ugly)
+        return;
+    write_lock(&Moca_fpfRWLock);
     MOCA_DEBUG_PRINT("Moca removing all false map%p\n",Moca_falsePfMap);
     Moca_FreeMap(Moca_falsePfMap);
     write_unlock(&Moca_fpfRWLock);
@@ -141,7 +152,7 @@ void Moca_AddFalsePf(struct mm_struct *mm, pte_t *pte)
     int status, try=0;
     struct _Moca_falsePf tmpPf;
     Moca_FalsePf p;
-    if(!Moca_use_false_pf || pte_none(*pte))
+    if(!Moca_use_false_pf || Moca_BadPte(pte))
         return;
     if(Moca_false_pf_ugly)
     {
@@ -167,18 +178,24 @@ void Moca_AddFalsePf(struct mm_struct *mm, pte_t *pte)
                 return;
             case  MOCA_HASHMAP_ALREADY_IN_MAP:
                 MOCA_DEBUG_PRINT("Moca Reusing bad false PF %p %p\n", pte, mm);
+                break;
             default:
                 //normal add
                 MOCA_DEBUG_PRINT("Moca Added false PF %p %p at %d/%d \n", pte, 
                         mm,(unsigned)status, Moca_NbElementInMap(Moca_falsePfMap));
-                p->status=MOCA_FALSE_PF_VALID;
-                *pte=pte_clear_flags(*pte,_PAGE_PRESENT);
-                write_unlock(&Moca_fpfRWLock);
-                return;
+                break;
         }
-    }while(try<2);
+    }while(status==MOCA_HASHMAP_FULL && try<2);
+    if(try>=2)
+    {
     MOCA_DEBUG_PRINT("Moca more than two try to add false pf pte %p, mm %p\n",
             pte, mm);
+    }
+    else
+    {
+       p->status=MOCA_FALSE_PF_VALID;
+       *pte=pte_clear_flags(*pte,_PAGE_PRESENT);
+    }
     write_unlock(&Moca_fpfRWLock);
 }
 
@@ -193,20 +210,23 @@ int Moca_FixFalsePf(struct mm_struct *mm, pte_t *pte)
     struct _Moca_falsePf tmpPf;
     Moca_FalsePf p;
     int res=1;
-    if(!Moca_use_false_pf || !pte || pte_none(*pte))
+    if(!Moca_use_false_pf || Moca_BadPte(pte))
         return res;
     if(Moca_false_pf_ugly)
         return Moca_FixPte(pte,mm);
 
-    read_lock(&Moca_fpfRWLock);
     MOCA_DEBUG_PRINT("Moca testing pte fault %p mm %p\n",pte,mm);
     tmpPf.key=pte;
     tmpPf.mm=mm;
+    read_lock(&Moca_fpfRWLock);
     if((p=(Moca_FalsePf)Moca_EntryFromKey(Moca_falsePfMap,(hash_entry)&tmpPf)))
     {
         MOCA_DEBUG_PRINT("Moca found false pte %p mm %p\n",p->key,p->mm);
-        res=Moca_FixPte(pte, mm);
-        p->status=MOCA_FALSE_PF_BAD;
+        if(p->status == MOCA_FALSE_PF_VALID)
+        {
+            p->status=MOCA_FALSE_PF_BAD;
+            res=Moca_FixPte(pte, mm);
+        }
     }
     read_unlock(&Moca_fpfRWLock);
     return res;

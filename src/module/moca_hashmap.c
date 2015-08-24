@@ -185,7 +185,7 @@ hash_entry Moca_AddToMap(hash_map map, hash_entry e, int *status)
             MOCA_DEBUG_PRINT("Moca %p already in map %p\n", e->key, map);
             *status=MOCA_HASHMAP_ALREADY_IN_MAP;
             //This seems useless
-            tableElt(map,nextPos)->key=NULL;
+            //tableElt(map,nextPos)->key=NULL;
             return tableElt(map,ind);
         }
         MOCA_DEBUG_PRINT("Moca collision in map %p key %p\n", map, e->key);
