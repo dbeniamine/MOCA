@@ -165,7 +165,9 @@ void Moca_ClearAllData(void)
     while((t=Moca_NextTask(&i)))
     {
         MOCA_DEBUG_PRINT("Moca asking data %d %p %p to end\n",i, t->data, t->key);
+        spin_lock(&t->data->lock);
         t->data->status=MOCA_DATA_STATUS_NEEDFLUSH;
+        spin_unlock(&t->data->lock);
     }
     MOCA_DEBUG_PRINT("Moca flushing\n");
     i=0;
@@ -378,10 +380,12 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
 #endif
     MOCA_DEBUG_PRINT("Moca_Flushing data %p allowed len %lu\n", data, length);
 
+    spin_lock(&data->lock);
     if(MOCA_DATA_STATUS_DYING_OR_ZOMBIE(data))
     {
         //Data already flush, do noting and wait for kfreedom
         data->status=MOCA_DATA_STATUS_ZOMBIE;
+        spin_unlock(&data->lock);
         return 0;
     }
 
@@ -399,6 +403,7 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
                     data->internalId,task_pid_nr(data->task), PAGE_SIZE);
         MOCA_DEBUG_PRINT("Moca user size %lu\n", len);
     }
+    spin_unlock(&data->lock);
 
     //Iterate on all chunks, start where we stopped if needed
     for(chunkid=(data->currentlyFlushed<0)?0:data->currentlyFlushed;
@@ -472,7 +477,9 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
             }
         }
         if(complete)
+        {
             spin_unlock(&data->chunks[chunkid]->lock);
+        }
         else
         {
             MOCA_DEBUG_PRINT("Moca stopping flush chunk %d, available space %lu\n",
@@ -483,10 +490,12 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
     }
     if(complete)
     {
+        spin_lock(&data->lock);
         ++data->nbflush;
         if(data->status==MOCA_DATA_STATUS_NEEDFLUSH )
             data->status=MOCA_DATA_STATUS_DYING;
         data->currentlyFlushed=-1;
+        spin_unlock(&data->lock);
     }
     MOCA_DEBUG_PRINT("Moca Flushing size %lu for data %p\n", sz, data);
     return sz;

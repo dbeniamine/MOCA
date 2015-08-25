@@ -10,14 +10,14 @@
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
-#define MOCA_DEBUG
+/* #define MOCA_DEBUG */
 
 #include "moca_false_pf.h"
 #include "moca_hashmap.h"
 #include <linux/rwlock_types.h>
 #include <linux/rwlock.h>
 
-#define MOCA_FALSE_PF_HASH_BITS 14
+#define MOCA_FALSE_PF_HASH_BITS 16
 #define MOCA_FALSE_PF_VALID 0
 #define MOCA_FALSE_PF_BAD 1
 
@@ -42,7 +42,7 @@ DEFINE_RWLOCK(Moca_fpfRWLock);
 
 static inline int Moca_BadPte(pte_t *pte)
 {
-    return (!pte || pte_none(*pte) || pte_special(*pte));
+    return (!pte || pte_none(*pte));
 }
 
 int Moca_FixPte(pte_t *pte, struct mm_struct *mm)
@@ -257,5 +257,19 @@ void Moca_FixAllFalsePf(struct mm_struct *mm)
             Moca_RemoveFromMap(Moca_falsePfMap,(hash_entry)p);
         }
     }
+    write_unlock(&Moca_fpfRWLock);
+}
+
+void Moca_LockPf(void)
+{
+    if(!Moca_use_false_pf || Moca_false_pf_ugly)
+        return;
+    write_lock(&Moca_fpfRWLock);
+}
+
+void Moca_UnlockPf(void)
+{
+    if(!Moca_use_false_pf || Moca_false_pf_ugly)
+        return;
     write_unlock(&Moca_fpfRWLock);
 }

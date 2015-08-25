@@ -30,8 +30,8 @@ typedef struct _hash_map
     hash_entry *table;
     unsigned int nbentry;
     unsigned long hash_bits;
-    unsigned long size;
-    unsigned long tableSize;
+    int size;
+    int tableSize;
     size_t elt_size;
     comp_fct_t comp;
 }*hash_map;
@@ -122,8 +122,15 @@ hash_entry Moca_EntryFromKey(hash_map map, hash_entry e)
         return NULL;
     h=HASH(e->key, map);
     ind=map->hashs[h];
-    while(ind>=0 && map->comp(tableElt(map,ind),e)!=0 )
+    while(ind>=0 && ind < map->tableSize && map->comp(tableElt(map,ind),e)!=0 )
         ind=tableElt(map,ind)->next;
+    if(ind >= map->tableSize)
+    {
+        printk("Moca Hashmap ind %d >= max: %d\n",ind, map->tableSize);
+        dump_stack();
+        Moca_Panic("HASMAP ERROR");
+        return NULL;
+    }
     if(ind >=0)
         return tableElt(map,ind);
     return NULL;

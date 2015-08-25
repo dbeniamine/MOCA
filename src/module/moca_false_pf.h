@@ -25,6 +25,7 @@ void Moca_ClearFalsePfData(void);
 void Moca_AddFalsePf(struct mm_struct *mm, pte_t *pte);
 
 
+
 /*
  * Try to fix false pte fault on pte.
  * Does nothing if pte isn't in the false pte list
@@ -38,6 +39,15 @@ int Moca_FixFalsePf(struct mm_struct *mm, pte_t *pte);
  * back
  */
 void Moca_FixAllFalsePf(struct mm_struct *mm);
+
+/*
+ * There is no need to use these locking function before calling any of the
+ * subroutines above.
+ * It is only usefull for the logging thread which need to be sure that a task
+ * does not held any lock before pausing it.
+ */
+void Moca_LockPf(void);
+void Moca_UnlockPf(void);
 
 #endif //__MOCA_FALSE_PF__
 
