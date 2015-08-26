@@ -13,15 +13,13 @@
 #ifndef __MOCA_PAGE__
 #define __MOCA_PAGE__
 
-
 #define MOCA_DEFAULT_WAKEUP_INTERVAL 40
+
+#define IS_KERNEL_ADDR(addr) ((addr) >= TASK_SIZE)
 
 /* Main function for TLB walkthrough
  * Check accessed page every Memmap_wakeupsIinterval ms
  */
 int Moca_MonitorThread(void *);
 
-pte_t *Moca_PteFromAdress(unsigned long addr, struct mm_struct *mm);
-
-void *Moca_PhyFromVirt(void *addr, struct mm_struct *mm);
 #endif //__MOCA_PAGE__

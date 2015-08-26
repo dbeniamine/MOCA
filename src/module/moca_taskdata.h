@@ -32,13 +32,6 @@ struct task_struct *Moca_GetTaskFromData(task_data data);
 int Moca_AddToChunk(task_data data, void *addr,int cpu);
 
 /*
- * Check if add is in chunkid
- * Returns  0 if addr is in chunk
- *          1 if not
- */
-/* int Moca_IsInChunk(task_data data, void *addr); */
-
-/*
  * Update the posth entry of the current chunk
  * Add count access and update the type
  */

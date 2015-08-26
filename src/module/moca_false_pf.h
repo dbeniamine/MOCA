@@ -21,24 +21,32 @@ void Moca_InitFalsePf(void);
 void Moca_ClearFalsePf(void);
 void Moca_ClearFalsePfData(void);
 
-// Marks the nb pte as not present and save them as false page fault
-void Moca_AddFalsePf(struct mm_struct *mm, pte_t *pte);
+/* Marks the nb addr as not present and save them as false page fault
+ * Set young and dirty to the value of the young and dirty flags from the pte
+ */
+void Moca_AddFalsePf(struct mm_struct *mm, unsigned long addr,
+        int *young, int * dirty);
 
 
 
 /*
- * Try to fix false pte fault on pte.
- * Does nothing if pte isn't in the false pte list
+ * Try to fix false pte fault on addr.
+ * Does nothing if addr isn't in the false pte list
  * returns 0 on success
- *         1 if pte is not in the false pf list
+ *         1 if addr is not in the false pf list
  */
-int Moca_FixFalsePf(struct mm_struct *mm, pte_t *pte);
+int Moca_FixFalsePf(struct mm_struct *mm, unsigned long addr);
 
 /*
  * Remove all false page faults associated to mm and set the present flags
  * back
  */
 void Moca_FixAllFalsePf(struct mm_struct *mm);
+
+void *Moca_PhyFromVirt(void *addr, struct mm_struct *mm);
+
+void Moca_GetCountersFromAddr(unsigned long addr, struct mm_struct *mm,
+        int * young, int *dirty);
 
 /*
  * There is no need to use these locking function before calling any of the

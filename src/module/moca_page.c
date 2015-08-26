@@ -22,75 +22,30 @@
 #include <linux/delay.h> //msleep
 #include <linux/slab.h>
 #include <linux/pid.h>
-#include <asm/pgtable.h>
 
 // Wakeup period in ms
 int Moca_wakeupInterval=MOCA_DEFAULT_WAKEUP_INTERVAL;
 
-void *Moca_PhyFromVirt(void *addr, struct mm_struct *mm)
-{
-    return addr;
-    /* pte_t *pte=Moca_PteFromAdress((unsigned long)addr,mm); */
-    /* if(!pte || pte_none(*pte)) */
-    /*     return addr; //Kernel address no translation needed */
-    /* return (void *)__pa(pte_page(*pte)); */
-}
-
-pte_t *Moca_PteFromAdress(unsigned long address, struct mm_struct *mm)
-{
-    pgd_t *pgd;
-    pmd_t *pmd;
-    pud_t *pud;
-    if(!mm)
-    {
-        MOCA_DEBUG_PRINT("Moca mm null !\n");
-        return NULL;
-    }
-    pgd = pgd_offset(mm, address);
-    if (!pgd || pgd_none(*pgd) || pgd_bad(*pgd) )
-        return NULL;
-    pud = pud_offset(pgd, address);
-    if(!pud || pud_none(*pud) || pud_bad(*pud))
-        return NULL;
-    pmd = pmd_offset(pud, address);
-    if (!pmd || pmd_none(*pmd) || pmd_bad(*pmd))
-        return NULL;
-    return pte_offset_map(pmd, address);
-
-}
-
 // Walk through the current chunk
 void Moca_MonitorPage(task_data data)
 {
-    int i=0,countR, countW;
+    int i=0,countR=0, countW=0;
     struct task_struct *tsk=Moca_GetTaskFromData(data);
-    pte_t *pte;
     void *addr;
     MOCA_DEBUG_PRINT("Moca monitor thread walking data %p , task %p, mm %p\n",
             data, tsk, tsk->mm);
     while((addr=Moca_AddrInChunkPos(data,i))!=NULL)
     {
-        pte=Moca_PteFromAdress((unsigned long)addr,tsk->mm);
-        MOCA_DEBUG_PRINT("Moca pagewalk addr : %p pte %p ind %d cpu %d data %p\n",
-                addr, pte, i,tsk->on_cpu, data);
-        if(pte)
-        {
+        MOCA_DEBUG_PRINT("Moca pagewalk addr : %p ind %d cpu %d data %p\n",
+            addr, i,tsk->on_cpu, data);
             //TODO: count perfctr
-            // Set R/W status
-            if(pte_young(*pte))
-                countR=1;
-            if(pte_dirty(*pte))
-                countW=1;
-            Moca_UpdateData(data,i,countR,countW,tsk->on_cpu);
-            Moca_AddFalsePf(tsk->mm, pte);
-        }
-        else
-            MOCA_DEBUG_PRINT("Moca no pte for adress %p\n", addr);
+        Moca_AddFalsePf(tsk->mm, (unsigned long)addr,&countR,&countW);
+        Moca_UpdateData(data,i,countR,countW,tsk->on_cpu);
         ++i;
     }
     // Goto to next chunk
     Moca_NextChunks(data);
-    MOCA_DEBUG_PRINT("Moca pagewalk pte cpu %d data %p end\n",
+    MOCA_DEBUG_PRINT("Moca monitor page cpu %d data %p end\n",
             tsk->on_cpu,data);
 }
 

@@ -24,10 +24,10 @@
 void Moca_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
         unsigned long address, unsigned int flags)
 {
-    pte_t *pte;
-
     task_data data;
     moca_task tsk;
+	if (IS_KERNEL_ADDR(address)) //do not handle kernel faults
+        jprobe_return();
     if(!(data=Moca_GetData(current)))
     {
         if(!Moca_IsActivated() || !(tsk=Moca_AddTaskIfNeeded(current)))
@@ -35,14 +35,12 @@ void Moca_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
         data=tsk->data;
     }
     if(Moca_IsActivated())
-        Moca_AddToChunk(data,(void *)(address&PAGE_MASK),get_cpu());
+        Moca_AddToChunk(data,(void *)address,get_cpu());
     MOCA_DEBUG_PRINT("Moca Pte fault task %p\n", current);
-    pte=Moca_PteFromAdress(address&PAGE_MASK,mm);
-    if(Moca_FixFalsePf(mm,pte)!=0)
-        MOCA_DEBUG_PRINT("Moca true pte fault at %p %p \n", pte, mm);
+    if(Moca_FixFalsePf(mm,address)!=0)
+        MOCA_DEBUG_PRINT("Moca true pte fault at %p %p \n", address, mm);
     Moca_UpdateClock();
     jprobe_return();
-
 }
 
 void Moca_ExitHandler(struct mmu_gather *tlb, struct vm_area_struct *start_vma,
