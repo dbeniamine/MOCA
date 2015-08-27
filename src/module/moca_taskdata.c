@@ -137,7 +137,7 @@ task_data Moca_InitData(struct task_struct *t)
         data->chunks[i]->startClock=-1;
         data->chunks[i]->used=0;
         data->chunks[i]->map=Moca_InitHashMap(Moca_taskDataHashBits,
-                Moca_taskDataChunkSize, sizeof(struct _chunk_entry), NULL);
+                Moca_taskDataChunkSize, sizeof(struct _chunk_entry));
         spin_lock_init(&data->chunks[i]->lock);
         if(!data->chunks[i]->map)
             Moca_Panic("Cannot allocate hash map for taskdata");
@@ -219,7 +219,6 @@ void Moca_UnlockChunk(task_data data)
 int Moca_AddToChunk(task_data data, void *addr, int cpu)
 {
     int status, cur;
-    struct _chunk_entry tmp;
     chunk_entry e;
     cur=Moca_CurrentChunk(data);
     spin_lock(&data->chunks[cur]->lock);
@@ -230,8 +229,7 @@ int Moca_AddToChunk(task_data data, void *addr, int cpu)
     }
     MOCA_DEBUG_PRINT("Moca hashmap adding %p to chunk %d %p data %p cpu %d\n",
             addr, cur, data->chunks[cur],data, cpu);
-    tmp.key=addr;
-    e=(chunk_entry)Moca_AddToMap(data->chunks[cur]->map,(hash_entry)&tmp, &status);
+    e=(chunk_entry)Moca_AddToMap(data->chunks[cur]->map,(void *)addr, &status);
     switch(status)
     {
         case MOCA_HASHMAP_FULL :
@@ -314,8 +312,8 @@ int Moca_NextChunks(task_data data)
             Moca_nbChunks);
     if(cur==old)
     {
-        printk(KERN_ALERT "Moca no more chunks, stopping trace for task %d\n You can fix that by relaunching Moca either with a higher number of chunks\n or by decreasing the logging daemon wakeupinterval\n",
-                data->internalId);
+        /* printk(KERN_ALERT "Moca no more chunks, stopping trace for task %d\n You can fix that by relaunching Moca either with a higher number of chunks\n or by decreasing the logging daemon wakeupinterval\n", */
+        /*         data->internalId); */
         return 1;
     }
     return 0;
@@ -370,7 +368,6 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
 {
     ssize_t  sz=0;
     int chunkid, ind, nelt, complete=1;
-    struct _chunk_entry tmpch;
     chunk_entry e;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
     task_data data=(task_data)PDE_DATA(file_inode(filp));
@@ -455,8 +452,7 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
                     sz+=Moca_CpuMask(e->cpu,buffer+sz,length-sz);
                     buffer[sz++]='\n';
                     //Re init data
-                    tmpch.key=e->key;
-                    Moca_RemoveFromMap(data->chunks[chunkid]->map,(hash_entry)&tmpch);
+                    Moca_RemoveFromMap(data->chunks[chunkid]->map,(void *)e->key);
                     e->countR=0;
                     e->countW=0;
                     e->cpu=0;

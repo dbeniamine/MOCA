@@ -106,11 +106,10 @@ void Moca_CleanUp(void)
     if(!Moca_Activated)
         return;
     Moca_Activated=0;
-    if(Moca_threadTask && current != Moca_threadTask)
-    {
-        MOCA_DEBUG_PRINT("Killing thread task %p\n",Moca_threadTask);
-        kthread_stop(Moca_threadTask);
-    }
+    MOCA_DEBUG_PRINT("Killing thread task %p\n",Moca_threadTask);
+    kthread_stop(Moca_threadTask);
+    MOCA_DEBUG_PRINT("Waiting for fpf action to end\n");
+    Moca_WLockPf();
     MOCA_DEBUG_PRINT("Moca Removing falsepf\n");
     Moca_ClearFalsePf();
     MOCA_DEBUG_PRINT("Moca Removed falsepf\n");
@@ -118,6 +117,7 @@ void Moca_CleanUp(void)
     Moca_UnregisterProbes();
     MOCA_DEBUG_PRINT("Moca Removing False Pf data\n");
     Moca_ClearFalsePfData();
+    Moca_WUnlockPf();
     MOCA_DEBUG_PRINT("Moca Removing shared data\n");
     Moca_CleanProcessData();
     MOCA_DEBUG_PRINT("Moca Removed shared data\n");
@@ -140,11 +140,11 @@ static int __init Moca_Init(void)
     if(Moca_InitThreads()!=0)
         return -2;
     MOCA_DEBUG_PRINT("Moca threads ready \n");
+    Moca_Activated=1;
     if(Moca_RegisterProbes()!=0)
         return -3;
     MOCA_DEBUG_PRINT("Moca probes ready \n");
     printk(KERN_NOTICE "Moca correctly intialized\n");
-    Moca_Activated=1;
     return 0;
 }
 

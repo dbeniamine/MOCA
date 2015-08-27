@@ -67,7 +67,6 @@ int Moca_MonitorThread(void * arg)
     while(!kthread_should_stop())
     {
         pos=0;
-        /* dump_stack(); */
         while((t=Moca_NextTask(&pos)))
         {
             data=t->data;
@@ -78,13 +77,13 @@ int Moca_MonitorThread(void * arg)
                 lastwake=task->sched_info.last_arrival;
                 MOCA_DEBUG_PRINT("Moca monitor thread found task %p\n",task);
                 Moca_LockChunk(data);
-                Moca_LockPf();
+                Moca_WLockPf();
                 // Here we are sure that the monitored task does not held an
                 // important lock therefore we can stop it
                 kill_pid(task_pid(task), SIGSTOP, 1);
-                Moca_UnlockPf();
                 Moca_UnlockChunk(data);
                 Moca_MonitorPage(data);
+                Moca_WUnlockPf();
                 kill_pid(task_pid(task), SIGCONT, 1);
             }
         }
