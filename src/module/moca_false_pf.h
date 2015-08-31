@@ -24,6 +24,7 @@ void Moca_ClearFalsePfData(void);
 
 /* Marks the nb addr as not present and save them as false page fault
  * Set young and dirty to the value of the young and dirty flags from the pte
+ * Requires write lock to be held
  */
 void Moca_AddFalsePf(struct mm_struct *mm, unsigned long addr,
         int *young, int * dirty);
@@ -51,16 +52,9 @@ void *Moca_PhyFromVirt(void *addr, struct mm_struct *mm);
 void Moca_GetCountersFromAddr(unsigned long addr, struct mm_struct *mm,
         int * young, int *dirty);
 
-/*
- * There is no need to use these locking function before calling any of the
- * subroutines above.
- * It is only usefull for the logging thread which need to be sure that a task
- * does not held any lock before pausing it.
- */
-void Moca_WLockPf(void);
-void Moca_WUnlockPf(void);
 void Moca_RLockPf(void);
 void Moca_RUnlockPf(void);
-
+void Moca_WLockPf(void);
+void Moca_WUnlockPf(void);
 #endif //__MOCA_FALSE_PF__
 

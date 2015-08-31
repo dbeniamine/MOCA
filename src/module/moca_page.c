@@ -34,14 +34,15 @@ void Moca_MonitorPage(task_data data)
     void *addr;
     MOCA_DEBUG_PRINT("Moca monitor thread walking data %p , task %p, mm %p\n",
             data, tsk, tsk->mm);
-    while((addr=Moca_AddrInChunkPos(data,i))!=NULL)
+    while((addr=Moca_AddrInChunkPos(data,&i))!=NULL)
     {
         MOCA_DEBUG_PRINT("Moca pagewalk addr : %p ind %d cpu %d data %p\n",
             addr, i,tsk->on_cpu, data);
             //TODO: count perfctr
+        Moca_WLockPf();
         Moca_AddFalsePf(tsk->mm, (unsigned long)addr,&countR,&countW);
+        Moca_WUnlockPf();
         Moca_UpdateData(data,i,countR,countW,tsk->on_cpu);
-        ++i;
     }
     // Goto to next chunk
     Moca_NextChunks(data);
@@ -62,7 +63,6 @@ int Moca_MonitorThread(void * arg)
     int pos;
     unsigned long long lastwake=0;
 
-    /* dump_stack(); */
     MOCA_DEBUG_PRINT("Moca monitor thread alive \n");
     while(!kthread_should_stop())
     {
@@ -76,15 +76,7 @@ int Moca_MonitorThread(void * arg)
             {
                 lastwake=task->sched_info.last_arrival;
                 MOCA_DEBUG_PRINT("Moca monitor thread found task %p\n",task);
-                Moca_LockChunk(data);
-                Moca_WLockPf();
-                // Here we are sure that the monitored task does not held an
-                // important lock therefore we can stop it
-                kill_pid(task_pid(task), SIGSTOP, 1);
-                Moca_UnlockChunk(data);
                 Moca_MonitorPage(data);
-                Moca_WUnlockPf();
-                kill_pid(task_pid(task), SIGCONT, 1);
             }
         }
         Moca_UpdateClock();

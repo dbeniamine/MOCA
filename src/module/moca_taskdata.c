@@ -312,15 +312,15 @@ int Moca_NextChunks(task_data data)
             Moca_nbChunks);
     if(cur==old)
     {
-        /* printk(KERN_ALERT "Moca no more chunks, stopping trace for task %d\n You can fix that by relaunching Moca either with a higher number of chunks\n or by decreasing the logging daemon wakeupinterval\n", */
-        /*         data->internalId); */
+        printk(KERN_ALERT "Moca no more chunks, stopping trace for task %d\n You can fix that by relaunching Moca either with a higher number of chunks\n or by decreasing the logging daemon wakeupinterval\n",
+                data->internalId);
         return 1;
     }
     return 0;
 }
 
 
-void *Moca_AddrInChunkPos(task_data data,int pos)
+void *Moca_AddrInChunkPos(task_data data,int *pos)
 {
     chunk_entry e;
     int cur=Moca_CurrentChunk(data);
@@ -332,7 +332,7 @@ void *Moca_AddrInChunkPos(task_data data,int pos)
     }
     MOCA_DEBUG_PRINT("Moca Looking for next addr in ch %d, pos %d/%u\n",
             cur, pos, Moca_NbElementInMap(data->chunks[cur]->map));
-    e=(chunk_entry)Moca_EntryAtPos(data->chunks[cur]->map,
+    e=(chunk_entry)Moca_NextEntryPos(data->chunks[cur]->map,
             pos);
     spin_unlock(&data->chunks[cur]->lock);
     if(!e)

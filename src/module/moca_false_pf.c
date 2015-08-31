@@ -10,13 +10,14 @@
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
-/* #define MOCA_DEBUG */
+#define MOCA_DEBUG
 
 #include "moca_false_pf.h"
 #include "moca_hashmap.h"
 #include <linux/rwlock_types.h>
 #include <linux/rwlock.h>
 #include <linux/delay.h> //msleep
+#include <linux/mm.h>
 
 #define MOCA_FALSE_PF_HASH_BITS 16
 #define MOCA_FALSE_PF_VALID 0
@@ -28,26 +29,18 @@
  */
 int Moca_use_false_pf=1;
 int Moca_false_pf_ugly=0;
-atomic_t Moca_fpf_writers=ATOMIC_INIT(0);
 
 
 typedef struct _Moca_falsePf
 {
     void *key; //addr
     int next;
-    int status;
+    atomic_t status;
 }*Moca_FalsePf;
 
 hash_map Moca_falsePfMap;
 DEFINE_RWLOCK(Moca_fpfRWLock);
-
-static inline int Moca_BadPte(pte_t *pte)
-{
-    return (!pte || pte_none(*pte));
-}
-
-
-
+static atomic_t Moca_NbWriters=ATOMIC_INIT(0);
 
 void *Moca_PhyFromVirt(void *addr, struct mm_struct *mm)
 {
@@ -58,11 +51,13 @@ void *Moca_PhyFromVirt(void *addr, struct mm_struct *mm)
     /* return (void *)__pa(pte_page(*pte)); */
 }
 
-pte_t *Moca_PteFromAddress(unsigned long address, struct mm_struct *mm)
+pte_t *Moca_PteFromAddress(unsigned long address, struct mm_struct *mm,
+        spinlock_t **ptl)
 {
     pgd_t *pgd;
     pmd_t *pmd;
     pud_t *pud;
+    pte_t *pte;
     if(!mm)
     {
         MOCA_DEBUG_PRINT("Moca mm null !\n");
@@ -77,7 +72,17 @@ pte_t *Moca_PteFromAddress(unsigned long address, struct mm_struct *mm)
     pmd = pmd_offset(pud, address);
     if (!pmd || pmd_none(*pmd) || pmd_bad(*pmd))
         return NULL;
-    return pte_offset_map(pmd, address);
+    pte=pte_offset_map(pmd, address);
+    if(!pte)
+        return NULL;
+    if(pte_none(*pte))
+    {
+        pte_unmap(pte);
+        return NULL;
+    }
+    *ptl=pte_lockptr(mm,pmd);
+    spin_lock(*ptl);
+    return pte;
 }
 
 static inline void Moca_GetCountersFromPte(pte_t *pte,int *young, int* dirty)
@@ -89,49 +94,45 @@ static inline void Moca_GetCountersFromPte(pte_t *pte,int *young, int* dirty)
 void Moca_GetCountersFromAddr(unsigned long addr, struct mm_struct *mm,
         int * young, int *dirty)
 {
-    pte_t *pte=Moca_PteFromAddress(addr,mm);
-    if(Moca_BadPte(pte))
-    {
-        *young=0;
-        *dirty=0;
+    spinlock_t *ptl;
+    pte_t *pte=Moca_PteFromAddress(addr,mm,&ptl);
+    if(!pte)
         return;
-    }
     Moca_GetCountersFromPte(pte,young,dirty);
-    pte_unmap(pte);
+    pte_unmap_unlock(pte,ptl);
 }
 
-int Moca_clearPte(unsigned long addr, struct mm_struct *mm,
+int Moca_ClearPte(unsigned long addr, struct mm_struct *mm,
         int *young,int *dirty)
 {
-    pte_t *pte=Moca_PteFromAddress(addr,mm);
-    if(!Moca_BadPte(pte))
-    {
-        Moca_GetCountersFromPte(pte,young,dirty);
-        *pte=pte_clear_flags(*pte, _PAGE_PRESENT);
-        pte_unmap(pte);
-        MOCA_DEBUG_PRINT("Moca cleared pte_fault %p mm %p\n",pte,mm);
-        return 0;
-    }
-    return 1;
+    spinlock_t *ptl;
+    pte_t *pte;
+    MOCA_DEBUG_PRINT("Moca clearing addr fault %p mm %p\n",(void *)addr,mm);
+    pte=Moca_PteFromAddress(addr,mm,&ptl);
+    if(!pte)
+        return 1;
+    Moca_GetCountersFromPte(pte,young,dirty);
+    *pte=pte_clear_flags(*pte, _PAGE_PRESENT);
+    MOCA_DEBUG_PRINT("Moca cleared pte_fault %p mm %p\n",pte,mm);
+    pte_unmap_unlock(pte,ptl);
+    MOCA_DEBUG_PRINT("Moca pte_fault %p unlocked\n",pte);
+    return 0;
 }
 
 
 int Moca_FixPte(unsigned long addr, struct mm_struct *mm)
 {
-    pte_t *pte=Moca_PteFromAddress(addr,mm);
-    if(!Moca_BadPte(pte))
-    {
-        MOCA_DEBUG_PRINT("Moca fixing false pte_fault addr %p, pte %p mm %p\n",
-                (void *)addr,pte,mm);
-        *pte=pte_set_flags(*pte, _PAGE_PRESENT);
-        pte_unmap(pte);
-        MOCA_DEBUG_PRINT("Moca fixed false pte_fault addr %p, pte %p mm %p\n",
-                (void *)addr,pte,mm);
-        return 0;
-    }
-    MOCA_DEBUG_PRINT("Moca not fixing false pte_fault addr %p pte %p mm %p\n",
+    spinlock_t *ptl;
+    pte_t *pte=Moca_PteFromAddress(addr,mm,&ptl);
+    if(!pte)
+        return 1;
+    MOCA_DEBUG_PRINT("Moca fixing false pte_fault addr %p, pte %p mm %p\n",
             (void *)addr,pte,mm);
-    return 1;
+    *pte=pte_set_flags(*pte, _PAGE_PRESENT);
+    MOCA_DEBUG_PRINT("Moca fixed false pte_fault addr %p, pte %p mm %p\n",
+            (void *)addr,pte,mm);
+    pte_unmap_unlock(pte,ptl);
+    return 0;
 }
 
 void Moca_FixAllPte(struct mm_struct *mm)
@@ -174,9 +175,9 @@ void Moca_DeleteBadFpf(void)
         return;
     while((p=(Moca_FalsePf)Moca_NextEntryPos(Moca_falsePfMap, &i))!=NULL)
     {
-        if(p->status==MOCA_FALSE_PF_BAD)
+        if(atomic_read(&p->status)==MOCA_FALSE_PF_BAD)
         {
-            MOCA_DEBUG_PRINT("Moca removed bad pf %p %p\n", (void *)p->key, p->mm);
+            MOCA_DEBUG_PRINT("Moca removed bad pf %p\n", (void *)p->key);
             Moca_RemoveFromMap(Moca_falsePfMap,p->key);
         }
     }
@@ -200,7 +201,7 @@ void Moca_ClearFalsePf(void)
     MOCA_DEBUG_PRINT("Moca removing all false pf\n");
     while((p=(Moca_FalsePf)Moca_NextEntryPos(Moca_falsePfMap, &i))!=NULL)
     {
-        Moca_FixPte((unsigned long)p->key, NULL);
+        // Useless: Moca_FixPte((unsigned long)p->key, NULL);
         Moca_RemoveFromMap(Moca_falsePfMap,p->key);
     }
 }
@@ -221,11 +222,11 @@ void Moca_AddFalsePf(struct mm_struct *mm, unsigned long address, int *young,
     Moca_FalsePf p;
     *young=0;
     *dirty=0;
-    if(!Moca_use_false_pf)
+    if(!Moca_use_false_pf || !mm)
         return;
     if(Moca_false_pf_ugly)
     {
-        Moca_clearPte(addr,mm,young,dirty);
+        Moca_ClearPte(addr,mm,young,dirty);
         return;
     }
 
@@ -253,13 +254,14 @@ void Moca_AddFalsePf(struct mm_struct *mm, unsigned long address, int *young,
     }while(status==MOCA_HASHMAP_FULL && try<2);
     if(status==MOCA_HASHMAP_FULL)
     {
-    MOCA_DEBUG_PRINT("Moca more than two try to add false pf addr %p, mm %p\n",
-            (void *)addr, mm);
+        MOCA_DEBUG_PRINT("Moca more than two try to add false pf addr %p, mm %p\n",
+                (void *)addr, mm);
     }
     else
     {
-       p->status=MOCA_FALSE_PF_VALID;
-       Moca_clearPte(addr,mm,young,dirty);
+        atomic_set(&p->status,MOCA_FALSE_PF_VALID);
+        if(Moca_ClearPte(addr,mm,young,dirty)!=0)
+            Moca_RemoveFromMap(Moca_falsePfMap,p->key);
     }
 }
 
@@ -273,7 +275,7 @@ int Moca_FixFalsePf(struct mm_struct *mm, unsigned long address)
 {
     unsigned long addr=address&PAGE_MASK;
     Moca_FalsePf p;
-    int res=1;
+    int res=1,st;
     if(!Moca_use_false_pf)
         return res;
     if(Moca_false_pf_ugly)
@@ -282,14 +284,16 @@ int Moca_FixFalsePf(struct mm_struct *mm, unsigned long address)
     MOCA_DEBUG_PRINT("Moca testing addr fault %p mm %p\n",(void *)addr,mm);
     if((p=(Moca_FalsePf)Moca_EntryFromKey(Moca_falsePfMap,(void *)addr)))
     {
+        st=atomic_read(&p->status);
         MOCA_DEBUG_PRINT("Moca found false addr %p mm %p status %d \n",
-                (void *)p->key,p->mm,p->status);
-        if(p->status == MOCA_FALSE_PF_VALID)
+                (void *)p->key,mm,st);
+        if(st == MOCA_FALSE_PF_VALID)
         {
             if((res=Moca_FixPte(addr, mm))==0)
-                p->status=MOCA_FALSE_PF_BAD;
+                atomic_set(&p->status,MOCA_FALSE_PF_BAD);
         }
     }
+    MOCA_DEBUG_PRINT("Moca fixed addr %p ? : %d\n", (void *)addr, res);
     return res;
 }
 
@@ -309,20 +313,22 @@ void Moca_FixAllFalsePf(struct mm_struct *mm)
         Moca_FixAllPte(mm);
         return;
     }
+    MOCA_DEBUG_PRINT("Moca fixing all false pf for mm %p\n",mm);
     while((p=(Moca_FalsePf)Moca_NextEntryPos(Moca_falsePfMap, &i))!=NULL)
     {
+        MOCA_DEBUG_PRINT("Moca found addr %p\n",(void *)p->key);
         if(Moca_FixPte((unsigned long)p->key, mm)==0)
-            p->status=MOCA_FALSE_PF_BAD;
+            atomic_set(&p->status,MOCA_FALSE_PF_BAD);
+        MOCA_DEBUG_PRINT("Moca done addr %p\n",(void *)p->key);
     }
+    MOCA_DEBUG_PRINT("Moca fixed all false pf for mm %p\n",mm);
 }
 
-
-// Rwlock with priority to writes
 void Moca_WLockPf(void)
 {
     if(!Moca_use_false_pf || Moca_false_pf_ugly)
         return;
-    atomic_inc(&Moca_fpf_writers);
+    atomic_inc(&Moca_NbWriters);
     write_lock(&Moca_fpfRWLock);
 }
 
@@ -330,7 +336,7 @@ void Moca_WUnlockPf(void)
 {
     if(!Moca_use_false_pf || Moca_false_pf_ugly)
         return;
-    atomic_dec(&Moca_fpf_writers);
+    atomic_dec(&Moca_NbWriters);
     write_unlock(&Moca_fpfRWLock);
 }
 
@@ -338,7 +344,8 @@ void Moca_RLockPf(void)
 {
     if(!Moca_use_false_pf || Moca_false_pf_ugly)
         return;
-    while(atomic_read(&Moca_fpf_writers)>0){msleep(5);}
+    while(atomic_read(&Moca_NbWriters)>0)
+        msleep(4);
     read_lock(&Moca_fpfRWLock);
 }
 

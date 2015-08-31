@@ -160,7 +160,10 @@ static void __exit Moca_Exit(void)
 void Moca_Panic(const char *s)
 {
     printk(KERN_ALERT "Moca panic:\n%s\n", s);
-    Moca_CleanUp();
+    Moca_Activated=0;
+    Moca_UnregisterProbes();
+    kthread_stop(Moca_threadTask);
+    //Moca_CleanUp();
 }
 
 int Moca_IsActivated(void)
