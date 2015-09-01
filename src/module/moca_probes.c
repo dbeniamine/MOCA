@@ -55,7 +55,6 @@ void Moca_ExitHandler(struct mmu_gather *tlb, struct vm_area_struct *start_vma,
         MOCA_DEBUG_PRINT("Moca Exit handler handler task %p, mm %p\n", current, mm);
         Moca_RLockPf();
         Moca_FixAllFalsePf(mm);
-        Moca_RUnlockPf();
     }
     jprobe_return();
 }
@@ -83,19 +82,19 @@ static struct jprobe Moca_ExitProbe = {
     .kp.symbol_name="unmap_vmas",
 };
 
-/* static struct kretprobe Moca_PostExitProbe = { */
-/*     .handler=Moca_HandlerPost, */
-/*     .maxactive=2*NR_CPUS, */
-/* }; */
+static struct kretprobe Moca_PostExitProbe = {
+    .handler=Moca_HandlerPost,
+    .maxactive=2*NR_CPUS,
+};
 
 int Moca_RegisterProbes(void)
 {
     int ret;
     MOCA_DEBUG_PRINT("Moca registering probes\n");
 
-    /* Moca_PostExitProbe.kp.symbol_name="unmap_vmas"; */
-    /* if ((ret=register_kretprobe(&Moca_PostExitProbe))) */
-    /*     Moca_Panic("Unable to register post exit probe"); */
+    Moca_PostExitProbe.kp.symbol_name="unmap_vmas";
+    if ((ret=register_kretprobe(&Moca_PostExitProbe)))
+        Moca_Panic("Unable to register post exit probe");
 
 
     if ((ret=register_jprobe(&Moca_ExitProbe)))
@@ -120,5 +119,5 @@ void Moca_UnregisterProbes(void)
     // might need a delay here
     msleep(2*MOCA_DEFAULT_WAKEUP_INTERVAL);
     unregister_kretprobe(&Moca_PostFaultProbe);
-    /* unregister_kretprobe(&Moca_PostExitProbe); */
+    unregister_kretprobe(&Moca_PostExitProbe);
 }

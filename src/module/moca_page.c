@@ -34,7 +34,7 @@ void Moca_MonitorPage(task_data data)
     void *addr;
     MOCA_DEBUG_PRINT("Moca monitor thread walking data %p , task %p, mm %p\n",
             data, tsk, tsk->mm);
-    while((addr=Moca_AddrInChunkPos(data,&i))!=NULL)
+    while((addr=Moca_AddrInChunkPos(data,i))!=NULL)
     {
         MOCA_DEBUG_PRINT("Moca pagewalk addr : %p ind %d cpu %d data %p\n",
             addr, i,tsk->on_cpu, data);
@@ -43,6 +43,7 @@ void Moca_MonitorPage(task_data data)
         Moca_AddFalsePf(tsk->mm, (unsigned long)addr,&countR,&countW);
         Moca_WUnlockPf();
         Moca_UpdateData(data,i,countR,countW,tsk->on_cpu);
+        ++i;
     }
     // Goto to next chunk
     Moca_NextChunks(data);

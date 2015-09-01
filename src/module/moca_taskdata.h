@@ -48,7 +48,7 @@ int Moca_NextChunks(task_data data);
  * This function returns the pos th add in the data's current chunk
  * returns NULL if pos is invalid ( < 0 || >= nbentry in chunk)
  */
-void *Moca_AddrInChunkPos(task_data data,int *pos);
+void *Moca_AddrInChunkPos(task_data data,int pos);
 
 void Moca_LockChunk(task_data data);
 void Moca_UnlockChunk(task_data data);

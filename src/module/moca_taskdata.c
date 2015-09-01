@@ -320,7 +320,7 @@ int Moca_NextChunks(task_data data)
 }
 
 
-void *Moca_AddrInChunkPos(task_data data,int *pos)
+void *Moca_AddrInChunkPos(task_data data,int pos)
 {
     chunk_entry e;
     int cur=Moca_CurrentChunk(data);
@@ -332,7 +332,7 @@ void *Moca_AddrInChunkPos(task_data data,int *pos)
     }
     MOCA_DEBUG_PRINT("Moca Looking for next addr in ch %d, pos %d/%u\n",
             cur, pos, Moca_NbElementInMap(data->chunks[cur]->map));
-    e=(chunk_entry)Moca_NextEntryPos(data->chunks[cur]->map,
+    e=(chunk_entry)Moca_EntryAtPos(data->chunks[cur]->map,
             pos);
     spin_unlock(&data->chunks[cur]->lock);
     if(!e)
