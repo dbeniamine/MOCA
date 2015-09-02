@@ -18,25 +18,40 @@
 
 // Init data struct required for managing false pf hack
 void Moca_InitFalsePf(void);
+// the two following routines requires write lock to be held
+void Moca_ClearFalsePf(void);
 void Moca_ClearFalsePfData(void);
 
-// Marks the nb pte as not present and save them as false page fault
-void Moca_AddFalsePf(struct mm_struct *mm, pte_t *pte);
+/* Marks the nb addr as not present and save them as false page fault
+ * Set young and dirty to the value of the young and dirty flags from the pte
+ */
+void Moca_AddFalsePf(struct mm_struct *mm, unsigned long addr,
+        int *young, int * dirty);
+
 
 
 /*
- * Try to fix false pte fault on pte.
- * Does nothing if pte isn't in the false pte list
+ * Try to fix false pte fault on addr.
+ * Does nothing if addr isn't in the false pte list
  * returns 0 on success
- *         1 if pte is not in the false pf list
+ *         1 if addr is not in the false pf list
+ * Requires Read lock to be held
  */
-int Moca_FixFalsePf(struct mm_struct *mm, pte_t *pte);
+int Moca_FixFalsePf(struct mm_struct *mm, unsigned long addr);
 
 /*
  * Remove all false page faults associated to mm and set the present flags
  * back
+ * Requires Read lock to be held
  */
 void Moca_FixAllFalsePf(struct mm_struct *mm);
 
+void *Moca_PhyFromVirt(void *addr, struct mm_struct *mm);
+
+void Moca_GetCountersFromAddr(unsigned long addr, struct mm_struct *mm,
+        int * young, int *dirty);
+
+void Moca_RLockPf(void);
+void Moca_RUnlockPf(void);
 #endif //__MOCA_FALSE_PF__
 

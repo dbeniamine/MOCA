@@ -55,15 +55,14 @@ module_param(Moca_false_pf_ugly,int,0);
 struct task_struct *Moca_threadTask=NULL;
 
 // Vector clock
-atomic_long_t Moca_threadClock=ATOMIC_LONG_INIT(0);
+static atomic_long_t Moca_threadClock=ATOMIC_LONG_INIT(0);
 void Moca_UpdateClock(void)
 {
     atomic_long_inc(&Moca_threadClock);
 }
 unsigned long Moca_GetClock(void)
 {
-    unsigned long ret=atomic_long_read(&Moca_threadClock);
-    return ret;
+    return (unsigned long)atomic_long_read(&Moca_threadClock);
 }
 
 void Moca_PrintConfig(void)
@@ -106,17 +105,18 @@ void Moca_CleanUp(void)
     if(!Moca_Activated)
         return;
     Moca_Activated=0;
-    if(Moca_threadTask && current != Moca_threadTask)
-    {
-        MOCA_DEBUG_PRINT("Killing thread task %p\n",Moca_threadTask);
-        kthread_stop(Moca_threadTask);
-    }
+    MOCA_DEBUG_PRINT("Killing thread task %p\n",Moca_threadTask);
+    kthread_stop(Moca_threadTask);
+    MOCA_DEBUG_PRINT("Waiting for fpf action to end\n");
+    Moca_WLockPf();
     MOCA_DEBUG_PRINT("Moca Removing falsepf\n");
-    Moca_ClearFalsePfData();
+    Moca_ClearFalsePf();
     MOCA_DEBUG_PRINT("Moca Removed falsepf\n");
     MOCA_DEBUG_PRINT("Moca Unregistering probes\n");
     Moca_UnregisterProbes();
-    //Clean memory
+    MOCA_DEBUG_PRINT("Moca Removing False Pf data\n");
+    Moca_ClearFalsePfData();
+    Moca_WUnlockPf();
     MOCA_DEBUG_PRINT("Moca Removing shared data\n");
     Moca_CleanProcessData();
     MOCA_DEBUG_PRINT("Moca Removed shared data\n");
@@ -139,11 +139,11 @@ static int __init Moca_Init(void)
     if(Moca_InitThreads()!=0)
         return -2;
     MOCA_DEBUG_PRINT("Moca threads ready \n");
+    Moca_Activated=1;
     if(Moca_RegisterProbes()!=0)
         return -3;
     MOCA_DEBUG_PRINT("Moca probes ready \n");
     printk(KERN_NOTICE "Moca correctly intialized\n");
-    Moca_Activated=1;
     return 0;
 }
 
@@ -159,7 +159,10 @@ static void __exit Moca_Exit(void)
 void Moca_Panic(const char *s)
 {
     printk(KERN_ALERT "Moca panic:\n%s\n", s);
-    Moca_CleanUp();
+    Moca_Activated=0;
+    Moca_UnregisterProbes();
+    kthread_stop(Moca_threadTask);
+    //Moca_CleanUp();
 }
 
 int Moca_IsActivated(void)

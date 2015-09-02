@@ -30,7 +30,7 @@ usage()
     echo "  -w ms             Set the wakeup interval for Moca to interval ms,
     Default: 40ms"
     echo "  -L s              Set the logging daemon wakeup interval, default
-    .5s"
+    $log_thread_interval (s)"
     echo "  -p prio           Schedtool priority for the kernel module, the program
     priority will be prio-1. You can increase this parameter
     to reduce the system noise. Default: $prio"
@@ -62,7 +62,7 @@ timer()
 }
 
 initime=$(timer)
-install_dir="~/install/Moca"
+install_dir="$(dirname $0)/../../"
 kernLogFile="Moca"
 procdir="/proc/Moca"
 log_thread_interval=.5

@@ -22,75 +22,33 @@
 #include <linux/delay.h> //msleep
 #include <linux/slab.h>
 #include <linux/pid.h>
-#include <asm/pgtable.h>
 
 // Wakeup period in ms
 int Moca_wakeupInterval=MOCA_DEFAULT_WAKEUP_INTERVAL;
 
-void *Moca_PhyFromVirt(void *addr, struct mm_struct *mm)
-{
-    return addr;
-    /* pte_t *pte=Moca_PteFromAdress((unsigned long)addr,mm); */
-    /* if(!pte || pte_none(*pte)) */
-    /*     return addr; //Kernel address no translation needed */
-    /* return (void *)__pa(pte_page(*pte)); */
-}
-
-pte_t *Moca_PteFromAdress(unsigned long address, struct mm_struct *mm)
-{
-    pgd_t *pgd;
-    pmd_t *pmd;
-    pud_t *pud;
-    if(!mm)
-    {
-        MOCA_DEBUG_PRINT("Moca mm null !\n");
-        return NULL;
-    }
-    pgd = pgd_offset(mm, address);
-    if (!pgd || pgd_none(*pgd) || pgd_bad(*pgd) )
-        return NULL;
-    pud = pud_offset(pgd, address);
-    if(!pud || pud_none(*pud) || pud_bad(*pud))
-        return NULL;
-    pmd = pmd_offset(pud, address);
-    if (!pmd || pmd_none(*pmd) || pmd_bad(*pmd))
-        return NULL;
-    return pte_offset_map(pmd, address);
-
-}
-
 // Walk through the current chunk
-void Moca_MonitorPage(task_data data)
+void Moca_MonitorPage(task_data data,int cpu)
 {
-    int i=0,countR, countW;
+    int i=0,countR=0, countW=0;
     struct task_struct *tsk=Moca_GetTaskFromData(data);
-    pte_t *pte;
     void *addr;
-    MOCA_DEBUG_PRINT("Moca monitor thread walking data %p , task %p, mm %p\n",
-            data, tsk, tsk->mm);
+    MOCA_DEBUG_PRINT("Moca monitor thread walking data %p , task %p, mm %p cpu %d\n",
+            data, tsk, tsk->mm,cpu);
     while((addr=Moca_AddrInChunkPos(data,i))!=NULL)
     {
-        pte=Moca_PteFromAdress((unsigned long)addr,tsk->mm);
-        MOCA_DEBUG_PRINT("Moca pagewalk addr : %p pte %p ind %d cpu %d data %p\n",
-                addr, pte, i,tsk->on_cpu, data);
-        if(pte)
-        {
-            Moca_AddFalsePf(tsk->mm, pte);
-            //TODO: count perfctr
-            // Set R/W status
-            if(pte_young(*pte))
-                countR=1;
-            if(pte_dirty(*pte))
-                countW=1;
-            Moca_UpdateData(data,i,countR,countW,tsk->on_cpu);
-        }
-        else
-            MOCA_DEBUG_PRINT("Moca no pte for adress %p\n", addr);
+        MOCA_DEBUG_PRINT("Moca monitor Adding fpf : %p ind %d data %p\n",
+            addr, i,data);
+        Moca_AddFalsePf(tsk->mm, (unsigned long)addr,&countR,&countW);
+        MOCA_DEBUG_PRINT("Moca monitor Updating counters: %p ind %d data %p\n",
+            addr, i,data);
+        Moca_UpdateData(data,i,countR,countW,tsk->on_cpu);
+        MOCA_DEBUG_PRINT("Moca monitor done addr %p, data %p\n",addr,data);
         ++i;
     }
+    MOCA_DEBUG_PRINT("Moca monitor next chunks, data %p\n",data);
     // Goto to next chunk
     Moca_NextChunks(data);
-    MOCA_DEBUG_PRINT("Moca pagewalk pte cpu %d data %p end\n",
+    MOCA_DEBUG_PRINT("Moca monitor page cpu %d data %p end\n",
             tsk->on_cpu,data);
 }
 
@@ -104,31 +62,24 @@ int Moca_MonitorThread(void * arg)
     moca_task t;
     struct task_struct * task;
     //Init tlb walk data
-    int pos;
+    int pos,cpu;
     unsigned long long lastwake=0;
 
-    /* dump_stack(); */
     MOCA_DEBUG_PRINT("Moca monitor thread alive \n");
     while(!kthread_should_stop())
     {
         pos=0;
-        /* dump_stack(); */
         while((t=Moca_NextTask(&pos)))
         {
             data=t->data;
             task=(struct task_struct *)(t->key);
+            cpu=task->on_cpu;
             MOCA_DEBUG_PRINT("Moca monitor thread testing task %p\n", task);
             if(pid_alive(task) && task->sched_info.last_arrival >= lastwake)
             {
                 lastwake=task->sched_info.last_arrival;
                 MOCA_DEBUG_PRINT("Moca monitor thread found task %p\n",task);
-                Moca_LockChunk(data);
-                // Here we are sure that the monitored task does not held an
-                // important lock therefore we can stop it
-                kill_pid(task_pid(task), SIGSTOP, 1);
-                Moca_UnlockChunk(data);
-                Moca_MonitorPage(data);
-                kill_pid(task_pid(task), SIGCONT, 1);
+                Moca_MonitorPage(data,cpu);
             }
         }
         Moca_UpdateClock();
