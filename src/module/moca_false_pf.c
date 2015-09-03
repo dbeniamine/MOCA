@@ -14,8 +14,7 @@
 
 #include "moca_false_pf.h"
 #include "moca_hashmap.h"
-#include <linux/rwlock_types.h>
-#include <linux/rwlock.h>
+#include <linux/spinlock.h>
 #include <linux/delay.h> //msleep
 #include <linux/mm.h>
 
@@ -30,7 +29,6 @@
 int Moca_use_false_pf=1;
 int Moca_false_pf_ugly=0;
 
-
 typedef struct _Moca_falsePf
 {
     void *key; //addr
@@ -40,6 +38,7 @@ typedef struct _Moca_falsePf
 
 hash_map Moca_falsePfMap;
 DEFINE_RWLOCK(Moca_fpfRWLock);
+spinlock_t Moca_fpfFairLock;
 
 void *Moca_PhyFromVirt(void *addr, struct mm_struct *mm)
 {
@@ -200,6 +199,7 @@ void Moca_InitFalsePf(void)
     Moca_falsePfMap=Moca_InitHashMap(MOCA_FALSE_PF_HASH_BITS,
             2*(1<<MOCA_FALSE_PF_HASH_BITS),sizeof(struct _Moca_falsePf));
     rwlock_init(&Moca_fpfRWLock);
+    spin_lock_init(&Moca_fpfFairLock);
 }
 
 void Moca_ClearFalsePf(void)
@@ -239,15 +239,18 @@ void Moca_AddFalsePf(struct mm_struct *mm, unsigned long address, int *young,
         Moca_ClearPte(addr,mm,young,dirty);
         return;
     }
-    Moca_WLockPf();
     do{
+        Moca_WLockPf();
         p=(Moca_FalsePf)Moca_AddToMap(Moca_falsePfMap,(void *)addr,&status);
+        Moca_WUnlockPf();
         switch(status)
         {
             case MOCA_HASHMAP_FULL:
                 //TODO: clean BAD
                 MOCA_DEBUG_PRINT("Moca No more space in fpf hashmap cleaning\n");
+                Moca_WLockPf();
                 Moca_DeleteBadFpf();
+                Moca_WUnlockPf();
                 MOCA_DEBUG_PRINT("Moca done cleanning fpf hasmap\n");
                 ++try;
                 break;
@@ -277,11 +280,12 @@ void Moca_AddFalsePf(struct mm_struct *mm, unsigned long address, int *young,
         {
             MOCA_DEBUG_PRINT("Moca can't clear pte for addr %p, removing it\n",
                     (void *)addr);
+            Moca_WLockPf();
             Moca_RemoveFromMap(Moca_falsePfMap,p->key);
+            Moca_WUnlockPf();
             MOCA_DEBUG_PRINT("Moca removed false pf addr%p\n",(void *)addr);
         }
     }
-    Moca_WUnlockPf();
 }
 
 /*
@@ -347,7 +351,9 @@ void Moca_WLockPf(void)
 {
     if(!Moca_use_false_pf || Moca_false_pf_ugly)
         return;
+    spin_lock(&Moca_fpfFairLock);
     write_lock(&Moca_fpfRWLock);
+    spin_unlock(&Moca_fpfFairLock);
 }
 
 void Moca_WUnlockPf(void)
@@ -361,7 +367,9 @@ void Moca_RLockPf(void)
 {
     if(!Moca_use_false_pf || Moca_false_pf_ugly)
         return;
+    spin_lock(&Moca_fpfFairLock);
     read_lock(&Moca_fpfRWLock);
+    spin_unlock(&Moca_fpfFairLock);
 }
 
 void Moca_RUnlockPf(void)

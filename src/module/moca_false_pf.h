@@ -53,5 +53,7 @@ void Moca_GetCountersFromAddr(unsigned long addr, struct mm_struct *mm,
 
 void Moca_RLockPf(void);
 void Moca_RUnlockPf(void);
+void Moca_WLockPf(void);
+void Moca_WUnlockPf(void);
 #endif //__MOCA_FALSE_PF__
 
