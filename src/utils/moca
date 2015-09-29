@@ -62,7 +62,7 @@ timer()
 }
 
 initime=$(timer)
-install_dir="~/install/Moca"
+install_dir="$(dirname $0)/../../"
 kernLogFile="Moca"
 procdir="/proc/Moca"
 log_thread_interval=.5

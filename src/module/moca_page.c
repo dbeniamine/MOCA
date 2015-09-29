@@ -75,7 +75,6 @@ void Moca_MonitorPage(task_data data)
                 addr, pte, i,tsk->on_cpu, data);
         if(pte)
         {
-            Moca_AddFalsePf(tsk->mm, pte);
             //TODO: count perfctr
             // Set R/W status
             if(pte_young(*pte))
@@ -83,6 +82,9 @@ void Moca_MonitorPage(task_data data)
             if(pte_dirty(*pte))
                 countW=1;
             Moca_UpdateData(data,i,countR,countW,tsk->on_cpu);
+            Moca_WLockPf();
+            Moca_AddFalsePf(tsk->mm, pte);
+            Moca_WUnlockPf();
         }
         else
             MOCA_DEBUG_PRINT("Moca no pte for adress %p\n", addr);
@@ -121,14 +123,16 @@ int Moca_MonitorThread(void * arg)
             if(pid_alive(task) && task->sched_info.last_arrival >= lastwake)
             {
                 lastwake=task->sched_info.last_arrival;
-                MOCA_DEBUG_PRINT("Moca monitor thread found task %p\n",task);
-                Moca_LockChunk(data);
+                /* MOCA_DEBUG_PRINT("Moca monitor thread found task %p\n",task); */
+                /* Moca_LockChunk(data); */
+                /* Moca_WLockPf(); */
                 // Here we are sure that the monitored task does not held an
                 // important lock therefore we can stop it
-                kill_pid(task_pid(task), SIGSTOP, 1);
-                Moca_UnlockChunk(data);
+                /* kill_pid(task_pid(task), SIGSTOP, 1); */
+                /* Moca_WUnlockPf(); */
+                /* Moca_UnlockChunk(data); */
                 Moca_MonitorPage(data);
-                kill_pid(task_pid(task), SIGCONT, 1);
+                /* kill_pid(task_pid(task), SIGCONT, 1); */
             }
         }
         Moca_UpdateClock();

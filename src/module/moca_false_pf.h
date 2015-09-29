@@ -21,13 +21,16 @@ void Moca_InitFalsePf(void);
 void Moca_ClearFalsePfData(void);
 
 // Marks the nb pte as not present and save them as false page fault
+// Requires write lock to be held
 void Moca_AddFalsePf(struct mm_struct *mm, pte_t *pte);
+
 
 
 /*
  * Try to fix false pte fault on pte.
  * Does nothing if pte isn't in the false pte list
  * returns 0 on success
+ *         1 if addr is not in the false pf list
  *         1 if pte is not in the false pf list
  */
 int Moca_FixFalsePf(struct mm_struct *mm, pte_t *pte);
@@ -35,8 +38,13 @@ int Moca_FixFalsePf(struct mm_struct *mm, pte_t *pte);
 /*
  * Remove all false page faults associated to mm and set the present flags
  * back
+ * Requires Read lock to be held
  */
 void Moca_FixAllFalsePf(struct mm_struct *mm);
 
+void Moca_RLockPf(void);
+void Moca_RUnlockPf(void);
+void Moca_WLockPf(void);
+void Moca_WUnlockPf(void);
 #endif //__MOCA_FALSE_PF__
 

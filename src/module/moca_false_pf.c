@@ -14,8 +14,8 @@
 
 #include "moca_false_pf.h"
 #include "moca_hashmap.h"
-#include <linux/rwlock_types.h>
-#include <linux/rwlock.h>
+#include <linux/spinlock.h>
+#include <linux/delay.h> //msleep
 
 #define MOCA_FALSE_PF_HASH_BITS 14
 #define MOCA_FALSE_PF_VALID 0
@@ -41,6 +41,9 @@ typedef struct _Moca_falsePf
 
 hash_map Moca_falsePfMap;
 DEFINE_RWLOCK(Moca_fpfRWLock);
+static atomic_t Moca_fpfWriters=ATOMIC_INIT(0);
+static atomic_t Moca_fpfReaders=ATOMIC_INIT(0);
+
 
 //Synchronization stuff
 
@@ -128,12 +131,10 @@ void Moca_ClearFalsePfData(void)
     if(!Moca_use_false_pf || Moca_false_pf_ugly)
         return;
     MOCA_DEBUG_PRINT("Moca removing all false pf\n");
-    write_lock(&Moca_fpfRWLock);
     while((p=(Moca_FalsePf)Moca_NextEntryPos(Moca_falsePfMap, &i))!=NULL)
         Moca_FixPte((pte_t *)p->key, NULL);
     MOCA_DEBUG_PRINT("Moca removing all false map%p\n",Moca_falsePfMap);
     Moca_FreeMap(Moca_falsePfMap);
-    write_unlock(&Moca_fpfRWLock);
 }
 
 void Moca_AddFalsePf(struct mm_struct *mm, pte_t *pte)
@@ -151,7 +152,6 @@ void Moca_AddFalsePf(struct mm_struct *mm, pte_t *pte)
 
     tmpPf.key=pte;
     tmpPf.mm=mm;
-    write_lock(&Moca_fpfRWLock);
     do{
         p=(Moca_FalsePf)Moca_AddToMap(Moca_falsePfMap,(hash_entry)&tmpPf,&status);
         switch(status)
@@ -162,7 +162,6 @@ void Moca_AddFalsePf(struct mm_struct *mm, pte_t *pte)
                 ++try;
                 break;
             case MOCA_HASHMAP_ERROR:
-                write_unlock(&Moca_fpfRWLock);
                 Moca_Panic("Moca unhandled hashmap error");
                 return;
             case  MOCA_HASHMAP_ALREADY_IN_MAP:
@@ -173,13 +172,11 @@ void Moca_AddFalsePf(struct mm_struct *mm, pte_t *pte)
                         mm,(unsigned)status, Moca_NbElementInMap(Moca_falsePfMap));
                 p->status=MOCA_FALSE_PF_VALID;
                 *pte=pte_clear_flags(*pte,_PAGE_PRESENT);
-                write_unlock(&Moca_fpfRWLock);
                 return;
         }
     }while(try<2);
     MOCA_DEBUG_PRINT("Moca more than two try to add false pf pte %p, mm %p\n",
             pte, mm);
-    write_unlock(&Moca_fpfRWLock);
 }
 
 /*
@@ -198,17 +195,18 @@ int Moca_FixFalsePf(struct mm_struct *mm, pte_t *pte)
     if(Moca_false_pf_ugly)
         return Moca_FixPte(pte,mm);
 
-    read_lock(&Moca_fpfRWLock);
     MOCA_DEBUG_PRINT("Moca testing pte fault %p mm %p\n",pte,mm);
     tmpPf.key=pte;
     tmpPf.mm=mm;
     if((p=(Moca_FalsePf)Moca_EntryFromKey(Moca_falsePfMap,(hash_entry)&tmpPf)))
     {
         MOCA_DEBUG_PRINT("Moca found false pte %p mm %p\n",p->key,p->mm);
-        res=Moca_FixPte(pte, mm);
-        p->status=MOCA_FALSE_PF_BAD;
+        if(p->status == MOCA_FALSE_PF_VALID)
+        {
+            p->status=MOCA_FALSE_PF_BAD;
+            res=Moca_FixPte(pte, mm);
+        }
     }
-    read_unlock(&Moca_fpfRWLock);
     return res;
 }
 
@@ -228,14 +226,74 @@ void Moca_FixAllFalsePf(struct mm_struct *mm)
         Moca_FixAllPte(mm);
         return;
     }
-    write_lock(&Moca_fpfRWLock);
     while((p=(Moca_FalsePf)Moca_NextEntryPos(Moca_falsePfMap, &i))!=NULL)
     {
         if(p->mm==mm)
         {
             Moca_FixPte((pte_t *)p->key, mm);
-            Moca_RemoveFromMap(Moca_falsePfMap,(hash_entry)p);
+            //Moca_RemoveFromMap(Moca_falsePfMap,(hash_entry)p);
         }
     }
+}
+
+/*
+ * Fair RW Locks:
+ * If a writer arrive, it must take the priority, but several consecutive
+ * writers should NOT create a starvation for readers.
+ *
+ * Writer:
+ *  Wait for waiting readers (a.k.a reader that arrive while a writer was there)
+ *  Tell that we are waiting
+ *  Acquire the lock
+ *  Tell that we are not waiting anymore
+ *
+ * Reader:
+ *  Tell that we are waiting (so no writer arriving later can pass before us)
+ *  Wait for writers waiting
+ *  Acquire the lock
+ *  Tell that we are not waiting anymore
+ */
+
+void Moca_WLockPf(void)
+{
+    if(!Moca_use_false_pf)
+        return;
+    //MOCA_DEBUG_PRINT( "Moca writer waiting\n");
+    //atomic_inc(&Moca_fpfWriters);
+    //while(atomic_read(&Moca_fpfReaders)>0)
+    //    msleep(1);
+    //MOCA_DEBUG_PRINT( "Moca writer try lock\n");
+    write_lock(&Moca_fpfRWLock);
+    //atomic_dec(&Moca_fpfWriters);
+    MOCA_DEBUG_PRINT( "Moca writer got lock\n");
+}
+
+void Moca_WUnlockPf(void)
+{
+    if(!Moca_use_false_pf)
+        return;
     write_unlock(&Moca_fpfRWLock);
+    MOCA_DEBUG_PRINT( "Moca writer released lock\n");
+}
+
+void Moca_RLockPf(void)
+{
+    if(!Moca_use_false_pf)
+        return;
+    //MOCA_DEBUG_PRINT( "Moca reader waiting\n");
+    //while(atomic_read(&Moca_fpfWriters)>0)
+    //    msleep(1);
+    //atomic_inc(&Moca_fpfReaders);
+    //MOCA_DEBUG_PRINT( "Moca reader try lock\n");
+    read_lock(&Moca_fpfRWLock);
+    //atomic_dec(&Moca_fpfReaders);
+    MOCA_DEBUG_PRINT( "Moca reader got lock\n");
+}
+
+void Moca_RUnlockPf(void)
+{
+    if(!Moca_use_false_pf)
+        return;
+    MOCA_DEBUG_PRINT( "Moca reader released lock\n");
+    read_unlock(&Moca_fpfRWLock);
 }
