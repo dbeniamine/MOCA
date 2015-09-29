@@ -111,14 +111,14 @@ void Moca_CleanUp(void)
         MOCA_DEBUG_PRINT("Killing thread task %p\n",Moca_threadTask);
         kthread_stop(Moca_threadTask);
     }
+    MOCA_DEBUG_PRINT("Moca Removing falsepf\n");
     MOCA_DEBUG_PRINT("Moca Unregistering probes\n");
     Moca_UnregisterProbes();
-    MOCA_DEBUG_PRINT("Moca Removing falsepf\n");
-    Moca_WLockPf();
-    Moca_ClearFalsePfData();
-    MOCA_DEBUG_PRINT("Moca Removed falsepf\n");
-    MOCA_DEBUG_PRINT("Moca Removing False Pf data\n");
-    Moca_WUnlockPf();
+    //Moca_WLockPf();
+    //Moca_ClearFalsePfData();
+    //MOCA_DEBUG_PRINT("Moca Removed falsepf\n");
+    //MOCA_DEBUG_PRINT("Moca Removing False Pf data\n");
+    //Moca_WUnlockPf();
     MOCA_DEBUG_PRINT("Moca Removing shared data\n");
     Moca_CleanProcessData();
     MOCA_DEBUG_PRINT("Moca Removed shared data\n");
