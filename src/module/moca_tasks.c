@@ -130,7 +130,7 @@ moca_task Moca_AddTask(struct task_struct *t)
 
     //Create the task data
     data=Moca_InitData(t);
-    atomic_inc(&t->mm->mm_users);
+    /* atomic_inc(&t->mm->mm_users); */
     get_task_struct(t);
     if(!data)
         return NULL;
@@ -166,7 +166,7 @@ void Moca_RemoveTask(struct task_struct *t)
     write_lock(&Moca_tasksLock);
     Moca_RemoveFromMap(Moca_tasksMap, (hash_entry)&tsk);
     write_unlock(&Moca_tasksLock);
-    if(t->mm)
-        atomic_dec(&t->mm->mm_users);
+    /* if(t->mm) */
+    /*     atomic_dec(&t->mm->mm_users); */
     put_task_struct(t);
 }
