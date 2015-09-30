@@ -48,15 +48,17 @@ void Moca_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
 
 }
 
-int Moca_ExitHandler(struct kprobe* k, struct pt_regs* r)
+void Moca_ExitHandler(struct mmu_gather *tlb, struct vm_area_struct *start_vma, 
+         unsigned long start, unsigned long end)
 {
-    if(!current || !Moca_GetData(current))
-        return 0;
-    MOCA_DEBUG_PRINT("Exit handler handler task %p, mm %p\n", NULL, NULL);
-    Moca_RLockPf();
-    Moca_FixAllFalsePf(current->mm);
-    Moca_RUnlockPf();
-    return 0;
+    if(Moca_GetData(current))
+    {
+        MOCA_DEBUG_PRINT("Exit handler handler task %p, mm %p\n", NULL, NULL);
+        Moca_RLockPf();
+        Moca_FixAllFalsePf(start_vma->vm_mm);
+        Moca_RUnlockPf();
+    }
+    jprobe_return();
 }
 
 static struct jprobe Moca_Faultjprobe = {
@@ -65,8 +67,9 @@ static struct jprobe Moca_Faultjprobe = {
 };
 
 
-static struct kprobe Moca_ExitProbe = {
-    .symbol_name = "unmap_vmas",
+static struct jprobe Moca_ExitProbe = {
+    .entry=Moca_ExitHandler,
+    .kp.symbol_name = "unmap_vmas",
 };
 
 
@@ -75,8 +78,7 @@ int Moca_RegisterProbes(void)
     int ret;
     MOCA_DEBUG_PRINT("Moca registering probes\n");
 
-    Moca_ExitProbe.pre_handler=Moca_ExitHandler;
-    if ((ret=register_kprobe(&Moca_ExitProbe)))
+    if ((ret=register_jprobe(&Moca_ExitProbe)))
         Moca_Panic("Unable to register do exit probe");
 
     if ((ret=register_jprobe(&Moca_Faultjprobe)))
@@ -88,6 +90,6 @@ int Moca_RegisterProbes(void)
 
 void Moca_UnregisterProbes(void)
 {
-    unregister_kprobe(&Moca_ExitProbe);
+    unregister_jprobe(&Moca_ExitProbe);
     unregister_jprobe(&Moca_Faultjprobe);
 }
