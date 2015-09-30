@@ -43,6 +43,7 @@ void Moca_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
     if(Moca_FixFalsePf(mm,pte)!=0)
         MOCA_DEBUG_PRINT("Moca true pte fault at %p %p \n", pte, mm);
     Moca_UpdateClock();
+    Moca_RUnlockPf();
     jprobe_return();
 
 }
@@ -54,22 +55,7 @@ int Moca_ExitHandler(struct kprobe* k, struct pt_regs* r)
     MOCA_DEBUG_PRINT("Exit handler handler task %p, mm %p\n", NULL, NULL);
     Moca_RLockPf();
     Moca_FixAllFalsePf(current->mm);
-    return 0;
-}
-
-static int Moca_HandlerPost(struct kretprobe_instance *ri,
-        struct pt_regs *regs)
-{
-    MOCA_DEBUG_PRINT("Moca return probe task %p mm %p\n",
-            current, current->mm);
-    if(current && Moca_GetData(current)!=NULL)
-    {
-        MOCA_DEBUG_PRINT("Moca return probe valid task %p mm %p\n",
-                current, current->mm);
-        Moca_RUnlockPf();
-        MOCA_DEBUG_PRINT("Moca return probe unlocked task %p mm %p\n",
-                current, current->mm);
-    }
+    Moca_RUnlockPf();
     return 0;
 }
 
@@ -79,40 +65,15 @@ static struct jprobe Moca_Faultjprobe = {
 };
 
 
-static struct kretprobe Moca_PostFaultProbe = {
-    .handler=Moca_HandlerPost,
-    .maxactive=10*NR_CPUS,
-};
-
 static struct kprobe Moca_ExitProbe = {
     .symbol_name = "unmap_vmas",
 };
-
-static struct kretprobe Moca_PostExitProbe = {
-    .handler=Moca_HandlerPost,
-    .maxactive=10*NR_CPUS,
-};
-
 
 
 int Moca_RegisterProbes(void)
 {
     int ret;
     MOCA_DEBUG_PRINT("Moca registering probes\n");
-
-
-    Moca_PostExitProbe.kp.symbol_name="unmap_vmas";
-    /* Moca_ExitProbe.kp.fault_handler = Moca_ProbeFaultHandler; */
-    if ((ret=register_kretprobe(&Moca_PostExitProbe)))
-        Moca_Panic("Unable to register post exit probe");
-
-
-    /* if ((ret=register_jprobe(&testJProbe))) */
-    /*     Moca_Panic("Unable to register do exit probe"); */
-
-    Moca_PostFaultProbe.kp.symbol_name = "handle_mm_fault";
-    if ((ret=register_kretprobe(&Moca_PostFaultProbe)))
-        Moca_Panic("Unable to register post fault probe");
 
     Moca_ExitProbe.pre_handler=Moca_ExitHandler;
     if ((ret=register_kprobe(&Moca_ExitProbe)))
@@ -129,7 +90,4 @@ void Moca_UnregisterProbes(void)
 {
     unregister_kprobe(&Moca_ExitProbe);
     unregister_jprobe(&Moca_Faultjprobe);
-    msleep(50);
-    unregister_kretprobe(&Moca_PostFaultProbe);
-    unregister_kretprobe(&Moca_PostExitProbe);
 }

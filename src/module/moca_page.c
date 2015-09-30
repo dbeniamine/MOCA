@@ -10,7 +10,7 @@
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
 #define __NO_VERSION__
-/* #define MOCA_DEBUG */
+#define MOCA_DEBUG
 
 #include "moca.h"
 #include "moca_page.h"
@@ -73,7 +73,7 @@ void Moca_MonitorPage(task_data data)
         pte=Moca_PteFromAdress((unsigned long)addr,tsk->mm);
         MOCA_DEBUG_PRINT("Moca pagewalk addr : %p pte %p ind %d cpu %d data %p\n",
                 addr, pte, i,tsk->on_cpu, data);
-        if(pte)
+        if(pte && !pte_none(*pte))
         {
             //TODO: count perfctr
             // Set R/W status
