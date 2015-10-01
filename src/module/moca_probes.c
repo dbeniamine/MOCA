@@ -37,7 +37,7 @@ void Moca_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
     }
     Moca_RLockPf();
     if(Moca_IsActivated())
-        Moca_AddToChunk(data,(void *)(address&PAGE_MASK),get_cpu());
+        Moca_AddToChunk(data,(void *)(address&PAGE_MASK),get_cpu(),flags&FAULT_FLAG_WRITE?1:0);
     MOCA_DEBUG_PRINT("Moca Pte fault task %p\n", current);
     pte=Moca_PteFromAdress(address&PAGE_MASK,mm);
     if(Moca_FixFalsePf(mm,pte)!=0)

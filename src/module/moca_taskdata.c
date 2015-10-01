@@ -22,6 +22,10 @@
 #define MOCA_DATA_STATUS_DYING_OR_ZOMBIE(data) ((data)->status < 0)
 #define MOCA_HASH_BITS 15
 
+#define MOCA_CHUNK_NORMAL 0
+#define MOCA_CHUNK_ENDING 1
+#define MOCA_CHUNK_USED 2
+
 int Moca_taskDataHashBits=MOCA_HASH_BITS;
 int Moca_taskDataChunkSize=1<<(MOCA_HASH_BITS+1);
 int Moca_nbChunks=30;
@@ -64,8 +68,8 @@ typedef struct _chunk_entry
 typedef struct
 {
     hash_map map;
-    unsigned long startClock;
-    unsigned long endClock;
+    long startClock;
+    long endClock;
     int cpu;
     int used;
     spinlock_t lock;
@@ -77,6 +81,7 @@ typedef struct _task_data
     chunk **chunks;
     int cur;
     int currentlyFlushed;
+    int currentlyFlushedPos;
     int internalId;
     int nbflush;
     int status;
@@ -84,7 +89,7 @@ typedef struct _task_data
     struct proc_dir_entry *proc_entry;
 }*task_data;
 
-int Moca_nextTaskId=0;
+static atomic_t Moca_nextTaskId=ATOMIC_INIT(0);
 
 int Moca_CurrentChunk(task_data data)
 {
@@ -101,6 +106,14 @@ void Moca_InitTaskData(void)
     Moca_proc_root=proc_mkdir("Moca", NULL);
     if(!Moca_proc_root)
         Moca_Panic("Moca Unable to create proc root entry");
+}
+
+void Moca_ChunkEntryInitializer(void *e)
+{
+    chunk_entry ce=(chunk_entry)e;
+    ce->countR=0;
+    ce->countW=0;
+    ce->cpu=0;
 }
 
 task_data Moca_InitData(struct task_struct *t)
@@ -133,22 +146,25 @@ task_data Moca_InitData(struct task_struct *t)
             return NULL;
         }
         data->chunks[i]->cpu=0;
-        data->chunks[i]->used=0;
+        data->chunks[i]->startClock=-1;
+        data->chunks[i]->used=MOCA_CHUNK_NORMAL;
         data->chunks[i]->map=Moca_InitHashMap(Moca_taskDataHashBits,
-                Moca_taskDataChunkSize, sizeof(struct _chunk_entry), NULL);
+                Moca_taskDataChunkSize, sizeof(struct _chunk_entry), NULL,
+                Moca_ChunkEntryInitializer);
         spin_lock_init(&data->chunks[i]->lock);
         if(!data->chunks[i]->map)
             Moca_Panic("Cannot allocate hash map for taskdata");
     }
     data->task=t;
     data->cur=0;
-    data->internalId=Moca_nextTaskId++;
+    data->internalId=atomic_inc_return(&Moca_nextTaskId)-1;
     data->nbflush=0;
     data->status=MOCA_DATA_STATUS_NORMAL;
     snprintf(buf,10,"task%d",data->internalId);
     data->proc_entry=proc_create_data(buf,0,Moca_proc_root,
             &Moca_taskdata_fops,data);
     data->currentlyFlushed=-1;
+    data->currentlyFlushedPos=-1;
     spin_lock_init(&data->lock);
     return data;
 }
@@ -163,7 +179,9 @@ void Moca_ClearAllData(void)
     while((t=Moca_NextTask(&i)))
     {
         MOCA_DEBUG_PRINT("Moca asking data %d %p %p to end\n",i, t->data, t->key);
+        spin_lock(&t->data->lock);
         t->data->status=MOCA_DATA_STATUS_NEEDFLUSH;
+        spin_unlock(&t->data->lock);
     }
     MOCA_DEBUG_PRINT("Moca flushing\n");
     i=0;
@@ -212,14 +230,14 @@ void Moca_UnlockChunk(task_data data)
     spin_unlock(&data->chunks[Moca_CurrentChunk(data)]->lock);
 }
 
-int Moca_AddToChunk(task_data data, void *addr, int cpu)
+int Moca_AddToChunk(task_data data, void *addr, int cpu, int write)
 {
     int status, cur;
     struct _chunk_entry tmp;
     chunk_entry e;
     cur=Moca_CurrentChunk(data);
     spin_lock(&data->chunks[cur]->lock);
-    if(data->chunks[cur]->used)
+    if(data->chunks[cur]->used!=MOCA_CHUNK_NORMAL)
     {
         spin_unlock(&data->chunks[cur]->lock);
         return -1;
@@ -232,8 +250,7 @@ int Moca_AddToChunk(task_data data, void *addr, int cpu)
     {
         case MOCA_HASHMAP_FULL :
             spin_unlock(&data->chunks[cur]->lock);
-            printk(KERN_ALERT "Moca hashmap full\n");
-            //Moca_Panic("Moca hashmap full");
+            printk(KERN_INFO "Moca chunk full, part of the trace will be lost");
             return -1;
             break;
         case MOCA_HASHMAP_ERROR :
@@ -244,98 +261,78 @@ int Moca_AddToChunk(task_data data, void *addr, int cpu)
         case MOCA_HASHMAP_ALREADY_IN_MAP :
             MOCA_DEBUG_PRINT("Moca addr already in chunk %p\n", addr);
             ++e->countR;
-            ++e->countW;
+            e->countW+=write;
             break;
         default :
             //Normal add
-            e->countR=0;
-            e->countW=0;
+            e->countR=1;
+            e->countW=write;
             break;
     }
     e->cpu|=1<<cpu;
     data->chunks[cur]->cpu|=1<<cpu;
     data->chunks[cur]->endClock=Moca_GetClock();
-    if(Moca_NbElementInMap(data->chunks[cur]->map)==1)
-        data->chunks[cur]->startClock=Moca_GetClock();
-    spin_unlock(&data->chunks[cur]->lock);
-    MOCA_DEBUG_PRINT("Moca inserted %p\n", addr);
-    return 0;
-}
-
-int Moca_UpdateData(task_data data,int pos, int countR, int countW, int cpu)
-{
-    chunk_entry e;
-    int cur=Moca_CurrentChunk(data);
-    spin_lock(&data->chunks[cur]->lock);
-    if(data->chunks[cur]->used)
-    {
-        spin_unlock(&data->chunks[cur]->lock);
-        return -1;
-    }
-    e=(chunk_entry )Moca_EntryAtPos(data->chunks[cur]->map,
-            pos);
-    if(!e)
-    {
-        spin_unlock(&data->chunks[cur]->lock);
-        return 1;
-    }
-
-    e->countR+=countR;
-    e->countW+=countW;
-    e->cpu|=1<<cpu;
-    data->chunks[cur]->cpu|=1<<cpu;
+    if(data->chunks[cur]->startClock==-1)
+        data->chunks[cur]->startClock=data->chunks[cur]->endClock;
     spin_unlock(&data->chunks[cur]->lock);
     return 0;
 }
 
 int Moca_NextChunks(task_data data)
 {
-    int cur,old;
+    int cur,old,ret;
     MOCA_DEBUG_PRINT("Moca Goto next chunks %p, %d\n", data, data->cur);
     //Global lock
     spin_lock(&data->lock);
-    old=data->cur;
+    ret=old=data->cur;
     spin_lock(&data->chunks[old]->lock);
-    data->chunks[old]->used=1;
+    data->chunks[old]->used=MOCA_CHUNK_ENDING;
     cur=old;
     do{
         spin_unlock(&data->chunks[cur]->lock);
         cur=(cur+1)%Moca_nbChunks;
         spin_lock(&data->chunks[cur]->lock);
-    }while(data->chunks[cur]->used==1 && cur != old);
+    }while(data->chunks[cur]->used!=MOCA_CHUNK_NORMAL && cur != old);
     data->cur=cur;
     spin_unlock(&data->chunks[cur]->lock);
     spin_unlock(&data->lock);
-    MOCA_DEBUG_PRINT("Moca Goto chunks  %p %d, %d\n", data, data->cur,
+    MOCA_DEBUG_PRINT("Moca Goto chunks  %p %d, %d\n", data, cur,
             Moca_nbChunks);
     if(cur==old)
     {
         printk(KERN_ALERT "Moca no more chunks, stopping trace for task %d\n You can fix that by relaunching Moca either with a higher number of chunks\n or by decreasing the logging daemon wakeupinterval\n",
                 data->internalId);
-        return 1;
     }
-    return 0;
+    return ret;
+}
+
+void Moca_EndChunk(task_data data, int id)
+{
+    spin_lock(&data->chunks[id]->lock);
+    data->chunks[id]->used=MOCA_CHUNK_USED;
+    spin_unlock(&data->chunks[id]->lock);
 }
 
 
-void *Moca_AddrInChunkPos(task_data data,int pos)
+
+void *Moca_AddrInChunkPos(task_data data,int *pos, int ch)
 {
     chunk_entry e;
-    int cur=Moca_CurrentChunk(data);
-    spin_lock(&data->chunks[cur]->lock);
-    if(data->chunks[cur]->used)
+    if(ch < 0 || ch > Moca_nbChunks)
+        return NULL;
+    spin_lock(&data->chunks[ch]->lock);
+    if(data->chunks[ch]->used==MOCA_CHUNK_USED)
     {
-        spin_unlock(&data->chunks[cur]->lock);
+        spin_unlock(&data->chunks[ch]->lock);
         return NULL;
     }
-    MOCA_DEBUG_PRINT("Moca Looking for next addr in ch %d, pos %d/%u\n",
-            cur, pos, Moca_NbElementInMap(data->chunks[cur]->map));
-    e=(chunk_entry)Moca_EntryAtPos(data->chunks[cur]->map,
-            pos);
-    spin_unlock(&data->chunks[cur]->lock);
+    MOCA_DEBUG_PRINT("Moca Looking for next addr in ch %d, pos %d/%d\n",
+            ch, *pos, Moca_NbElementInMap(data->chunks[ch]->map));
+    e=(chunk_entry)Moca_NextEntryPos(data->chunks[ch]->map,pos);
+    spin_unlock(&data->chunks[ch]->lock);
     if(!e)
         return NULL;
-    MOCA_DEBUG_PRINT("Moca found adress %p\n", e->key);
+    MOCA_DEBUG_PRINT("Moca found adress %p at pos %d\n", e->key, *pos-1);
     return e->key;
 }
 
@@ -359,14 +356,13 @@ int Moca_CpuMask(int cpu, char *buf, size_t size)
     return i;
 }
 
-
-#define LINE_SZ 160
+#define LINE_WIDTH 320
 static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
-        size_t length, loff_t * offset)
+        size_t length, loff_t * offp)
 {
-    ssize_t  sz=0;
+    // size in kernel buffer, user buffer, total user buffer
     int chunkid, ind, nelt, complete=1;
-    struct _chunk_entry tmpch;
+    size_t sz=0;
     chunk_entry e;
     pte_t *pte;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
@@ -383,19 +379,20 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
         return 0;
     }
 
-    if(data->nbflush==0)
+    if(data->nbflush==0 && data->currentlyFlushed==-1)
     {
         //First flush
         MOCA_DEBUG_PRINT("Moca first flush for data %p\n", data);
 
         //Task id pid
-        if(data->internalId!=0)
+        if(data->internalId!=0){
             sz+=snprintf(buffer,length,"T %d %d\n",
                     data->internalId,task_pid_nr(data->task));
-        else
+        }else{
             sz+=snprintf(buffer,length,"T %d %d %lu\n",
                     data->internalId,task_pid_nr(data->task), PAGE_SIZE);
-        MOCA_DEBUG_PRINT("Moca user size %lu\n", len);
+        }
+        MOCA_DEBUG_PRINT("Moca header size %lu\n", sz);
     }
 
     //Iterate on all chunks, start where we stopped if needed
@@ -406,7 +403,7 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
         if(chunkid!=data->currentlyFlushed)
             spin_lock(&data->chunks[chunkid]->lock);
         if(data->status==MOCA_DATA_STATUS_NEEDFLUSH
-                || data->chunks[chunkid]->used)
+                || data->chunks[chunkid]->used==MOCA_CHUNK_USED)
         {
             if((nelt=Moca_NbElementInMap(data->chunks[chunkid]->map))>0)
             {
@@ -416,22 +413,24 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
                     if(data->chunks[chunkid]->endClock==data->chunks[chunkid]->startClock)
                         ++data->chunks[chunkid]->endClock;
                     //Chunk id  nb element startclock endclock cpumask
-                    sz+=snprintf(buffer+sz,length-sz,"C %d %d %lu %lu ",
-                            chunkid+data->nbflush*Moca_nbChunks,
+                    sz+=snprintf(buffer+sz,length-sz,"C %d %d %lu %lu ", chunkid,
                             Moca_NbElementInMap(data->chunks[chunkid]->map),
                             data->chunks[chunkid]->startClock,
                             data->chunks[chunkid]->endClock);
                     sz+=Moca_CpuMask(data->chunks[chunkid]->cpu, buffer+sz,
                             length-sz);
                     buffer[sz++]='\n';
+                    ind=0;
                 }
                 else
+                {
                     MOCA_DEBUG_PRINT("Moca resuming flush chunk %d, available space %lu\n",
-                            chunkid, length-len);
-                ind=0;
+                            chunkid, length);
+                    ind=data->currentlyFlushedPos;
+                }
                 while((e=(chunk_entry)Moca_NextEntryPos(data->chunks[chunkid]->map,&ind)))
                 {
-                    if(sz+LINE_SZ >= length)
+                    if(LINE_WIDTH >= length-sz)
                     {
                         complete=0;
                         break;
@@ -455,8 +454,6 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
                     sz+=Moca_CpuMask(e->cpu,buffer+sz,length-sz);
                     buffer[sz++]='\n';
                     //Re init data
-                    tmpch.key=e->key;
-                    Moca_RemoveFromMap(data->chunks[chunkid]->map,(hash_entry)&tmpch);
                     e->countR=0;
                     e->countW=0;
                     e->cpu=0;
@@ -464,27 +461,41 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
             }
             if(complete)
             {
+                Moca_ClearMap(data->chunks[chunkid]->map);
                 data->chunks[chunkid]->cpu=0;
-                data->chunks[chunkid]->used=0;
+                data->chunks[chunkid]->startClock=-1;
+                data->chunks[chunkid]->used=MOCA_CHUNK_NORMAL;
             }
         }
         if(complete)
+        {
             spin_unlock(&data->chunks[chunkid]->lock);
+        }
         else
         {
             MOCA_DEBUG_PRINT("Moca stopping flush chunk %d, available space %lu\n",
-                    chunkid, length-len);
+                    chunkid, length);
             data->currentlyFlushed=chunkid;
+            data->currentlyFlushedPos=ind-1;
             break;
         }
     }
     if(complete)
     {
+        spin_lock(&data->lock);
         ++data->nbflush;
+        data->currentlyFlushed=-1;
+        data->currentlyFlushedPos=-1;
         if(data->status==MOCA_DATA_STATUS_NEEDFLUSH )
             data->status=MOCA_DATA_STATUS_DYING;
-        data->currentlyFlushed=-1;
+        MOCA_DEBUG_PRINT("Moca Complete Flush data %p %d\n",
+                data,data->status);
+        spin_unlock(&data->lock);
     }
-    MOCA_DEBUG_PRINT("Moca Flushing size %lu for data %p\n", sz, data);
+
+    // We should handle properly copy_to_user return value
+    MOCA_DEBUG_PRINT("Moca Flushing size %lu for data %p chunk %d curflushed %d\n",
+            sz, data,chunkid,data->currentlyFlushed);
+
     return sz;
 }

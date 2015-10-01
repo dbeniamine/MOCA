@@ -29,33 +29,25 @@ struct task_struct *Moca_GetTaskFromData(task_data data);
  *         1 iff addr wad already in chunk
  *        -1 if current chunk is unusable (flush required)
  */
-int Moca_AddToChunk(task_data data, void *addr,int cpu);
-
-/*
- * Check if add is in chunkid
- * Returns  0 if addr is in chunk
- *          1 if not
- */
-/* int Moca_IsInChunk(task_data data, void *addr); */
-
-/*
- * Update the posth entry of the current chunk
- * Add count access and update the type
- */
-int Moca_UpdateData(task_data data,int pos, int countR, int countW, int cpu);
+int Moca_AddToChunk(task_data data, void *addr,int cpu, int write);
 
 /*
  * Start working on the next chunks
  * If required, flush data
- * returns 1 if data were flushed, 0 else
+ * returns the id of the old chunk
  */
 int Moca_NextChunks(task_data data);
 
 /*
- * This function returns the pos th add in the data's current chunk
+ * Mark the chunk ch as ended (flushable)
+ */
+void Moca_EndChunk(task_data data, int ch);
+
+/*
+ * This function returns the pos th add in the data's chunk ch
  * returns NULL if pos is invalid ( < 0 || >= nbentry in chunk)
  */
-void *Moca_AddrInChunkPos(task_data data,int pos);
+void *Moca_AddrInChunkPos(task_data data,int *pos, int ch);
 
 void Moca_LockChunk(task_data data);
 void Moca_UnlockChunk(task_data data);

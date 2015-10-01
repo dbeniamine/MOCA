@@ -112,13 +112,19 @@ void Moca_DeleteBadFpf(void)
     }
 }
 
+void Moca_FalsePfInitializer(void *e)
+{
+    Moca_FalsePf f=(Moca_FalsePf)e;
+    f->status=0;
+}
+
 void Moca_InitFalsePf(void)
 {
     if(!Moca_use_false_pf  || Moca_false_pf_ugly)
         return;
     Moca_falsePfMap=Moca_InitHashMap(MOCA_FALSE_PF_HASH_BITS,
             2*(1<<MOCA_FALSE_PF_HASH_BITS),sizeof(struct _Moca_falsePf),
-            &Moca_FalsePfComparator);
+            &Moca_FalsePfComparator, &Moca_FalsePfInitializer);
     rwlock_init(&Moca_fpfRWLock);
 }
 
@@ -156,7 +162,6 @@ void Moca_AddFalsePf(struct mm_struct *mm, pte_t *pte)
         switch(status)
         {
             case MOCA_HASHMAP_FULL:
-                //TODO: clean BAD
                 Moca_DeleteBadFpf();
                 ++try;
                 break;

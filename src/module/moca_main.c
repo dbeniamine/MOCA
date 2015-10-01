@@ -60,10 +60,9 @@ void Moca_UpdateClock(void)
 {
     atomic_long_inc(&Moca_threadClock);
 }
-unsigned long Moca_GetClock(void)
+long Moca_GetClock(void)
 {
-    unsigned long ret=atomic_long_read(&Moca_threadClock);
-    return ret;
+    return atomic_long_read(&Moca_threadClock);
 }
 
 void Moca_PrintConfig(void)
@@ -106,11 +105,8 @@ void Moca_CleanUp(void)
     if(!Moca_Activated)
         return;
     Moca_Activated=0;
-    if(Moca_threadTask && current != Moca_threadTask)
-    {
-        MOCA_DEBUG_PRINT("Killing thread task %p\n",Moca_threadTask);
-        kthread_stop(Moca_threadTask);
-    }
+    MOCA_DEBUG_PRINT("Killing thread task %p\n",Moca_threadTask);
+    kthread_stop(Moca_threadTask);
     MOCA_DEBUG_PRINT("Moca Removing falsepf\n");
     MOCA_DEBUG_PRINT("Moca Unregistering probes\n");
     Moca_UnregisterProbes();

@@ -31,13 +31,20 @@ struct task_struct *Moca_initTask=NULL;
 
 moca_task Moca_AddTask(struct task_struct *t);
 
+void Moca_TaskInitializer(void *e)
+{
+    moca_task t=(moca_task)e;
+    t->data=NULL;
+}
+
 int Moca_InitProcessManagment(int id)
 {
     // Monitored pids
     struct pid *pid;
     rwlock_init(&Moca_tasksLock);
     Moca_tasksMap=Moca_InitHashMap(Moca_tasksHashBits,
-            2*(1<<Moca_tasksHashBits), sizeof(struct _moca_task), NULL);
+            2*(1<<Moca_tasksHashBits), sizeof(struct _moca_task), NULL,
+            Moca_TaskInitializer);
     rcu_read_lock();
     pid=find_vpid(id);
     if(!pid)
@@ -63,24 +70,27 @@ void Moca_CleanProcessData(void)
     }
 }
 
+static inline int Moca_ShouldMonitorTask(struct task_struct *t)
+{
+    int ret=0;
+    struct _moca_task tsk;
+    if(t->real_parent==Moca_initTask)
+        return 1;
+    tsk.key=t->real_parent;
+    read_lock(&Moca_tasksLock);
+    ret=Moca_EntryFromKey(Moca_tasksMap, (hash_entry)&tsk)!=NULL;
+    read_unlock(&Moca_tasksLock);
+    return ret;
+
+}
+
 // Add pid to the monitored process if pid is a monitored process
 moca_task Moca_AddTaskIfNeeded(struct task_struct *t)
 {
-    struct _moca_task tsk;
-    moca_task res=NULL;
-    tsk.key=t->real_parent;
-    read_lock(&Moca_tasksLock);
-    if(t->real_parent == Moca_initTask  ||
-            Moca_EntryFromKey(Moca_tasksMap, (hash_entry)&tsk)!=NULL)
-    {
-        read_unlock(&Moca_tasksLock);
-        res=Moca_AddTask(t);
-    }
-    else
-    {
-        read_unlock(&Moca_tasksLock);
-    }
-    return res;
+    moca_task ret=NULL;
+    if(t && pid_alive(t) && t->real_parent && Moca_ShouldMonitorTask(t))
+        ret=Moca_AddTask(t);
+    return ret;
 }
 
 // Current number of monitored pids
@@ -130,10 +140,9 @@ moca_task Moca_AddTask(struct task_struct *t)
 
     //Create the task data
     data=Moca_InitData(t);
-    /* atomic_inc(&t->mm->mm_users); */
-    get_task_struct(t);
     if(!data)
         return NULL;
+    get_task_struct(t);
 
     tmptsk.key=t;
     tmptsk.data=data;
@@ -166,7 +175,5 @@ void Moca_RemoveTask(struct task_struct *t)
     write_lock(&Moca_tasksLock);
     Moca_RemoveFromMap(Moca_tasksMap, (hash_entry)&tsk);
     write_unlock(&Moca_tasksLock);
-    /* if(t->mm) */
-    /*     atomic_dec(&t->mm->mm_users); */
     put_task_struct(t);
 }

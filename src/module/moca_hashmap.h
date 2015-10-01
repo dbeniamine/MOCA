@@ -42,15 +42,24 @@ typedef struct _hash_map *hash_map;
  */
 typedef int (*comp_fct_t)(hash_entry e1, hash_entry e2);
 
+/*
+ * Hashmap initializer
+ * Initialize an entry except fields next and key
+ */
+typedef void(*init_fct_t)(void * e);
+
+
 /* Initialize an empty map of (1<<hash_bits) different keys, able to hold
  * nb_elt elements
  * An entry of this map must be castable in hash_entry and have a size of
  * elt_size.
  * A comparator function can be given via the comp parameter. If non are
  * given, we use the default comparator function (key comparison).
+ * A initializer can also be given and will be called each time an entry must
+ * be re initialized
  */
 hash_map Moca_InitHashMap(unsigned long hash_bits, int nb_elt, size_t elt_size, 
-        comp_fct_t comp);
+        comp_fct_t comp, init_fct_t init);
 
 // Return the number of entry in map
 int Moca_NbElementInMap(hash_map map);
@@ -83,12 +92,12 @@ hash_entry Moca_AddToMap(hash_map map, hash_entry e, int *status);
  * Returns the hash entry at position pos
  *         Null if pos is invalid or there is no entry at this position
  */
-hash_entry Moca_EntryAtPos(hash_map map, unsigned int pos);
+hash_entry Moca_EntryAtPos(hash_map map, int pos);
 /*
  * Returns the next entry starting from pos
  *  NULL if there is no entry after pos
  */
-hash_entry Moca_NextEntryPos(hash_map map, unsigned int *pos);
+hash_entry Moca_NextEntryPos(hash_map map, int *pos);
 
 // Remove e from the map
 hash_entry Moca_RemoveFromMap(hash_map map,hash_entry e);
