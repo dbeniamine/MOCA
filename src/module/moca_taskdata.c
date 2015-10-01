@@ -41,7 +41,7 @@ int Moca_nbChunks=30;
 #include "moca_taskdata.h"
 #include "moca_tasks.h"
 #include "moca_hashmap.h"
-#include "moca_page.h"
+#include "moca_false_pf.h"
 #include <asm/pgtable.h>
 
 
@@ -364,7 +364,6 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
     int chunkid, ind, nelt, complete=1;
     size_t sz=0;
     chunk_entry e;
-    pte_t *pte;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
     task_data data=(task_data)PDE_DATA(file_inode(filp));
 #else
@@ -434,17 +433,6 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
                     {
                         complete=0;
                         break;
-                    }
-                    if(e->countR == 0 && e->countW==0)
-                    {
-                        pte=Moca_PteFromAdress((unsigned long) e->key,data->task->mm);
-                        if(pte)
-                        {
-                            if(pte_young(*pte))
-                                e->countR=1;
-                            if(pte_dirty(*pte))
-                                e->countW=1;
-                        }
                     }
                     //Access @Virt @Phy countread countwrite cpumask
                     sz+=snprintf(buffer+sz,length-sz,"A %p %p %d %d ",
