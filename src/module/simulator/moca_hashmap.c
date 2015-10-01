@@ -12,9 +12,9 @@
 #define __NO_VERSION__
 /* #define MOCA_DEBUG */
 
-#include <linux/slab.h> //malloc
-#include <linux/hash.h>
-#include <linux/string.h> //memcpy
+ //malloc
+
+ //memcpy
 #include "moca_hashmap.h"
 
 #define HASH(k,m) (((int)hash_ptr((k),(m)->hash_bits))%(m)->size)

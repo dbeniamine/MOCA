@@ -12,14 +12,14 @@
 #define __NO_VERSION__
 //#define MOCA_DEBUG
 
-#include <linux/pid.h>
-#include <linux/sched.h>
-#include <linux/hash.h>
-#include <linux/slab.h>
+
+
+
+
 #include "moca.h"
 #include "moca_tasks.h"
-#include <linux/rwlock_types.h>
-#include <linux/rwlock.h>
+
+
 
 // The first bits are not random enough, 14 bits should be enough for pids
 unsigned long Moca_tasksHashBits=14;

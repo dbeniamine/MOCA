@@ -9,16 +9,11 @@
  * Copyright (C) 2010 David Beniamine
  * Author: David Beniamine <David.Beniamine@imag.fr>
  */
-#define __NO_VERSION__
-#ifndef __MOCA_PAGE__
-#define __MOCA_PAGE__
 
+#ifndef __MOCA_PROBES__
+#define __MOCA_PROBES__
 
-#define MOCA_DEFAULT_WAKEUP_INTERVAL 40
+int Moca_RegisterProbes(void);
+void Moca_UnregisterProbes(void);
 
-/* Main function for TLB walkthrough
- * Check accessed page every Memmap_wakeupsIinterval ms
- */
-int Moca_MonitorThread(void *);
-
-#endif //__MOCA_PAGE__
+#endif //__MOCA_PROBES__

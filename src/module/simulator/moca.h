@@ -21,9 +21,9 @@
 #define MAX(A,B) ((A)>(B) ? (A) : (B) )
 
 
-#include <linux/module.h>
-#include <linux/kernel.h>
-#include <linux/version.h>
+
+
+
 
 
 // Panic exit function

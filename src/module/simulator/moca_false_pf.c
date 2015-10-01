@@ -14,10 +14,10 @@
 
 #include "moca_false_pf.h"
 #include "moca_hashmap.h"
-#include <linux/spinlock.h>
-#include <linux/delay.h> //msleep
-#include <asm/pgtable.h>
-#include <linux/mm.h>
+
+ //msleep
+
+
 
 #define MOCA_FALSE_PF_HASH_BITS 15
 #define MOCA_FALSE_PF_VALID 0

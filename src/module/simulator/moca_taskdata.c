@@ -30,19 +30,19 @@ int Moca_taskDataHashBits=MOCA_HASH_BITS;
 int Moca_taskDataChunkSize=1<<(MOCA_HASH_BITS+1);
 int Moca_nbChunks=30;
 
-#include <linux/sched.h>
-#include <linux/spinlock.h>
-#include <linux/slab.h>
-#include <linux/proc_fs.h>
-#include <linux/cpumask.h> //num_online_cpus
-#include <asm/uaccess.h>  /* for copy_*_user */
-#include <linux/delay.h>
+
+
+
+
+ //num_online_cpus
+  /* for copy_*_user */
+
 #include "moca.h"
 #include "moca_taskdata.h"
 #include "moca_tasks.h"
 #include "moca_hashmap.h"
 #include "moca_false_pf.h"
-#include <asm/pgtable.h>
+
 
 
 

@@ -12,8 +12,8 @@
 #define __NO_VERSION__
 /* #define MOCA_DEBUG */
 
-#include <linux/kprobes.h>
-#include <linux/delay.h> //msleep
+
+ //msleep
 #include "moca.h"
 #include "moca_tasks.h"
 #include "moca_taskdata.h"

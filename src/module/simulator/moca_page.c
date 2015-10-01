@@ -17,11 +17,11 @@
 #include "moca_taskdata.h"
 #include "moca_tasks.h"
 #include "moca_false_pf.h"
-#include <linux/kthread.h>
-#include <linux/smp.h> //get_cpu()
-#include <linux/delay.h> //msleep
-#include <linux/slab.h>
-#include <linux/pid.h>
+
+ //get_cpu()
+ //msleep
+
+
 
 // Wakeup period in ms
 int Moca_wakeupInterval=MOCA_DEFAULT_WAKEUP_INTERVAL;

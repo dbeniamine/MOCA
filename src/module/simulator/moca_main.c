@@ -11,9 +11,9 @@
  */
 /* #define MOCA_DEBUG */
 
-#include <linux/init.h>
-#include <linux/kthread.h>
-#include <asm-generic/atomic-long.h>
+
+
+
 #include "moca.h"
 #include "moca_page.h"
 #include "moca_probes.h"
