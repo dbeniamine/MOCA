@@ -20,11 +20,11 @@
 //We can free data (after removing the /proc entry)
 #define MOCA_DATA_STATUS_ZOMBIE -2
 #define MOCA_DATA_STATUS_DYING_OR_ZOMBIE(data) ((data)->status < 0)
-#define MOCA_HASH_BITS 14
+#define MOCA_HASH_BITS 15
 
 int Moca_taskDataHashBits=MOCA_HASH_BITS;
-int Moca_taskDataChunkSize=2*(1<<MOCA_HASH_BITS);
-int Moca_nbChunks=20;
+int Moca_taskDataChunkSize=1<<(MOCA_HASH_BITS+1);
+int Moca_nbChunks=30;
 
 #include <linux/sched.h>
 #include <linux/spinlock.h>

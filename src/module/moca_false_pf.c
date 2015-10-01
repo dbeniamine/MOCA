@@ -17,7 +17,7 @@
 #include <linux/spinlock.h>
 #include <linux/delay.h> //msleep
 
-#define MOCA_FALSE_PF_HASH_BITS 14
+#define MOCA_FALSE_PF_HASH_BITS 15
 #define MOCA_FALSE_PF_VALID 0
 #define MOCA_FALSE_PF_BAD 1
 
