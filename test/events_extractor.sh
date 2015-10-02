@@ -17,7 +17,7 @@ do cd $f
         echo "$f,$id,Pin,$pages,$nacc" >> $WD/events.csv
         # Moca values
         pages=$(find . -name Moca-task*.log | xargs cat | grep ^A \
-            | awk '{print $2}' | sort -u | wc -l)
+            | sed 's/\(.*\)[a-f0-9]\{3\}/\1/' | awk '{print $2}' | sort -u | wc -l)
         nacc=$(find . -name Moca-task*.log | xargs cat | grep ^A \
             | awk 'BEGIN{s=0}{s+=$4+$5}END{print s}')
         echo "$f,$id,Moca,$pages,$nacc" >> $WD/events.csv
