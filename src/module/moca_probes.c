@@ -35,7 +35,7 @@ void Moca_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
     }
     Moca_RLockPf();
     if(Moca_IsActivated())
-        Moca_AddToChunk(data,(void *)(address&PAGE_MASK),get_cpu(),flags&FAULT_FLAG_WRITE?1:0);
+        Moca_AddToChunk(data,(void *)(address),get_cpu(),flags&FAULT_FLAG_WRITE?1:0);
     MOCA_DEBUG_PRINT("Moca Pte fault task %p\n", current);
     if(Moca_FixFalsePf(mm,address)!=0)
         MOCA_DEBUG_PRINT("Moca true page fault at %p %p \n", addr, mm);
