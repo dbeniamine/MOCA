@@ -15,9 +15,10 @@
 #include "moca_false_pf.h"
 #include "moca_hashmap.h"
 #include <linux/spinlock.h>
-#include <linux/delay.h> //msleep
 #include <asm/pgtable.h>
 #include <linux/mm.h>
+#include <linux/slab.h>
+#include <linux/sched.h>
 
 #define MOCA_FALSE_PF_HASH_BITS 15
 #define MOCA_FALSE_PF_VALID 0
@@ -31,6 +32,7 @@
  */
 int Moca_use_false_pf=1;
 int Moca_false_pf_ugly=0;
+unsigned long *Moca_recentlyFixed;
 
 
 typedef struct _Moca_falsePf
@@ -44,6 +46,18 @@ typedef struct _Moca_falsePf
 hash_map Moca_falsePfMap;
 DEFINE_RWLOCK(Moca_fpfRWLock);
 
+
+int Moca_RecentlyFixed(unsigned long addr)
+{
+    int i=0;
+    while(i<NR_CPUS)
+    {
+        if(Moca_recentlyFixed[i]==(addr&PAGE_MASK))
+            return 0;
+        ++i;
+    }
+    return 1;
+}
 
 void *Moca_PhyFromVirt(void *addr, struct mm_struct *mm)
 {
@@ -106,7 +120,10 @@ static int Moca_FixPte(pte_t *pte, struct mm_struct *mm)
 static int Moca_ClearAddr(unsigned long addr,struct mm_struct *mm)
 {
     spinlock_t *ptl;
-    pte_t *pte=Moca_PteFromAdress(addr,mm,&ptl);
+    pte_t *pte;
+    if(Moca_RecentlyFixed(addr)==0)
+        return 1;
+    pte=Moca_PteFromAdress(addr,mm,&ptl);
     if(!pte)
         return 1;
     MOCA_DEBUG_PRINT("Moca clearing pte %p addr %lx mm %p\n",pte,addr,mm);
@@ -115,15 +132,16 @@ static int Moca_ClearAddr(unsigned long addr,struct mm_struct *mm)
     return 0;
 }
 
-static int Moca_FixAddr(unsigned long addr,struct mm_struct *mm)
+static int Moca_FixAddr(unsigned long addr,struct mm_struct *mm, int cpu)
 {
     spinlock_t *ptl;
-    pte_t *pte=Moca_PteFromAdress(addr,mm,&ptl);
     int ret=1;
+    pte_t *pte=Moca_PteFromAdress(addr,mm,&ptl);
     if(!pte)
         return ret;
     MOCA_DEBUG_PRINT("Moca fixing pte %p addr %lx mm %p\n",pte,addr,mm);
-    ret=Moca_FixPte(pte,mm);
+    if((ret=Moca_FixPte(pte,mm))==0)
+        Moca_recentlyFixed[cpu]=addr&PAGE_MASK;
     Moca_UnmapPte(pte,ptl);
     return ret;
 }
@@ -198,6 +216,7 @@ void Moca_InitFalsePf(void)
             2*(1<<MOCA_FALSE_PF_HASH_BITS),sizeof(struct _Moca_falsePf),
             &Moca_FalsePfComparator, &Moca_FalsePfInitializer);
     rwlock_init(&Moca_fpfRWLock);
+    Moca_recentlyFixed=kcalloc(NR_CPUS,sizeof(unsigned long),GFP_KERNEL);
 }
 
 void Moca_ClearFalsePfData(void)
@@ -210,8 +229,8 @@ void Moca_ClearFalsePfData(void)
     while((p=(Moca_FalsePf)Moca_NextEntryPos(Moca_falsePfMap, &i))!=NULL)
         if(p->status==MOCA_FALSE_PF_VALID)
         {
-            Moca_FixAddr((unsigned long)p->key, NULL);
-            p->status=MOCA_FALSE_PF_BAD;
+            if(Moca_FixAddr((unsigned long)p->key, NULL,current->on_cpu)==0)
+                p->status=MOCA_FALSE_PF_BAD;
         }
     MOCA_DEBUG_PRINT("Moca removing all false map%p\n",Moca_falsePfMap);
     Moca_FreeMap(Moca_falsePfMap);
@@ -265,7 +284,7 @@ void Moca_AddFalsePf(struct mm_struct *mm, unsigned long address)
  * returns 0 on success
  *         1 if addr is not in the false pf list
  */
-int Moca_FixFalsePf(struct mm_struct *mm, unsigned long address)
+int Moca_FixFalsePf(struct mm_struct *mm, unsigned long address, int cpu)
 {
     struct _Moca_falsePf tmpPf;
     Moca_FalsePf p;
@@ -273,7 +292,7 @@ int Moca_FixFalsePf(struct mm_struct *mm, unsigned long address)
     if(!Moca_use_false_pf)
         return res;
     if(Moca_false_pf_ugly)
-        return Moca_FixAddr(address,mm);
+        return Moca_FixAddr(address,mm,cpu);
 
     MOCA_DEBUG_PRINT("Moca testing addr fault %lx mm %p\n",address,mm);
     tmpPf.key=(void*)(address&PAGE_MASK);
@@ -283,8 +302,8 @@ int Moca_FixFalsePf(struct mm_struct *mm, unsigned long address)
         MOCA_DEBUG_PRINT("Moca found false pf %p mm %p\n",p->key,p->mm);
         if(p->status == MOCA_FALSE_PF_VALID)
         {
-            res=Moca_FixAddr((unsigned long)p->key, mm);
-            p->status=MOCA_FALSE_PF_BAD;
+            if((res=Moca_FixAddr((unsigned long)p->key, mm,cpu))==0)
+                p->status=MOCA_FALSE_PF_BAD;
         }
     }
     return res;
@@ -295,7 +314,7 @@ int Moca_FixFalsePf(struct mm_struct *mm, unsigned long address)
  * Remove all false page faults associated to mm and set the present flags
  * back
  */
-void Moca_FixAllFalsePf(struct mm_struct *mm)
+void Moca_FixAllFalsePf(struct mm_struct *mm, int cpu)
 {
     int i=0;
     Moca_FalsePf p;
@@ -310,8 +329,8 @@ void Moca_FixAllFalsePf(struct mm_struct *mm)
     {
         if(p->mm==mm)
         {
-            Moca_FixAddr((unsigned long)p->key, mm);
-            p->status=MOCA_FALSE_PF_BAD;
+            if(Moca_FixAddr((unsigned long)p->key, mm,cpu)==0)
+                p->status=MOCA_FALSE_PF_BAD;
         }
     }
 }

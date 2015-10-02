@@ -37,7 +37,7 @@ void Moca_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
     if(Moca_IsActivated())
         Moca_AddToChunk(data,(void *)(address),get_cpu(),flags&FAULT_FLAG_WRITE?1:0);
     MOCA_DEBUG_PRINT("Moca Pte fault task %p\n", current);
-    if(Moca_FixFalsePf(mm,address)!=0)
+    if(Moca_FixFalsePf(mm,address,current->on_cpu)!=0)
         MOCA_DEBUG_PRINT("Moca true page fault at %p %p \n", addr, mm);
     Moca_UpdateClock();
     Moca_RUnlockPf();
@@ -52,7 +52,7 @@ void Moca_ExitHandler(struct mmu_gather *tlb, struct vm_area_struct *start_vma,
     {
         MOCA_DEBUG_PRINT("Exit handler handler task %p, mm %p\n", NULL, NULL);
         Moca_RLockPf();
-        Moca_FixAllFalsePf(start_vma->vm_mm);
+        Moca_FixAllFalsePf(start_vma->vm_mm,current->on_cpu);
         Moca_RUnlockPf();
     }
     jprobe_return();
