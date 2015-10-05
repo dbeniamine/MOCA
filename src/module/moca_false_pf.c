@@ -185,21 +185,23 @@ int Moca_FalsePfComparator(hash_entry e1, hash_entry e2)
     return 1;
 }
 
+int Moca_ShouldRemoveEntry(void *e)
+{
+    Moca_FalsePf p=(Moca_FalsePf)e;
+    if (p->status==MOCA_FALSE_PF_BAD)
+    {
+        MOCA_DEBUG_PRINT("Moca removed bad pf %p %p\n", p->key, p->mm);
+        return 0;
+    }
+    return 1;
+}
+
 //Remove all "BAD" falsepf
 void Moca_DeleteBadFpf(void)
 {
-    int i=0;
-    Moca_FalsePf p;
     if(!Moca_use_false_pf)
         return;
-    while((p=(Moca_FalsePf)Moca_NextEntryPos(Moca_falsePfMap, &i))!=NULL)
-    {
-        if(p->status==MOCA_FALSE_PF_BAD)
-        {
-            MOCA_DEBUG_PRINT("Moca removed bad pf %p %p\n", p->key, p->mm);
-            Moca_RemoveFromMap(Moca_falsePfMap,(hash_entry)p);
-        }
-    }
+    Moca_ConditionalRemove(Moca_falsePfMap,Moca_ShouldRemoveEntry);
 }
 
 void Moca_FalsePfInitializer(void *e)

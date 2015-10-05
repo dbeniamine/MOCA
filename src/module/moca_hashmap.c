@@ -248,6 +248,42 @@ hash_entry Moca_NextEntryPos(hash_map map, int *pos)
     return tableElt(map,i);
 }
 
+int Moca_ConditionalRemove(hash_map map, int (*fct)(void*))
+{
+    int h, ind, prev=MOCA_HASHMAP_END, remove=0;
+    hash_entry e;
+    for(ind=0;ind<map->tableSize;++ind)
+    {
+        e=tableElt(map,ind);
+        if(e->key!=NULL && fct(e)==0)
+        {
+            h=HASH(e->key,map);
+            prev=map->hashs[h];
+            if(prev==ind)
+            {
+                // Normal remove
+                map->hashs[h]=e->next;
+            }
+            else
+            {
+                // Find actual predecessor
+                while(prev>=0 && tableElt(map,prev)->next!=ind)
+                    prev=tableElt(map,prev)->next;
+                if(prev==MOCA_HASHMAP_END)
+                {
+                    Moca_Panic("Bad link in hashmap");
+                    return -1;
+                }
+                tableElt(map,prev)->next=e->next;
+            }
+            e->key=NULL;
+            e->next=MOCA_HASHMAP_END;
+            --map->nbentry;
+            ++remove;
+        }
+    }
+    return remove;
+}
 
 hash_entry Moca_RemoveFromMap(hash_map map,hash_entry e)
 {
