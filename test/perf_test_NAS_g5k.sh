@@ -151,18 +151,18 @@ do
             set +x
             rm $WORKPATH/$NAS/ADC.*
         done
-        echo "Compressing traces"
+        #echo "Compressing traces"
         mv $LOGDIR/Moca.log $LOGDIR/Moca-$benchname/
         mv $LOGDIR/Moca-$benchname/Moca-$benchname.log $LOGDIR/Moca.log
-        tar cvJf $LOGDIR/traces.tar.xz $LOGDIR/Moca-$benchname *.csv
-        rm -rf $LOGDIR/Moca-$benchname *.csv
-        echo "Done"
-        echo "Saving files"
-	    sudo chmod -R 777 $EXP_DIR
-	    chown -R $OWNER: $EXP_DIR
-	    su $OWNER -c "cp -ur $EXP_DIR /home/$OWNER/"
-        echo "Done"
+        #tar cvJf $LOGDIR/traces.tar.xz $LOGDIR/Moca-$benchname *.csv
+        #rm -rf $LOGDIR/Moca-$benchname *.csv
+        #echo "Done"
     done
+    echo "Saving files"
+	sudo chmod -R 777 $EXP_DIR
+	chown -R $OWNER: $EXP_DIR
+	su $OWNER -c "cp -ur $EXP_DIR /home/$OWNER/"
+    echo "Done"
 done
 
 #cd $EXP_DIR/

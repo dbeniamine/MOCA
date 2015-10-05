@@ -117,7 +117,8 @@ events$app <- events$Accesses/ events$Page
 evtstat <- ddply(events,c("Bench","Type"),summarize,
                N=length(Pages),mp=mean(Pages),sdp=sd(Pages),sep=sdp/sqrt(N),
                ma=mean(Accesses),sda=sd(Accesses),sea=sda/sqrt(N),
-               map=mean(app),sdap=sd(app),seap=sdap/sqrt(N))
+               map=mean(app),sdap=sd(app),seap=sdap/sqrt(N),
+               mad=mean(Address),sdad=sd(Address),sead=sdad/sqrt(N))
 #show(evtstat)
 p <- ggplot(evtstat,aes(x=Bench,y=mp,fill=Type))
 p  <-  p + geom_bar(stat="identity", position=position_dodge(.9) )
@@ -133,6 +134,27 @@ p <-  p + theme(panel.grid.minor = element_line(colour = "black", linetype="dash
 p <- p + scale_fill_brewer(palette="YlOrRd")
 show(p)
 ```
+
+#### Unique addresses
+
+```{r nbaddr, echo=F}
+p <- ggplot(evtstat,aes(x=Bench,y=mad,fill=Type))
+p  <-  p + geom_bar(stat="identity", position=position_dodge(.9) )
+p  <-  p + geom_errorbar(aes(ymin=mad-sead, ymax=mad+sead),
+                  width=.2,                    # Width of the error bars
+                  position=position_dodge(.9))
+p <- p + xlab("Benchmark")
+p <- p + ylab("Unique Addresses")
+p <- p + guides(fill=guide_legend(title="Execution type"))
+p <-  p + theme(panel.grid.minor = element_line(colour = "black", linetype="dashed", size = 0.1),
+        panel.grid.major = element_line(colour = "black", size = 0.1),
+        legend.position="bottom")
+p <- p + scale_fill_brewer(palette="YlOrRd")
+show(p)
+
+```
+
+
 
 #### Captured events
 
@@ -152,6 +174,7 @@ p <- p + scale_fill_brewer(palette="YlOrRd")
 show(p)
 
 ```
+
 
 #### Captured events / pages
 
@@ -179,25 +202,11 @@ show(evtstat)
 
 + ma, sda, sea:  mean, standard error and deviation for: Accesses
 + mp, sdp, sep:  mean, standard error and deviation for: Pages
++ mad, sdad, sead:  mean, standard error and deviation for: unique Addresses
 + map, sdap, seap:  mean, standard error and deviation for: Accesses/Pages
 
 Conclusions
 -----------
-
-+ Moca is indeed more efficient than tabarnac
-+ Moca covers the whole set of pages
-+ Comparison on number of event between sampling and complete instrumentation
-  does not make sense => **Make Memprof work !**
-+ Overhead Different from observed in Tabarnac benchmarks
-  + Currently running an expe with only Tabarnac on edel to check if these
-    results seems correct
-+ Moca logs show a few (minor) errors:
-    + Soft lockups: quite frequent (not always), due to monitor thread waiting a
-    bit to much for Linux
-    + 1 Bad page map (over 100 runs) => probably due to race condition between
-      fix and handle_mm_fault
-    + 1 extremely slow run (mg.A run 5), now explainations for now ...
-
 
 ```{r free, echo=F}
 remove(p)
