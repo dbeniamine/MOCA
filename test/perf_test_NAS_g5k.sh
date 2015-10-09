@@ -4,7 +4,7 @@ CMDLINE="$0 $@"
 EXP_NAME=$(basename $0 .sh)
 OUTPUT="exp.log"
 OWNER=dbeniamine
-RUN=15
+RUN=2
 PREFIX="/home/dbeniamine"
 WORKPATH="/tmp"
 NAS="NPB3.3-OMP/"
@@ -134,7 +134,7 @@ make clean
 make
 cd -
 
-for run in $(seq $FIRST $LAST)
+for run in $(seq $FIRSTRUN $LASTRUN)
 do
     echo "RUN : $run"
     #Actual exp
