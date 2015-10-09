@@ -9,11 +9,8 @@ PREFIX="/home/dbeniamine"
 WORKPATH="/tmp"
 NAS="NPB3.3-OMP/"
 MOCAPATH="Moca"
-#MEMPROFPATH="MemProf"
-TABARNACPATH="tabarnac"
-export PATH=$PATH:/opt/pin
-CONFIGS=('Moca' 'Base' 'Pin' ) #'Memprof')
-declare -A TARGETS
+BENCH=ft
+CLASS=A
 
 #report error if needed
 function testAndExitOnError
@@ -117,53 +114,38 @@ if [ $PREFIX != $WORKPATH ]
 then
     cp -rv $PREFIX/$NAS $WORKPATH/
     cp -rv $PREFIX/$MOCAPATH $WORKPATH/
-    #cp -rv $PREFIX/$MEMPROFPATH $WORKPATH/
-    cp -rv $PREFIX/$TABARNACPATH $WORKPATH/
 fi
 
 #Do the first compilation
 cd $WORKPATH/$NAS
 make clean
-make suite
-#make dc CLASS=A
+make $BENCH CLASS=$CLASS
 rm bin/*.x
 cd -
 
-cd $WORKPATH/$TABARNACPATH
-make clean
-make
-cd -
-
+bench="$WORKPATH/$NAS/bin/$BENCH.$CLASS"
 for run in $(seq $FIRST $LAST)
 do
     echo "RUN : $run"
     #Actual exp
-    for bench in $WORKPATH/$NAS/bin/*
+    for wint in $(seq 10 10 100) #ms
     do
-
-	benchname=$(basename $bench)
-        echo "$benchname"
-        LOGDIR="$EXP_DIR/$benchname/run-$run"
-        mkdir -p $LOGDIR
-	TARGETS=([Base]='' [MemProf]="$WORKPATH/$MEMPROFPATH/scripts/profile_app.sh" \
-		[Moca]="$WORKPATH/$MOCAPATH/src/utils/moca -d $WORKPATH/$MOCAPATH -G -D $LOGDIR/Moca-$benchname -c" \
-    		[Pin]="$WORKPATH/$TABARNACPATH/tabarnac -r --")
-        echo $LOGDIR
-        #Actual experiment
-        for conf in ${CONFIGS[@]}
+        for lint in $(seq 1 9) #sec
         do
-            cmd="${TARGETS[$conf]} $bench"
+            LOGDIR="$EXP_DIR/mon-$wint/log-$lint/run-$run"
+            mkdir -p $LOGDIR
+            echo $LOGDIR
+	        cmd="$WORKPATH/$MOCAPATH/src/utils/moca -G -w $wint -L .$lint \
+                -D $LOGDIR/Moca-$BENCH -c $bench"
+            #Actual experiment
             set -x
-            $cmd > $LOGDIR/$conf.log 2> $LOGDIR/$conf.err
-            #testAndExitOnError "Exec failed $conf $benchname run-$run"
+            $cmd > $LOGDIR/log 2> $LOGDIR/err
+            #testAndExitOnError "Exec failed $conf $BENCH run-$run"
             set +x
-            rm $WORKPATH/$NAS/ADC.*
         done
         #echo "Compressing traces"
-        mv $LOGDIR/Moca.log $LOGDIR/Moca-$benchname/
-        mv $LOGDIR/Moca-$benchname/Moca-$benchname.log $LOGDIR/Moca.log
-        #tar cvJf $LOGDIR/traces.tar.xz $LOGDIR/Moca-$benchname *.csv
-        mv *.csv $LOGDIR/
+        #tar cvJf $LOGDIR/traces.tar.xz $LOGDIR/Moca-$BENCH *.csv
+        #rm -rf $LOGDIR/Moca-$BENCH *.csv
         #echo "Done"
     done
     echo "Saving files"
