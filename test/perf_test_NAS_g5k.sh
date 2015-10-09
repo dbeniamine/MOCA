@@ -155,7 +155,7 @@ do
         mv $LOGDIR/Moca.log $LOGDIR/Moca-$benchname/
         mv $LOGDIR/Moca-$benchname/Moca-$benchname.log $LOGDIR/Moca.log
         #tar cvJf $LOGDIR/traces.tar.xz $LOGDIR/Moca-$benchname *.csv
-        #rm -rf $LOGDIR/Moca-$benchname *.csv
+        mv *.csv $LOGDIR/
         #echo "Done"
     done
     echo "Saving files"
