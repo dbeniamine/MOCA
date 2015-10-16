@@ -30,7 +30,7 @@ usage()
     echo "  -w ms             Set the wakeup interval for Moca to interval ms,
     Default: 40ms"
     echo "  -L s              Set the logging daemon wakeup interval, default
-    $log_thread_interval seconds"
+    .5s"
     echo "  -p prio           Schedtool priority for the kernel module, the program
     priority will be prio-1. You can increase this parameter
     to reduce the system noise. Default: $prio"

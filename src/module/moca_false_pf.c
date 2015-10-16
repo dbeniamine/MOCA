@@ -137,11 +137,11 @@ static int Moca_FixAddr(unsigned long addr,struct mm_struct *mm, int cpu)
     spinlock_t *ptl;
     int ret=1;
     pte_t *pte=Moca_PteFromAdress(addr,mm,&ptl);
-    Moca_recentlyFixed[cpu]=addr&PAGE_MASK;
     if(!pte)
         return ret;
     MOCA_DEBUG_PRINT("Moca fixing pte %p addr %lx mm %p\n",pte,addr,mm);
-    ret=Moca_FixPte(pte,mm);
+    if((ret=Moca_FixPte(pte,mm))==0)
+        Moca_recentlyFixed[cpu]=addr&PAGE_MASK;
     Moca_UnmapPte(pte,ptl);
     return ret;
 }
