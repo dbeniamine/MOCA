@@ -84,7 +84,7 @@ do
             RUN=$OPTARG
             ;;
         i)
-            id=0 #$OPTARG
+            id=$OPTARG
             ;;
         *)
             usage
