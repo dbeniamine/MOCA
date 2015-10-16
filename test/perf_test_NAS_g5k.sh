@@ -9,7 +9,7 @@ PREFIX="/home/dbeniamine"
 WORKPATH="/tmp"
 NAS="NPB3.3-OMP/"
 MOCAPATH="Moca"
-MEMPROFPATH="MemProf"
+#MEMPROFPATH="MemProf"
 TABARNACPATH="tabarnac"
 export PATH=$PATH:/opt/pin
 CONFIGS=('Moca' 'Base' 'Pin' ) #'Memprof')
@@ -36,6 +36,8 @@ function dumpInfos
     echo "EXP_NAME $EXP_NAME"
     echo "OUTPUT $OUTPUT"
     echo "RUN $RUN"
+    echo "FIRST: $FIRSTRUN"
+    echo "LAST: $LASTRUN"
     echo "########################"
     # DUMP environement important stuff
     echo "#### Hostname: #########"
@@ -61,13 +63,14 @@ function dumpInfos
     cp -v *.rmd  $EXP_DIR/
     cp -v Makefile  $EXP_DIR/
 }
-#if [ $(whoami) != "root" ]
-#then
-#    echo "This script must be run as root"
-#    exit 1
-#fi
+if [ $(whoami) != "root" ]
+then
+    echo "This script must be run as root"
+    exit 1
+fi
+id=0
 #parsing args
-while getopts "ho:e:r:" opt
+while getopts "ho:e:r:i:" opt
 do
     case $opt in
         h)
@@ -82,6 +85,9 @@ do
             ;;
         r)
             RUN=$OPTARG
+            ;;
+        i)
+            id=$OPTARG
             ;;
         *)
             usage
@@ -99,6 +105,9 @@ fi
 EXP_DIR="$WORKPATH/$EXP_NAME"_$(date +%y%m%d_%H%M)
 mkdir $EXP_DIR
 OUTPUT="$EXP_DIR/$OUTPUT"
+FIRSTRUN=$(( $id * $RUN ))
+LASTRUN=$(( $FIRSTRUN + $RUN ))
+FIRSTRUN=$(( $FIRSTRUN + 1 ))
 
 #Continue but change the OUTPUT
 exec > >(tee $OUTPUT) 2>&1
@@ -109,7 +118,7 @@ if [ $PREFIX != $WORKPATH ]
 then
     cp -rv $PREFIX/$NAS $WORKPATH/
     cp -rv $PREFIX/$MOCAPATH $WORKPATH/
-    cp -rv $PREFIX/$MEMPROFPATH $WORKPATH/
+    #cp -rv $PREFIX/$MEMPROFPATH $WORKPATH/
     cp -rv $PREFIX/$TABARNACPATH $WORKPATH/
 fi
 
@@ -126,7 +135,7 @@ make clean
 make
 cd -
 
-for run in $(seq 1 $RUN)
+for run in $(seq $FIRSTRUN $LASTRUN)
 do
     echo "RUN : $run"
     #Actual exp
@@ -155,7 +164,7 @@ do
         mv $LOGDIR/Moca.log $LOGDIR/Moca-$benchname/
         mv $LOGDIR/Moca-$benchname/Moca-$benchname.log $LOGDIR/Moca.log
         #tar cvJf $LOGDIR/traces.tar.xz $LOGDIR/Moca-$benchname *.csv
-        #rm -rf $LOGDIR/Moca-$benchname *.csv
+        mv *.csv $LOGDIR/
         #echo "Done"
     done
     echo "Saving files"
@@ -177,4 +186,3 @@ echo "thermal_throttle infos :"
 cat /sys/devices/system/cpu/cpu0/thermal_throttle/*
 END_TIME=$(date +%y%m%d_%H%M%S)
 echo "Expe ended at $END_TIME"
-
