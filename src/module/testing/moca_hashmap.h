@@ -1,14 +1,21 @@
 /*
+ * Copyright (C) 2015  Beniamine, David <David@Beniamine.net>
+ * Author: Beniamine, David <David@Beniamine.net>
+ *
  * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation, version 2 of the
- * License.
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
  *
- * Moca is a kernel module designed to track memory access
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * Copyright (C) 2010 David Beniamine
- * Author: David Beniamine <David.Beniamine@imag.fr>
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 #ifndef __MOCA_HASHMAP_H__
 #define __MOCA_HASHMAP_H__
 #define __NO_VERSION__
@@ -49,7 +56,7 @@ typedef int (*comp_fct_t)(hash_entry e1, hash_entry e2);
  * A comparator function can be given via the comp parameter. If non are
  * given, we use the default comparator function (key comparison).
  */
-hash_map Moca_InitHashMap(unsigned long hash_bits, int nb_elt, size_t elt_size, 
+hash_map Moca_InitHashMap(unsigned long hash_bits, int nb_elt, size_t elt_size,
         comp_fct_t comp);
 
 // Return the number of entry in map
