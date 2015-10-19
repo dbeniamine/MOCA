@@ -8,12 +8,19 @@ program.
 
 ## Background Knowledge
 
-MOCA is the successor if HeapInfo [1], all Valgrind tool which intercept every
+MOCA is the successor if HeapInfo [1], a Valgrind tool which intercept every
 memory access and gives a carthograpy of the memory usage. This new tool is
 based on a Linux kernel module, it intercept pagefaults to record memory
-access. As pagefaults do not occurs very often, it trigger false page faults
+access. As pagefaults do not occurs very often, it periodically trigger false page faults
 to record more access. This mechanism is inspired by [2]. More details on
 Moca's implementation can be find on [3].
+
+No tools is currently provided to visualize Moca traces, still there is a
+prototype of visualization using
+[framesoc](https://github.com/soctrace-inria/framesoc) [4] and
+[ocelotl](https://github.com/soctrace-inria/ocelotl) [5]. The
+importer required to visualize Moca traces in framesoc will be available soon
+in [framesoc importer repository](https://github.com/soctrace-inria/framesoc.importers).
 
 ## Usage
 
@@ -126,11 +133,12 @@ anywhere using the parameter -d to give the path to the Moca directory. If
 
 [1] David Beniamine. *Cartographier la mémoire virtuelle d'une application de
 calcul scientifique. In ComPAS'2013 / RenPar'21* , Grenoble, France, 2013.  
-[2] E. H. M. Cruz, M. Diener, and P. O. A. Navaux. Using the Translation Lookaside
-Buffet to Map Threads in Parallel Applications Based on Shared Memory. In
-*Parallel Distributed Processing Symposium (IPDPS), 2012 IEEE 26th
-International, page 532-543, May 2012.*  
-[3] **MOCA TODO INRIA TECH REPORT**  
+[2] E. H. M. Cruz, M. Diener, and P. O. A. Navaux. *Using the Translation Lookaside
+Buffet to Map Threads in Parallel Applications Based on Shared Memory.* In
+Parallel Distributed Processing Symposium (IPDPS), 2012 IEEE 26th
+International, page 532-543, May 2012.  
+[3] D. Beniamine, Y. Corre, D. Dosimont and G. Huard. *Memory Organisation
+Cartography & Analysis.* Research report 8694, Inria. March 2015.  
 [4] G. Pagano, D. Dosimont, G. Huard, V. Marangozova-Martin, and J. M.
 Vincent.  Trace Management and Analysis for Embedded Systems. In *Embedded
 Multicore Socs (MCSoC), 122, Sept 2013.*  
