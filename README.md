@@ -129,6 +129,7 @@ No installation script is provided yet, however moca script can be run from
 anywhere using the parameter -d to give the path to the Moca directory. If
 "-n" is not specified in the command, Moca will recompile the module.
 
+
 ## References
 
 [1] David Beniamine. *Cartographier la mémoire virtuelle d'une application de
@@ -138,12 +139,12 @@ Buffet to Map Threads in Parallel Applications Based on Shared Memory.* In
 Parallel Distributed Processing Symposium (IPDPS), 2012 IEEE 26th
 International, page 532-543, May 2012.  
 [3] D. Beniamine, Y. Corre, D. Dosimont and G. Huard. *Memory Organisation
-Cartography & Analysis.* Research report 8694, Inria. March 2015.  
+Cartography & Analysis.* Technical Report RR-8694, Inria. March 2015.  
 [4] G. Pagano, D. Dosimont, G. Huard, V. Marangozova-Martin, and J. M.
-Vincent.  Trace Management and Analysis for Embedded Systems. In *Embedded
-Multicore Socs (MCSoC), 122, Sept 2013.*  
+Vincent.  *Trace Management and Analysis for Embedded Systems.* In Embedded
+Multicore Socs (MCSoC), 122, Sept 2013.  
 [5] Damien Dosimont, Lucas Mello Schnorr, Guillaume Huard, and Jean-Marc
-Vincent. A Trace Macroscopic Description based on Time Aggregation. Technical
+Vincent. *A Trace Macroscopic Description based on Time Aggregation.* Technical
 Report RR-8524, Apr 2014.  Trace visualization; trace analysis; trace
 overview; time aggregation; parallel systems; embedded systems; information
 theory; scientific computation; multimedia appli- cation; debugging;
