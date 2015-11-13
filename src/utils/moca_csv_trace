@@ -1,0 +1,23 @@
+#!/bin/bash
+if [ -z $1 ]
+then
+    echo "Usage $0 output.csv"
+    exit 1
+fi
+
+echo "Virtual Addr,Physical Addr, R, W, CPUMask, StartTime, EndTime, Task" > $1
+
+cpt=0
+for f in Moca-task*
+do
+    echo $f
+    awk '/^T/{T=$2} /^C/{S=$4;E=$5} /^A/{print $2","$3","$4","$5","$6","S","E","T}' < $f >> $1
+    cpt=$(( $cpt + 1 ))
+done
+if [ $cpt -eq 0 ]
+then
+    echo "No trace file found, re run this script from a Moca trace directory"
+    exit 1
+else
+    echo "$cpt Moca files merged in $1"
+fi
