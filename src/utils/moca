@@ -192,7 +192,8 @@ child()
     then
         $cmd $args
     else
-        $cmd $args > $logfile 2> $logfile.err
+        pin -xyzzy -enable_vsm 0 -t $install_dir/obj-*/*.so -- $cmd $args \
+            > $logfile 2> $logfile.err
     fi
     ret=$?
     echo "$program ended code $ret"
