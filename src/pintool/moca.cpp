@@ -53,13 +53,13 @@
 #define REAL_TID(tid) ((tid)>=2 ? (tid)-1 : (tid))
 #define ACC_T_READ 0
 #define ACC_T_WRITE 1
-#define PAGE_MAPPING_CHECK_THRESHOLD 1000 // Check page mapping every 1000 acces by one thread to one page
 
 char TYPE_NAME[2]={'R','W'};
 
 const int MAXTHREADS = 1024;
 int PAGESIZE;
 unsigned int REAL_PAGESIZE;
+KNOB<string>output_path(KNOB_MODE_WRITEONCE,"pintool", "o", "", "Output in directory (default \"\")");
 
 
 
@@ -80,8 +80,6 @@ array<UINT64, MAXTHREADS> stackmax;  // tid -> stack base address from file (unp
 map<UINT32, UINT64> stackmap;        // stack base address from pinned application
 
 string img_name;
-
-
 
 
 long GetStackSize()
@@ -109,12 +107,12 @@ VOID ThreadStart(THREADID tid, CONTEXT *ctxt, INT32 flags, VOID *v)
     ofstream ofs;
     if(tid==0)
     {
-        ofs.open(img_name + ".stackmap.csv");
+        ofs.open(output_path.Value()+string("/")+img_name + ".stackmap.csv");
         ofs << "tid,stackmax,sz"<<endl;
     }
     else
     {
-        ofs.open(img_name + ".stackmap.csv", std::ios_base::app);
+        ofs.open(output_path.Value()+string("/")+img_name + ".stackmap.csv", std::ios_base::app);
     }
     ofs << REAL_TID(tid) <<"," << stackmap[pid] <<","<< GetStackSize() << endl;
     ofs.close();
@@ -124,74 +122,15 @@ VOID ThreadStart(THREADID tid, CONTEXT *ctxt, INT32 flags, VOID *v)
 
 //retrieve structures names address and size
 int getStructs(const char* file);
-string get_struct_name(string str, int ln, string fname, int rec);
+/* string get_struct_name(string str, int ln, string fname, int rec); */
 
-string get_complex_struct_name(int ln, string fname)
-{
-    ifstream fstr(fname);
-    int lastmalloc=0;
-    // Find the real malloc line
-    string line,allocstr;
-    for(int i=0; i< ln; ++i)
-    {
-        getline(fstr, line);
-        if(line.find("alloc")!=string::npos)
-        {
-            allocstr=line;
-            lastmalloc=i;
-        }
-    }
-    fstr.close();
-    if(allocstr.find("=")==string::npos)
-    {
-        /*
-         * Allocation split among several lines,
-         * we assume it looks like
-         *  foo =
-         *      malloc(bar)
-         *  Note:
-         *      if foo and '=' are on different lines, we will give up
-         */
-        fstr.open(fname);
-        for(int i=0; i< lastmalloc; ++i)
-        {
-            getline(fstr, line);
-            if(line.find("=")!=string::npos)
-                allocstr=line;
-        }
-        fstr.close();
-    }
-    //Now that we have the good line, extract the struct name
-    return get_struct_name(allocstr, ln, fname, 1/*forbid recursive calls*/);
-}
-
-string get_struct_name(string str, int ln, string fname, int hops)
-{
-    if( str.find(string("alloc"))==string::npos && hops==0)
-        return get_complex_struct_name(ln, fname); //Return Ip is not malloc line
-    // Remove everything after first '='
-    string ret=str.substr(0,str.find('='));
-    //remove trailing whitespaces
-    while(ret.back()==' ')
-        ret.resize(ret.size()-1);
-    // Take the last word
-    ret=ret.substr(ret.find_last_of(string(" )*"))+1)+string(":")+fname+
-        string(":")+str;
-    // Our search have failed, it will be an anonymous malloc
-    // if(ret.compare("")==0)
-    // {
-    //     cerr << "Unable to find a suitable alloc name for file  "
-    //         << fname << " l: " << ln << endl;
-    //     return string("AnonymousStruct");
-    // }
-    return ret;
-}
 
 VOID PREMALLOC(ADDRINT retip, THREADID tid, ADDRINT sz)
 {
     int col, ln;
     int id=REAL_TID(tid);
-    static int warned=0;
+    static int anonid=0;
+    /* static int warned=0; */
     string fname;
     if( (unsigned int) sz >= REAL_PAGESIZE)
     {
@@ -199,25 +138,11 @@ VOID PREMALLOC(ADDRINT retip, THREADID tid, ADDRINT sz)
         PIN_LockClient();
         PIN_GetSourceLocation 	(retip, &col, &ln, &fname);
         PIN_UnlockClient();
-        //TODO: optimize this to read file only once
-        ifstream fstr(fname);
-        string line;
-        if(!fstr)
+        if(fname.compare("")!=0){
+            Allocs[id].sym=fname+string(":") + to_string(ln);
+        }else
         {
-            if(!warned || fname.compare("")!=0)
-            {
-                cerr << "Can't open file '" << fname << "', malloc will be anonymous"<< endl;
-                cerr << "Have you compiled your program with '-g' flag ?" <<endl;
-                warned=1;
-            }
-            Allocs[id].sym=fname.compare("")==0?"AnonymousStruct":fname+string(":")+line;
-        }
-        else
-        {
-            for(int i=0; i< ln; ++i)
-                getline(fstr, line);
-            fstr.close();
-            Allocs[id].sym=get_struct_name(line, ln, fname, 0/*allow recursive calls*/);
+            Allocs[id].sym="UnnamedStruct#" + to_string(anonid++);
         }
         Allocs[id].sz=sz;
         Allocs[id].ended=0;
@@ -226,13 +151,10 @@ VOID PREMALLOC(ADDRINT retip, THREADID tid, ADDRINT sz)
 VOID POSTMALLOC(ADDRINT ret, THREADID tid)
 {
     int id=REAL_TID(tid);
-    static int anonymousId=0;
+    //static int anonymousId=0;
     if (Allocs[id].ended==0)
     {
-        fstructStream << Allocs[id].sym;
-        if(Allocs[id].sym.compare("AnonymousStruct")==0)
-            fstructStream << anonymousId++;
-        fstructStream <<","<<ret<<","<<Allocs[id].sz<<endl;
+        fstructStream  << Allocs[id].sym <<","<<ret<<","<<Allocs[id].sz<<endl;
         Allocs[id].ended=1;
     }
 }
@@ -242,9 +164,7 @@ VOID binName(IMG img, VOID *v)
     if (IMG_IsMainExecutable(img))
     {
         img_name = basename(IMG_Name(img).c_str());
-        char fname[255];
-        sprintf(fname, "%s.structs.csv", img_name.c_str());
-        fstructStream.open(fname);
+        fstructStream.open(output_path.Value()+string("/")+img_name+string(".structs.csv"));
         fstructStream << "name,start,sz" << endl;
 
     }
@@ -266,15 +186,8 @@ VOID binName(IMG img, VOID *v)
 
 VOID Fini(INT32 code, VOID *v)
 {
-    //print_numa();
     fstructStream.close();
-    //delete CPU_NODE;
-
-    //cout << endl << "MAXTHREADS: " << MAXTHREADS << " PAGESIZE: " << PAGESIZE << " INTERVAL: " << INTERVAL << endl << endl;
 }
-
-
-
 
 int main(int argc, char *argv[])
 {
@@ -283,15 +196,6 @@ int main(int argc, char *argv[])
 
     REAL_PAGESIZE=sysconf(_SC_PAGESIZE);
     PAGESIZE = log2(REAL_PAGESIZE);
-
-    //THREADID t = PIN_SpawnInternalThread(mythread, NULL, 0, NULL);
-    //if (t!=1)
-    //    cerr << "ERROR internal thread " << t << endl;
-
-
-    //INS_AddInstrumentFunction(trace_memory_page, 0);
-
-
 
 
     IMG_AddInstrumentFunction(binName, 0);

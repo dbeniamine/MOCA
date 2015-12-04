@@ -32,6 +32,8 @@ usage()
     echo "  -D dirname        Set the output directory MUST be an absolute path.
     Default: $logdir"
     echo "  -G                Do not generate framesoc's files"
+    echo "  -P                Do not use pin (needed for structure name
+                              detection)"
     echo -e "\n  The following parameters allows you to do fine tuning on the
     module. By default you shouldn't need to use them.
     + If you encounter performance issues, you can increase the wakeup
@@ -78,7 +80,9 @@ timer()
 }
 
 initime=$(timer)
-install_dir="$(dirname $0)/../../"
+install_dir="$(dirname $0)/../.."
+pintooldir=$install_dir/src/pintool
+pin=true
 kernLogFile="Moca"
 procdir="/proc/Moca"
 log_thread_interval=.4
@@ -87,7 +91,7 @@ name=$(basename $0)
 compi=true
 framesoc=true
 
-while getopts "c:ha:d:f:l:w:p:b:S:C:D:L:nHFG" opt
+while getopts "c:ha:d:f:l:w:p:b:S:C:D:L:nHFGP" opt
 do
     case $opt in
         c)
@@ -151,6 +155,9 @@ do
         G)
             framesoc=false
             ;;
+        P)
+            pin=false
+            ;;
         *)
             usage
             exit 1
@@ -176,6 +183,8 @@ if [ -z "$logdir" ]
 then
     logdir="$(pwd)/Moca-$program-$(date +%Y-%m-%d_%H-%M-%S)"
 fi
+
+
 mkdir $logdir
 
 if [ -z "$logfile" ]
@@ -192,8 +201,13 @@ child()
     then
         $cmd $args
     else
-        pin -xyzzy -enable_vsm 0 -t $install_dir/obj-*/*.so -- $cmd $args \
-            > $logfile 2> $logfile.err
+        if $pin
+        then
+            pincmd="pin -xyzzy -enable_vsm 0 -t $pintooldir/obj-*/*.so -o $logdir --"
+        else
+            pincmd=""
+        fi
+        $pincmd $cmd $args > $logfile 2> $logfile.err
     fi
     ret=$?
     echo "$program ended code $ret"
@@ -230,15 +244,20 @@ then
     schedtool -F -p $prio $$
     schedtool -F -p $user_prio $pid
 fi
-cd $install_dir/src/module/
 if $compi
 then
-    make clean && make
+    cd $install_dir/src/
+    if $pin
+    then
+        target=""
+    else
+        target="module/moca.ko"
+    fi
+    echo "$PWD make $target"
+    make $target
     abort_on_error $? "make fail"
 fi
-# make install
-# abort_on_error $? "Install fail"
-insmod moca.ko Moca_mainPid=$pid $moca_interval $moca_bits $moca_factor \
+insmod $install_dir/src/module/moca.ko Moca_mainPid=$pid $moca_interval $moca_bits $moca_factor \
     $Moca_false_pf $Moca_ugly $moca_chunks $moca_prio
 abort_on_error $? "unable to load module"
 cd -
