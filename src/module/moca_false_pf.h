@@ -24,7 +24,7 @@
 #include <asm/pgtable.h>
 
 // Init data struct required for managing false pf hack
-void Moca_InitFalsePf(void);
+int Moca_InitFalsePf(void);
 void Moca_ClearFalsePfData(void);
 
 // Marks the nb addr as not present and save them as false page fault

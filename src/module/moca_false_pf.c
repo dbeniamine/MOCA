@@ -217,15 +217,22 @@ void Moca_FalsePfInitializer(void *e)
     f->status=0;
 }
 
-void Moca_InitFalsePf(void)
+int Moca_InitFalsePf(void)
 {
     if(!Moca_use_false_pf  || Moca_false_pf_ugly)
-        return;
-    Moca_falsePfMap=Moca_InitHashMap(MOCA_FALSE_PF_HASH_BITS,
+        return 0;
+    if(!(Moca_falsePfMap=Moca_InitHashMap(MOCA_FALSE_PF_HASH_BITS,
             2*(1<<MOCA_FALSE_PF_HASH_BITS),sizeof(struct _Moca_falsePf),
-            &Moca_FalsePfComparator, &Moca_FalsePfInitializer);
+            &Moca_FalsePfComparator, &Moca_FalsePfInitializer)))
+        return 1;
     rwlock_init(&Moca_fpfRWLock);
-    Moca_recentlyFixed=kcalloc(NR_CPUS,sizeof(unsigned long),GFP_KERNEL);
+    if(!(Moca_recentlyFixed=kcalloc(NR_CPUS,sizeof(unsigned long),GFP_KERNEL)))
+    {
+        Moca_FreeMap(Moca_falsePfMap);
+        return 2;
+    }
+
+    return 0;
 }
 
 void Moca_ClearFalsePfData(void)

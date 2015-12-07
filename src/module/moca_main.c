@@ -137,7 +137,8 @@ static int __init Moca_Init(void)
 {
     printk(KERN_NOTICE "Moca started\n");
     Moca_PrintConfig();
-    Moca_InitFalsePf();
+    if(Moca_InitFalsePf()!=0)
+        return -1;
     MOCA_DEBUG_PRINT("Moca false Pf ready \n");
     //Remove previous Moca entries
     if(Moca_InitProcessManagment(Moca_mainPid)!=0)
