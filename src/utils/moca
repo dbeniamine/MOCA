@@ -195,7 +195,14 @@ kernLogFile="$logdir/$kernLogFile"
 
 panic()
 {
+    # Give some time to MOCA for removing probes
+    sleep 5
+    # Kill subprocesses
+    kill -TERM  -- -$(pgrep -o $(basename $0))
+    # Flush all data
     cat $procdir/* > /dev/null 2>&1
+    # Exit
+    exit 1
 }
 
 child()
