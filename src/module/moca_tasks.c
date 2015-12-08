@@ -49,22 +49,27 @@ int Moca_InitProcessManagment(int id)
     // Monitored pids
     struct pid *pid;
     rwlock_init(&Moca_tasksLock);
-    Moca_tasksMap=Moca_InitHashMap(Moca_tasksHashBits,
+    if(!(Moca_tasksMap=Moca_InitHashMap(Moca_tasksHashBits,
             2*(1<<Moca_tasksHashBits), sizeof(struct _moca_task), NULL,
-            Moca_TaskInitializer);
+            Moca_TaskInitializer)))
+        goto fail;
     rcu_read_lock();
     pid=find_vpid(id);
     if(!pid)
     {
         // Skip internal process
         rcu_read_unlock();
-        Moca_Panic("Moca unable to find pid for init task");
-        return 1;
+        goto clean;
     }
     Moca_initTask=pid_task(pid, PIDTYPE_PID);
     rcu_read_unlock();
-    Moca_InitTaskData();
+    if(Moca_InitTaskData()!=0)
+        goto clean;
     return 0;
+clean:
+    Moca_FreeMap(Moca_tasksMap);
+fail:
+    return 1;
 
 }
 
@@ -159,10 +164,11 @@ moca_task Moca_AddTask(struct task_struct *t)
     switch(status)
     {
         case MOCA_HASHMAP_FULL:
-            Moca_Panic("Moca Too many pids");
-            break;
+            printk("Moca Too many pids");
+            Moca_RemoveTask(t);
+            return NULL;
         case MOCA_HASHMAP_ERROR:
-            Moca_Panic("Moca unhandeled hashmap error");
+            printk("Moca unhandeled hashmap error");
             break;
         case  MOCA_HASHMAP_ALREADY_IN_MAP:
             MOCA_DEBUG_PRINT("Moca Adding an already exixsting task %p\n", t);

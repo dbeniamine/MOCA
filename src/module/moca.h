@@ -33,8 +33,6 @@
 #include <linux/version.h>
 
 
-// Panic exit function
-void Moca_Panic(const char *s);
 //Clocks managment
 void Moca_UpdateClock(void);
 long Moca_GetClock(void);

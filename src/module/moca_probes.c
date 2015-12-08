@@ -83,11 +83,11 @@ int Moca_RegisterProbes(void)
     MOCA_DEBUG_PRINT("Moca registering probes\n");
 
     if ((ret=register_jprobe(&Moca_ExitProbe)))
-        Moca_Panic("Unable to register do exit probe");
+        return ret;
 
     if ((ret=register_jprobe(&Moca_Faultjprobe)))
-        Moca_Panic("Moca Unable to register pte fault probe");
-    MOCA_DEBUG_PRINT("Moca registered probes\n");
+        unregister_jprobe(&Moca_ExitProbe);
+    MOCA_DEBUG_PRINT("Moca registered probes:%d\n", ret);
     return ret;
 }
 

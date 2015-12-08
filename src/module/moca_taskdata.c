@@ -107,12 +107,13 @@ int Moca_CurrentChunk(task_data data)
     return ret;
 }
 
-void Moca_InitTaskData(void)
+int Moca_InitTaskData(void)
 {
     //Procfs init
     Moca_proc_root=proc_mkdir("Moca", NULL);
     if(!Moca_proc_root)
-        Moca_Panic("Moca Unable to create proc root entry");
+        return 1;
+    return 0;
 }
 
 void Moca_ChunkEntryInitializer(void *e)
@@ -132,26 +133,18 @@ task_data Moca_InitData(struct task_struct *t)
     data=kmalloc(sizeof(struct _task_data),GFP_ATOMIC);
     MOCA_DEBUG_PRINT("Moca Initialising data for task %p\n",t);
     if(!data)
-    {
-        Moca_Panic("Moca unable to allocate data ");
-        return NULL;
-    }
+        goto fail;
     data->chunks=kmalloc(sizeof(chunk)*Moca_nbChunks,GFP_ATOMIC);
     if(!data->chunks)
     {
-        kfree(data);
-        Moca_Panic("Moca unable to allocate chunks");
-        return NULL;
+        goto clean;
     }
     for(i=0;i<Moca_nbChunks;i++)
     {
         MOCA_DEBUG_PRINT("Moca Initialising data chunk %d for task %p\n",i, t);
         data->chunks[i]=kmalloc(sizeof(chunk),GFP_ATOMIC);
         if(!data->chunks[i])
-        {
-            Moca_Panic("Moca unable to allocate data chunk");
-            return NULL;
-        }
+            goto cleanChunks;
         data->chunks[i]->cpu=0;
         data->chunks[i]->startClock=-1;
         data->chunks[i]->used=MOCA_CHUNK_NORMAL;
@@ -160,7 +153,7 @@ task_data Moca_InitData(struct task_struct *t)
                 Moca_ChunkEntryInitializer);
         spin_lock_init(&data->chunks[i]->lock);
         if(!data->chunks[i]->map)
-            Moca_Panic("Cannot allocate hash map for taskdata");
+            goto cleanChunks;
     }
     data->task=t;
     data->cur=0;
@@ -174,6 +167,20 @@ task_data Moca_InitData(struct task_struct *t)
     data->currentlyFlushedPos=-1;
     spin_lock_init(&data->lock);
     return data;
+
+cleanChunks:
+    i=0;
+    while(i< Moca_nbChunks && data->chunks[i]!=NULL)
+    {
+        if(data->chunks[i]->map!=NULL)
+            kfree(data->chunks[i]->map);
+        kfree(data->chunks[i]);
+    }
+clean:
+    kfree(data);
+fail:
+        return NULL;
+
 }
 
 void Moca_ClearAllData(void)
@@ -262,7 +269,7 @@ int Moca_AddToChunk(task_data data, void *addr, int cpu, int write)
             break;
         case MOCA_HASHMAP_ERROR :
             spin_unlock(&data->chunks[cur]->lock);
-            Moca_Panic("Moca hashmap error");
+            printk("Moca hashmap error");
             return -1;
             break;
         case MOCA_HASHMAP_ALREADY_IN_MAP :
@@ -357,7 +364,7 @@ int Moca_CpuMask(int cpu, char *buf, size_t size)
     }
     if( i>=size)
     {
-        Moca_Panic("Moca Buffer overflow in CpuMask");
+        printk("Moca Buffer overflow in CpuMask");
         return 0;
     }
     return i;

@@ -142,7 +142,6 @@ hash_entry Moca_EntryFromKey(hash_map map, hash_entry e)
     {
         printk("Moca Hashmap ind %d >= max: %u\n",ind, map->tableSize);
         dump_stack();
-        Moca_Panic("HASMAP ERROR");
         return NULL;
     }
     if(ind >=0)
@@ -182,7 +181,6 @@ hash_entry Moca_AddToMap(hash_map map, hash_entry e, int *status)
     if(nextPos >= map->tableSize)
     {
         *status=MOCA_HASHMAP_ERROR;
-        Moca_Panic("Moca hashmap BUG in AddToMap");
         return NULL;
     }
     //Update the link
@@ -277,10 +275,7 @@ int Moca_ConditionalRemove(hash_map map, int (*fct)(void*))
                 while(prev>=0 && tableElt(map,prev)->next!=ind)
                     prev=tableElt(map,prev)->next;
                 if(prev==MOCA_HASHMAP_END)
-                {
-                    Moca_Panic("Bad link in hashmap");
                     return -1;
-                }
                 tableElt(map,prev)->next=e->next;
             }
             e->key=NULL;

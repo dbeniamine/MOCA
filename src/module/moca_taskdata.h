@@ -24,7 +24,7 @@ typedef struct _task_data *task_data;
 // Current number of monitored tasks
 extern int Moca_GetNumTasks(void);
 
-void Moca_InitTaskData(void);
+int Moca_InitTaskData(void);
 task_data Moca_InitData(struct task_struct *t);
 void Moca_ClearAllData(void);
 

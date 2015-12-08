@@ -276,7 +276,7 @@ void Moca_AddFalsePf(struct mm_struct *mm, unsigned long address)
                 ++try;
                 break;
             case MOCA_HASHMAP_ERROR:
-                Moca_Panic("Moca unhandled hashmap error");
+                MOCA_DEBUG_PRINT("Moca unhandled hashmap error");
                 return;
             case  MOCA_HASHMAP_ALREADY_IN_MAP:
                 MOCA_DEBUG_PRINT("Moca Reusing bad false PF %lx %p\n", address, mm);

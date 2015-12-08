@@ -93,7 +93,7 @@ int Moca_InitThreads(void)
     MOCA_DEBUG_PRINT("Moca kthread task %p\n", Moca_threadTask);
     if(!Moca_threadTask)
     {
-        Moca_Panic("Moca Kthread create failed");
+        MOCA_DEBUG_PRINT("Moca Kthread create failed");
         return -1;
     }
     get_task_struct(Moca_threadTask);
@@ -119,11 +119,11 @@ void Moca_CleanUp(void)
     MOCA_DEBUG_PRINT("Moca Removing falsepf\n");
     MOCA_DEBUG_PRINT("Moca Unregistering probes\n");
     Moca_UnregisterProbes();
-    //Moca_WLockPf();
-    //Moca_ClearFalsePfData();
-    //MOCA_DEBUG_PRINT("Moca Removed falsepf\n");
-    //MOCA_DEBUG_PRINT("Moca Removing False Pf data\n");
-    //Moca_WUnlockPf();
+    MOCA_DEBUG_PRINT("Moca Removing False Pf data\n");
+    Moca_WLockPf();
+    Moca_ClearFalsePfData();
+    Moca_WUnlockPf();
+    MOCA_DEBUG_PRINT("Moca Removed falsepf\n");
     MOCA_DEBUG_PRINT("Moca Removing shared data\n");
     Moca_CleanProcessData();
     MOCA_DEBUG_PRINT("Moca Removed shared data\n");
@@ -138,21 +138,32 @@ static int __init Moca_Init(void)
     printk(KERN_NOTICE "Moca started\n");
     Moca_PrintConfig();
     if(Moca_InitFalsePf()!=0)
-        return -1;
+        goto fail;
     MOCA_DEBUG_PRINT("Moca false Pf ready \n");
     //Remove previous Moca entries
     if(Moca_InitProcessManagment(Moca_mainPid)!=0)
-        return -1;
+        goto cleanPf;
     MOCA_DEBUG_PRINT("Moca common data ready \n");
     if(Moca_InitThreads()!=0)
-        return -2;
+        goto cleanProcess;
     MOCA_DEBUG_PRINT("Moca threads ready \n");
     if(Moca_RegisterProbes()!=0)
-        return -3;
+        goto cleanThreads;
     MOCA_DEBUG_PRINT("Moca probes ready \n");
     printk(KERN_NOTICE "Moca correctly intialized\n");
     Moca_Activated=1;
     return 0;
+
+cleanThreads:
+    kthread_stop(Moca_threadTask);
+cleanProcess:
+    Moca_CleanProcessData();
+cleanPf:
+    Moca_WLockPf();
+    Moca_ClearFalsePfData();
+    Moca_WUnlockPf();
+fail:
+    return 1;
 }
 
 // function called by rmmod
@@ -161,16 +172,6 @@ static void __exit Moca_Exit(void)
     printk(KERN_NOTICE "Moca exiting\n");
     Moca_CleanUp();
     printk(KERN_NOTICE "Moca exited\n");
-}
-
-// Panic exit function
-void Moca_Panic(const char *s)
-{
-    printk(KERN_ALERT "Moca panic:\n%s\n", s);
-    struct task_struct * t=pid_task(Moca_mainPid, PIDTYPE_PID)
-    if(t)
-        kill_pid(t,SIGINT,1);
-    Moca_CleanUp();
 }
 
 int Moca_IsActivated(void)
