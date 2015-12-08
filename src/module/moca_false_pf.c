@@ -239,17 +239,18 @@ void Moca_ClearFalsePfData(void)
 {
     int i;
     Moca_FalsePf p;
-    if(!Moca_use_false_pf || Moca_false_pf_ugly)
+    if(!Moca_use_false_pf || Moca_false_pf_ugly || !Moca_falsePfMap)
         return;
-    MOCA_DEBUG_PRINT("Moca removing all false pf\n");
-    while((p=(Moca_FalsePf)Moca_NextEntryPos(Moca_falsePfMap, &i))!=NULL)
-        if(p->status==MOCA_FALSE_PF_VALID)
-        {
-            if(Moca_FixAddr((unsigned long)p->key, NULL,current->on_cpu)==0)
-                p->status=MOCA_FALSE_PF_BAD;
-        }
-    MOCA_DEBUG_PRINT("Moca removing all false map%p\n",Moca_falsePfMap);
+    // MOCA_DEBUG_PRINT("Moca removing all false pf\n");
+    // while((p=(Moca_FalsePf)Moca_NextEntryPos(Moca_falsePfMap, &i))!=NULL)
+    //     if(p->status==MOCA_FALSE_PF_VALID)
+    //     {
+    //         if(Moca_FixAddr((unsigned long)p->key, NULL,current->on_cpu)==0)
+    //             p->status=MOCA_FALSE_PF_BAD;
+    //     }
+    MOCA_DEBUG_PRINT("Moca removing false pf map%p\n",Moca_falsePfMap);
     Moca_FreeMap(Moca_falsePfMap);
+    Moca_falsePfMap=NULL;
 }
 
 void Moca_AddFalsePf(struct mm_struct *mm, unsigned long address)
