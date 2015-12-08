@@ -167,6 +167,9 @@ static void __exit Moca_Exit(void)
 void Moca_Panic(const char *s)
 {
     printk(KERN_ALERT "Moca panic:\n%s\n", s);
+    struct task_struct * t=pid_task(Moca_mainPid, PIDTYPE_PID)
+    if(t)
+        kill_pid(t,SIGINT,1);
     Moca_CleanUp();
 }
 

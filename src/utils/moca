@@ -193,9 +193,15 @@ then
 fi
 kernLogFile="$logdir/$kernLogFile"
 
-# Wait for the kernel module to start
+panic()
+{
+    cat $procdir/* > /dev/null 2>&1
+}
+
 child()
 {
+    trap panic SIGINT
+    # Wait for the kernel module to start
     kill -s SIGSTOP $BASHPID
     if [ -z "$logfile" ]
     then
