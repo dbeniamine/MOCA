@@ -134,7 +134,7 @@ task_data Moca_InitData(struct task_struct *t)
     MOCA_DEBUG_PRINT("Moca Initialising data for task %p\n",t);
     if(!data)
         goto fail;
-    data->chunks=kmalloc(sizeof(chunk)*Moca_nbChunks,GFP_ATOMIC);
+    data->chunks=kcalloc(Moca_nbChunks,sizeof(chunk),GFP_ATOMIC);
     if(!data->chunks)
     {
         goto clean;
@@ -142,7 +142,7 @@ task_data Moca_InitData(struct task_struct *t)
     for(i=0;i<Moca_nbChunks;i++)
     {
         MOCA_DEBUG_PRINT("Moca Initialising data chunk %d for task %p\n",i, t);
-        data->chunks[i]=kmalloc(sizeof(chunk),GFP_ATOMIC);
+        data->chunks[i]=kcalloc(1,sizeof(chunk),GFP_ATOMIC);
         if(!data->chunks[i])
             goto cleanChunks;
         data->chunks[i]->cpu=0;
@@ -151,9 +151,9 @@ task_data Moca_InitData(struct task_struct *t)
         data->chunks[i]->map=Moca_InitHashMap(Moca_taskDataHashBits,
                 Moca_taskDataChunkSize, sizeof(struct _chunk_entry), NULL,
                 Moca_ChunkEntryInitializer);
-        spin_lock_init(&data->chunks[i]->lock);
         if(!data->chunks[i]->map)
             goto cleanChunks;
+        spin_lock_init(&data->chunks[i]->lock);
     }
     data->task=t;
     data->cur=0;
@@ -173,8 +173,9 @@ cleanChunks:
     while(i< Moca_nbChunks && data->chunks[i]!=NULL)
     {
         if(data->chunks[i]->map!=NULL)
-            kfree(data->chunks[i]->map);
+            Moca_FreeMap(data->chunks[i]->map);
         kfree(data->chunks[i]);
+        ++i;
     }
 clean:
     kfree(data);
