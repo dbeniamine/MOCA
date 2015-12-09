@@ -33,7 +33,7 @@ unsigned long Moca_tasksHashBits=14;
 DEFINE_RWLOCK(Moca_tasksLock);
 
 // Monitored process
-hash_map Moca_tasksMap;
+hash_map Moca_tasksMap=NULL;
 struct task_struct *Moca_initTask=NULL;
 
 moca_task Moca_AddTask(struct task_struct *t);
@@ -79,6 +79,7 @@ void Moca_CleanProcessData(void)
     {
         Moca_ClearAllData();
         Moca_FreeMap(Moca_tasksMap);
+        Moca_tasksMap=NULL;
     }
 }
 

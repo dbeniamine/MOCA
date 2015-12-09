@@ -53,7 +53,7 @@ int Moca_nbChunks=30;
 
 
 
-static struct proc_dir_entry *Moca_proc_root;
+static struct proc_dir_entry *Moca_proc_root=NULL;
 
 static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
         size_t length, loff_t * offset);

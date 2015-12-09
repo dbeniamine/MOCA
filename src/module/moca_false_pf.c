@@ -39,7 +39,7 @@
  */
 int Moca_use_false_pf=1;
 int Moca_false_pf_ugly=0;
-unsigned long *Moca_recentlyFixed;
+unsigned long *Moca_recentlyFixed=NULL;
 
 
 typedef struct _Moca_falsePf
@@ -50,7 +50,7 @@ typedef struct _Moca_falsePf
     int status;
 }*Moca_FalsePf;
 
-hash_map Moca_falsePfMap;
+hash_map Moca_falsePfMap=NULL;
 DEFINE_RWLOCK(Moca_fpfRWLock);
 
 
@@ -237,20 +237,19 @@ int Moca_InitFalsePf(void)
 
 void Moca_ClearFalsePfData(void)
 {
-    int i;
-    Moca_FalsePf p;
-    if(!Moca_use_false_pf || Moca_false_pf_ugly || !Moca_falsePfMap)
+    if(!Moca_use_false_pf || Moca_false_pf_ugly)
         return;
-    // MOCA_DEBUG_PRINT("Moca removing all false pf\n");
-    // while((p=(Moca_FalsePf)Moca_NextEntryPos(Moca_falsePfMap, &i))!=NULL)
-    //     if(p->status==MOCA_FALSE_PF_VALID)
-    //     {
-    //         if(Moca_FixAddr((unsigned long)p->key, NULL,current->on_cpu)==0)
-    //             p->status=MOCA_FALSE_PF_BAD;
-    //     }
     MOCA_DEBUG_PRINT("Moca removing false pf map%p\n",Moca_falsePfMap);
-    Moca_FreeMap(Moca_falsePfMap);
-    Moca_falsePfMap=NULL;
+    if(Moca_recentlyFixed)
+    {
+        kfree(Moca_recentlyFixed);
+        Moca_recentlyFixed=NULL;
+    }
+    if(Moca_falsePfMap)
+    {
+        Moca_FreeMap(Moca_falsePfMap);
+        Moca_falsePfMap=NULL;
+    }
 }
 
 void Moca_AddFalsePf(struct mm_struct *mm, unsigned long address)
