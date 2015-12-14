@@ -135,6 +135,7 @@ void Moca_CleanUp(void)
 // Fuction called by insmod
 static int __init Moca_Init(void)
 {
+    int fail=0;
     printk(KERN_NOTICE "Moca started\n");
     Moca_PrintConfig();
     if(Moca_InitFalsePf()!=0)
@@ -155,14 +156,18 @@ static int __init Moca_Init(void)
     return 0;
 
 cleanThreads:
+    fail=3;
     kthread_stop(Moca_threadTask);
 cleanProcess:
+    fail=2;
     Moca_CleanProcessData();
 cleanPf:
+    fail=1;
     Moca_WLockPf();
     Moca_ClearFalsePfData();
     Moca_WUnlockPf();
 fail:
+    printk(KERN_NOTICE "Moca failed at initialization: %d\n", fail);
     return 1;
 }
 

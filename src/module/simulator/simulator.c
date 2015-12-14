@@ -23,29 +23,29 @@
 #include <stdint.h>
 #include <pthread.h>
 #define MAX_FILES 100
-#define nbTh 100
-#define nbRTh 20
 #define POOL_SIZE PAGE_SIZE*20
 
 int nbIterations=100000;
+int nbTh=100;
+int nbRTh=20;
 int FlusherShouldDie=0;
 int MonitorShouldDie=0;
 pthread_t MonitorTh;
 
 struct file moca_files[MAX_FILES];
 atomic_t nb_files=ATOMIC_INIT(1);
-struct task_struct *tasks[nbTh];
+struct task_struct **tasks;
 
 
-pthread_t threads[nbTh];
+pthread_t *threads;
 pthread_t FlusherTh;
 
 
 
 extern int Moca_MonitorThread(void * arg);
 
-extern int Moca_HandlerPost(struct kretprobe_instance *ri,
-        struct pt_regs *regs);
+/* extern int Moca_HandlerPost(struct kretprobe_instance *ri,
+        struct pt_regs *regs); */
 
 extern void Moca_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
         unsigned long address, unsigned int flags);
@@ -114,6 +114,7 @@ struct task_struct *init_task(struct task_struct *parent)
     return t;
 }
 
+
 void Init_mm_tasks(void)
 {
     int i;
@@ -123,7 +124,7 @@ void Init_mm_tasks(void)
     for(i=2; i< nbRTh;++i)
         tasks[i]=init_task(tasks[i-1]);
     // Un monitored tasks
-    tasks[i]=init_task(NULL);
+    tasks[i++]=init_task(NULL);
     while(i<nbTh)
     {
         tasks[i]=init_task(tasks[i-1]);
@@ -141,6 +142,8 @@ struct task_struct *pid_task(int pid, int type)
 void do_exit(struct task_struct *t, int reinit)
 {
     struct mm_struct *oldmm=t->mm;
+    struct vm_area_struct *oldvma=t->vma;
+    pgd_t *oldpgd=t->mm->pgd;
     Moca_ExitHandler(NULL,t->vma,0UL,0UL);
     if(reinit)
     {
@@ -148,10 +151,11 @@ void do_exit(struct task_struct *t, int reinit)
     }
     else
     {
-        t->mm=NULL;
-        t->vma->vm_mm=NULL;
+        free(t);
     }
     free(oldmm);
+    free(oldvma);
+    free(oldpgd);
 }
 
 unsigned long pick_addr(struct mm_struct *mm)
@@ -189,15 +193,15 @@ void *do_stuff(void * arg)
             do_exit(self,1);
         else
             do_pagefault(self);
-        usleep(10);
-        Moca_HandlerPost(NULL,NULL);
+        //usleep(10);
+        //Moca_HandlerPost(NULL,NULL);
         /* printf("Thread %d sleeping iteration %d\n",id,i); */
         sleepifneeded();
         /* printf("Thread %d end iteration %d\n",id,i); */
     }
     msleep(10);
     do_exit(self,0);
-    Moca_HandlerPost(NULL,NULL);
+    //Moca_HandlerPost(NULL,NULL);
     return NULL;
 }
 
@@ -226,12 +230,55 @@ void *do_flush(void *arg)
 extern int Moca_Init(void);
 extern void Moca_Exit(void);
 
-int main()
+void usage(char *s)
+{
+    printf("Usage : %s [options]\n",s);
+    printf("Options in \n");
+    printf("-h      Display thi message and quit\n");
+    printf("-t num  Set the total number of thread to num, default %d\n", nbTh);
+    printf("-r num  Set the number of monitored thread to num, default %d\n", nbRTh);
+    printf("-i num  Set the number of iterations to num, default %d\n", nbIterations);
+}
+
+void parse_args(int argc, char **argv)
+{
+    int opt;
+    extern char *optarg;
+    printf("main pid %d\n", getpid());
+    while((opt=getopt(argc, argv, "t:r:i:h"))!=-1)
+    {
+        switch(opt)
+        {
+            case 't':
+                nbTh=atoi(optarg);
+                break;
+            case 'r':
+                nbRTh=atoi(optarg);
+                break;
+            case 'i':
+                nbIterations=atoi(optarg);
+                break;
+            case 'h':
+                usage(argv[0]);
+                exit(0);
+            default:
+                printf("Invalid argument %c\n", opt);
+                usage(argv[0]);
+                exit(1);
+        }
+    }
+
+}
+
+int main(int argc, char **argv)
 {
     int i;
     void *res;
+    parse_args(argc,argv);
     srand(time(NULL));
     printf("Init mm\n");
+    tasks=(struct task_struct **)malloc(sizeof(struct task_struct *)*nbTh);
+    threads=(pthread_t *)malloc(sizeof(pthread_t)*nbTh);
     //Init memory and "tasks"
     Init_mm_tasks();
     //Init data
@@ -257,5 +304,8 @@ int main()
     FlusherShouldDie=1;
     printf("Waiting for thread flusher\n");
     pthread_join(FlusherTh, &res);
+    printf("Cleaning\n");
+    kfree(tasks);
+    kfree(threads);
     printf("Simulator ended\n");
 }

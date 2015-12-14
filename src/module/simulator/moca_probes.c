@@ -42,9 +42,9 @@ void Moca_MmFaultHandler(struct mm_struct *mm, struct vm_area_struct *vma,
     }
     Moca_RLockPf();
     if(Moca_IsActivated())
-        Moca_AddToChunk(data,(void *)(address&PAGE_MASK),get_cpu(),flags&FAULT_FLAG_WRITE?1:0);
+        Moca_AddToChunk(data,(void *)(address),get_cpu(),flags&FAULT_FLAG_WRITE?1:0);
     MOCA_DEBUG_PRINT("Moca Pte fault task %p\n", current);
-    if(Moca_FixFalsePf(mm,address)!=0)
+    if(Moca_FixFalsePf(mm,address,get_cpu())!=0)
         MOCA_DEBUG_PRINT("Moca true page fault at %p %p \n", addr, mm);
     Moca_UpdateClock();
     Moca_RUnlockPf();
@@ -59,7 +59,7 @@ void Moca_ExitHandler(struct mmu_gather *tlb, struct vm_area_struct *start_vma,
     {
         MOCA_DEBUG_PRINT("Exit handler handler task %p, mm %p\n", NULL, NULL);
         Moca_RLockPf();
-        Moca_FixAllFalsePf(start_vma->vm_mm);
+        Moca_FixAllFalsePf(start_vma->vm_mm,get_cpu());
         Moca_RUnlockPf();
     }
     jprobe_return();
@@ -83,11 +83,12 @@ int Moca_RegisterProbes(void)
     MOCA_DEBUG_PRINT("Moca registering probes\n");
 
     if ((ret=register_jprobe(&Moca_ExitProbe)))
-        Moca_Panic("Unable to register do exit probe");
+        return ret;
 
     if ((ret=register_jprobe(&Moca_Faultjprobe)))
-        Moca_Panic("Moca Unable to register pte fault probe");
-    MOCA_DEBUG_PRINT("Moca registered probes\n");
+        unregister_jprobe(&Moca_ExitProbe);
+    else
+        MOCA_DEBUG_PRINT("Moca registered probes:%d\n", ret);
     return ret;
 }
 

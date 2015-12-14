@@ -32,7 +32,7 @@ usage()
     echo "  -D dirname        Set the output directory MUST be an absolute path.
     Default: $logdir"
     echo "  -G                Do not generate framesoc's files"
-    echo "  -P                Do not use pin (needed for structure name
+    echo "  -P                Do use pin (needed for structure name
                               detection)"
     echo -e "\n  The following parameters allows you to do fine tuning on the
     module. By default you shouldn't need to use them.
@@ -82,7 +82,7 @@ timer()
 initime=$(timer)
 install_dir="$(dirname $0)/../.."
 pintooldir=$install_dir/src/pintool
-pin=true
+pin=false
 kernLogFile="Moca"
 procdir="/proc/Moca"
 log_thread_interval=.4
@@ -156,7 +156,7 @@ do
             framesoc=false
             ;;
         P)
-            pin=false
+            pin=true
             ;;
         *)
             usage
@@ -193,21 +193,8 @@ then
 fi
 kernLogFile="$logdir/$kernLogFile"
 
-panic()
-{
-    # Give some time to MOCA for removing probes
-    sleep 5
-    # Kill subprocesses
-    kill -TERM  -- -$(pgrep -o $(basename $0))
-    # Flush all data
-    cat $procdir/* > /dev/null 2>&1
-    # Exit
-    exit 1
-}
-
 child()
 {
-    trap panic SIGINT
     # Wait for the kernel module to start
     kill -s SIGSTOP $BASHPID
     if [ -z "$logfile" ]
@@ -232,7 +219,7 @@ log()
     do
         for f in $(\ls $procdir)
         do
-            cat $procdir/$f >> $kernLogFile-$f.log
+            cat $procdir/$f >> $kernLogFile-$f.csv
         done
         sleep $log_thread_interval
     done

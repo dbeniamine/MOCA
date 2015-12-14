@@ -48,7 +48,6 @@ int Moca_InitProcessManagment(int id)
 {
     // Monitored pids
     struct pid *pid;
-    rwlock_init(&Moca_tasksLock);
     if(!(Moca_tasksMap=Moca_InitHashMap(Moca_tasksHashBits,
             2*(1<<Moca_tasksHashBits), sizeof(struct _moca_task), NULL,
             Moca_TaskInitializer)))
@@ -69,6 +68,7 @@ int Moca_InitProcessManagment(int id)
 clean:
     Moca_FreeMap(Moca_tasksMap);
 fail:
+    printk(KERN_NOTICE "Moca fail initializing process data \n");
     return 1;
 
 }
@@ -131,11 +131,13 @@ task_data Moca_GetData(struct task_struct *t)
 {
     int pos;
     struct _moca_task tsk;
+    moca_task tret=NULL;
     task_data ret=NULL;
     tsk.key=t;
     read_lock(&Moca_tasksLock);
     if((pos=Moca_PosInMap(Moca_tasksMap ,(hash_entry)&tsk))>=0)
-        ret=((moca_task)Moca_EntryAtPos(Moca_tasksMap,pos))->data;
+        if((tret=((moca_task)Moca_EntryAtPos(Moca_tasksMap,pos)))!=NULL)
+            ret=tret->data;
     read_unlock(&Moca_tasksLock);
     return ret;
 }
@@ -152,34 +154,40 @@ moca_task Moca_AddTask(struct task_struct *t)
 
 
     //Create the task data
-    data=Moca_InitData(t);
-    if(!data)
-        return NULL;
-    get_task_struct(t);
 
+    get_task_struct(t);
     tmptsk.key=t;
-    tmptsk.data=data;
     write_lock(&Moca_tasksLock);
     tsk=(moca_task)Moca_AddToMap(Moca_tasksMap,(hash_entry)&tmptsk,&status);
-    write_unlock(&Moca_tasksLock);
     switch(status)
     {
         case MOCA_HASHMAP_FULL:
-            printk("Moca Too many pids");
-            Moca_RemoveTask(t);
-            return NULL;
+            printk(KERN_NOTICE "Moca too many tasks ignoring %p",t);
+            goto fail;
         case MOCA_HASHMAP_ERROR:
             printk("Moca unhandeled hashmap error");
-            break;
+            goto fail;
         case  MOCA_HASHMAP_ALREADY_IN_MAP:
             MOCA_DEBUG_PRINT("Moca Adding an already exixsting task %p\n", t);
-            break;
+            return tsk;
         default:
             //normal add
             MOCA_DEBUG_PRINT("Moca Added task %p at pos %d \n", t, status);
             break;
     }
+    // Here we are sure that t has been added to the map
+    data=Moca_InitData(t);
+    if(!data)
+    {
+        Moca_RemoveTask(t);
+        goto fail;
+    }
+    tsk->data=data;
+    write_unlock(&Moca_tasksLock);
     return tsk;
+fail:
+    write_unlock(&Moca_tasksLock);
+    return NULL;
 }
 
 void Moca_RemoveTask(struct task_struct *t)

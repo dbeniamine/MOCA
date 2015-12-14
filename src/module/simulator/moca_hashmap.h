@@ -106,6 +106,13 @@ hash_entry Moca_EntryAtPos(hash_map map, int pos);
  */
 hash_entry Moca_NextEntryPos(hash_map map, int *pos);
 
+/*
+ * Remove elements from map under condition:
+ *  Loop through all elements of the map and call fct on them
+ *  if fct returns 0, remove the element
+ */
+int Moca_ConditionalRemove(hash_map map, int (*fct)(void*));
+
 // Remove e from the map
 hash_entry Moca_RemoveFromMap(hash_map map,hash_entry e);
 // Reset the map, be carefull with this one

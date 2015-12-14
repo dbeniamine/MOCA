@@ -136,7 +136,7 @@ hash_entry Moca_EntryFromKey(hash_map map, hash_entry e)
         return NULL;
     h=HASH(e->key, map);
     ind=map->hashs[h];
-    while(ind>=0 && map->comp(tableElt(map,ind),e)!=0 )
+    while(ind>=0 && ind < map->tableSize && map->comp(tableElt(map,ind),e)!=0 )
         ind=tableElt(map,ind)->next;
     if(ind > 0 &&  ind >= map->tableSize)
     {

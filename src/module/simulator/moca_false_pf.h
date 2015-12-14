@@ -20,11 +20,11 @@
 #define __MOCA_FALSE_PF__
 #define __NO_VERSION__
 
-
+#include "moca.h"
 
 
 // Init data struct required for managing false pf hack
-void Moca_InitFalsePf(void);
+int Moca_InitFalsePf(void);
 void Moca_ClearFalsePfData(void);
 
 // Marks the nb addr as not present and save them as false page fault
@@ -40,14 +40,14 @@ void Moca_AddFalsePf(struct mm_struct *mm, unsigned long addr);
  *         1 if addr is not in the false pf list
  *         1 if addr is not in the false pf list
  */
-int Moca_FixFalsePf(struct mm_struct *mm, unsigned long addr);
+int Moca_FixFalsePf(struct mm_struct *mm, unsigned long addr,int cpu);
 
 /*
  * Remove all false page faults associated to mm and set the present flags
  * back
  * Requires Read lock to be held
  */
-void Moca_FixAllFalsePf(struct mm_struct *mm);
+void Moca_FixAllFalsePf(struct mm_struct *mm,int cpu);
 
 void *Moca_PhyFromVirt(void *addr, struct mm_struct *mm);
 

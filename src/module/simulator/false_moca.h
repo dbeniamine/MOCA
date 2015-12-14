@@ -87,6 +87,7 @@ void remove_proc_entry(const char *,struct proc_dir_entry *);
 #define find_vpid(A) 1
 
 #define pte_none(A) !A
+#define pte_special(A) !A
 #define pmd_none(A) !A
 #define pmd_bad(A) !A
 #define pud_none(A) !A
@@ -103,6 +104,7 @@ void remove_proc_entry(const char *,struct proc_dir_entry *);
 #define pte_offset_map(p,a) (a)
 #define pte_lockptr(mm,pmd) NULL
 #define pte_unmap(pte) noop
+#define pte_unmap_unlock(pte,ptl) noop
 #define pte_clear_flags(pte,flags) *(int *)pte=0
 #define pte_set_flags(pte,flags) *(int *)pte=1
 
@@ -190,6 +192,7 @@ struct mmu_gather {int r;};
 #define __init
 #define __exit
 #define KERN_NOTICE
+#define KERN_INFO
 #define KERN_ALERT
 #define KERN_DEBUG
 
@@ -200,10 +203,10 @@ extern pthread_t MonitorTh;
 
 static inline int kthread_stop(struct task_struct *t)
 {
-    int ret;
+    int *ret;
     MonitorShouldDie=1;
-    pthread_join(MonitorTh, &ret);
-    return ret;
+    pthread_join(MonitorTh, (void **)&ret);
+    return (int)ret;
 }
 #define kthread_should_stop(A) (MonitorShouldDie==1)
 

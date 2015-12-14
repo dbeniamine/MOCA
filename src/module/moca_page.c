@@ -41,6 +41,8 @@ void Moca_MonitorPage(task_data data)
     int i=0,ch;
     struct task_struct *tsk=Moca_GetTaskFromData(data);
     void *addr;
+    if(!tsk)
+        return;
     MOCA_DEBUG_PRINT("Moca monitor thread walking data %p , task %p, mm %p\n",
             data, tsk, tsk->mm);
     // Goto to next chunk

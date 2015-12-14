@@ -30,10 +30,10 @@
 
 // The first bits are not random enough, 14 bits should be enough for pids
 unsigned long Moca_tasksHashBits=14;
-DEFINE_RWLOCK(Moca_tasksLock);
+rwlock_t Moca_tasksLock;
 
 // Monitored process
-hash_map Moca_tasksMap;
+hash_map Moca_tasksMap=NULL;
 struct task_struct *Moca_initTask=NULL;
 
 moca_task Moca_AddTask(struct task_struct *t);
@@ -49,22 +49,28 @@ int Moca_InitProcessManagment(int id)
     // Monitored pids
     struct pid *pid;
     rwlock_init(&Moca_tasksLock);
-    Moca_tasksMap=Moca_InitHashMap(Moca_tasksHashBits,
+    if(!(Moca_tasksMap=Moca_InitHashMap(Moca_tasksHashBits,
             2*(1<<Moca_tasksHashBits), sizeof(struct _moca_task), NULL,
-            Moca_TaskInitializer);
+            Moca_TaskInitializer)))
+        goto fail;
     rcu_read_lock();
     pid=find_vpid(id);
     if(!pid)
     {
         // Skip internal process
         rcu_read_unlock();
-        Moca_Panic("Moca unable to find pid for init task");
-        return 1;
+        goto clean;
     }
     Moca_initTask=pid_task(pid, PIDTYPE_PID);
     rcu_read_unlock();
-    Moca_InitTaskData();
+    if(Moca_InitTaskData()!=0)
+        goto clean;
     return 0;
+clean:
+    Moca_FreeMap(Moca_tasksMap);
+fail:
+    printk(KERN_NOTICE "Moca fail initializing process data \n");
+    return 1;
 
 }
 
@@ -74,6 +80,7 @@ void Moca_CleanProcessData(void)
     {
         Moca_ClearAllData();
         Moca_FreeMap(Moca_tasksMap);
+        Moca_tasksMap=NULL;
     }
 }
 
@@ -146,33 +153,40 @@ moca_task Moca_AddTask(struct task_struct *t)
 
 
     //Create the task data
-    data=Moca_InitData(t);
-    if(!data)
-        return NULL;
-    get_task_struct(t);
 
+    get_task_struct(t);
     tmptsk.key=t;
-    tmptsk.data=data;
     write_lock(&Moca_tasksLock);
     tsk=(moca_task)Moca_AddToMap(Moca_tasksMap,(hash_entry)&tmptsk,&status);
-    write_unlock(&Moca_tasksLock);
     switch(status)
     {
         case MOCA_HASHMAP_FULL:
-            Moca_Panic("Moca Too many pids");
-            break;
+            printk(KERN_NOTICE "Moca too many tasks ignoring %p",t);
+            goto fail;
         case MOCA_HASHMAP_ERROR:
-            Moca_Panic("Moca unhandeled hashmap error");
-            break;
+            printk("Moca unhandeled hashmap error");
+            goto fail;
         case  MOCA_HASHMAP_ALREADY_IN_MAP:
             MOCA_DEBUG_PRINT("Moca Adding an already exixsting task %p\n", t);
-            break;
+            return tsk;
         default:
             //normal add
             MOCA_DEBUG_PRINT("Moca Added task %p at pos %d \n", t, status);
             break;
     }
+    // Here we are sure that t has been added to the map
+    data=Moca_InitData(t);
+    if(!data)
+    {
+        Moca_RemoveTask(t);
+        goto fail;
+    }
+    tsk->data=data;
+    write_unlock(&Moca_tasksLock);
     return tsk;
+fail:
+    write_unlock(&Moca_tasksLock);
+    return NULL;
 }
 
 void Moca_RemoveTask(struct task_struct *t)

@@ -33,7 +33,6 @@
 typedef struct _hash_map
 {
     int *hashs;
-    struct _hash_entry *table;
     int nbentry;
     int hash_bits;
     int size;
@@ -41,6 +40,7 @@ typedef struct _hash_map
     size_t elt_size;
     comp_fct_t comp;
     init_fct_t init;
+    struct _hash_entry *table;
 }*hash_map;
 
 int Moca_DefaultHashMapComp(hash_entry e1, hash_entry e2)
@@ -136,13 +136,12 @@ hash_entry Moca_EntryFromKey(hash_map map, hash_entry e)
         return NULL;
     h=HASH(e->key, map);
     ind=map->hashs[h];
-    while(ind>=0 && map->comp(tableElt(map,ind),e)!=0 )
+    while(ind>=0 && ind < map->tableSize && map->comp(tableElt(map,ind),e)!=0 )
         ind=tableElt(map,ind)->next;
     if(ind > 0 &&  ind >= map->tableSize)
     {
         printk("Moca Hashmap ind %d >= max: %u\n",ind, map->tableSize);
         dump_stack();
-        Moca_Panic("HASMAP ERROR");
         return NULL;
     }
     if(ind >=0)
@@ -182,13 +181,13 @@ hash_entry Moca_AddToMap(hash_map map, hash_entry e, int *status)
     if(nextPos >= map->tableSize)
     {
         *status=MOCA_HASHMAP_ERROR;
-        Moca_Panic("Moca hashmap BUG in AddToMap");
         return NULL;
     }
     //Update the link
     h=HASH(e->key, map);
     ind=map->hashs[h];
-    memcpy(tableElt(map,nextPos),e,map->elt_size);
+    //memcpy(tableElt(map,nextPos),e,map->elt_size);
+    tableElt(map,nextPos)->key=e->key;
     tableElt(map,nextPos)->next=MOCA_HASHMAP_END;
     if(ind<0)
     {
@@ -207,7 +206,7 @@ hash_entry Moca_AddToMap(hash_map map, hash_entry e, int *status)
             *status=MOCA_HASHMAP_ALREADY_IN_MAP;
             // Cancel insertion
             if(map->init)
-                map->init(tableElt(map,nextPos));
+                map->init(tableElt(map,nextPos)); // WUUUT ???
             tableElt(map,nextPos)->key=NULL;
             return tableElt(map,ind);
         }
@@ -255,6 +254,39 @@ hash_entry Moca_NextEntryPos(hash_map map, int *pos)
     return tableElt(map,i);
 }
 
+int Moca_ConditionalRemove(hash_map map, int (*fct)(void*))
+{
+    int h, ind, prev=MOCA_HASHMAP_END, remove=0;
+    hash_entry e;
+    for(ind=0;ind<map->tableSize;++ind)
+    {
+        e=tableElt(map,ind);
+        if(e->key!=NULL && fct(e)==0)
+        {
+            h=HASH(e->key,map);
+            prev=map->hashs[h];
+            if(prev==ind)
+            {
+                // Normal remove
+                map->hashs[h]=e->next;
+            }
+            else
+            {
+                // Find actual predecessor
+                while(prev>=0 && tableElt(map,prev)->next!=ind)
+                    prev=tableElt(map,prev)->next;
+                if(prev==MOCA_HASHMAP_END)
+                    return -1;
+                tableElt(map,prev)->next=e->next;
+            }
+            e->key=NULL;
+            e->next=MOCA_HASHMAP_END;
+            --map->nbentry;
+            ++remove;
+        }
+    }
+    return remove;
+}
 
 hash_entry Moca_RemoveFromMap(hash_map map,hash_entry e)
 {
