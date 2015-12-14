@@ -31,7 +31,7 @@ usage()
     echo "  -n                Do not compile the module"
     echo "  -D dirname        Set the output directory MUST be an absolute path.
     Default: $logdir"
-    echo "  -G                Do not generate framesoc's files"
+    echo "  -G                Do generate framesoc's files"
     echo "  -P                Do use pin (needed for structure name
                               detection)"
     echo -e "\n  The following parameters allows you to do fine tuning on the
@@ -85,11 +85,11 @@ pintooldir=$install_dir/src/pintool
 pin=false
 kernLogFile="Moca"
 procdir="/proc/Moca"
-log_thread_interval=.4
+log_thread_interval=.1
 Moca_log="Moca-output.log"
 name=$(basename $0)
 compi=true
-framesoc=true
+framesoc=false
 
 while getopts "c:ha:d:f:l:w:p:b:S:C:D:L:nHFGP" opt
 do
@@ -153,7 +153,7 @@ do
             Moca_false_pf="Moca_use_false_pf=0"
             ;;
         G)
-            framesoc=false
+            framesoc=true
             ;;
         P)
             pin=true
@@ -294,7 +294,7 @@ then
     echo -e "\tdone in $(timer $t)"
     cd -
 else
-    echo "Not create framesoc files as requested"
+    echo "Not creating framesoc files"
     echo "You can generate them later by running:"
     echo "cd $logdir; $install_dir/src/utils/create_event_producer.pl $pgsize $kernLogFile-task*"
 fi

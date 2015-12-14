@@ -35,7 +35,7 @@
 
 int Moca_taskDataHashBits=MOCA_HASH_BITS;
 int Moca_taskDataChunkSize=1<<(MOCA_HASH_BITS+1);
-int Moca_nbChunks=30;
+int Moca_nbChunks=40;
 
 #include <linux/sched.h>
 #include <linux/spinlock.h>
@@ -92,7 +92,6 @@ typedef struct _task_data
     int currentlyFlushed;
     int currentlyFlushedPos;
     int internalId;
-    int nbflush;
     int status;
     spinlock_t lock;
 }*task_data;
@@ -164,7 +163,6 @@ task_data Moca_InitData(struct task_struct *t)
     data->task=t;
     data->cur=0;
     data->internalId=atomic_inc_return(&Moca_nextTaskId)-1;
-    data->nbflush=0;
     data->status=MOCA_DATA_STATUS_NORMAL;
     data->currentlyFlushed=-1;
     data->currentlyFlushedPos=-1;
@@ -206,11 +204,18 @@ void Moca_ClearAllData(void)
     while((t=Moca_NextTask(&i)))
     {
         //Wait for the task to be dead
-        MOCA_DEBUG_PRINT("Moca waiting data %d to end\n",i);
-        while(t->data->status!=MOCA_DATA_STATUS_ZOMBIE)
+        printk("Moca waiting data %p : %d to end\n",t->data,i);
+        while(!MOCA_DATA_STATUS_DYING_OR_ZOMBIE(t->data))
             msleep(100);
+    }
+    printk("Moca Removing proc root\n");
+    remove_proc_entry(MOCA_PROC_TRACE, Moca_proc_root);
+    remove_proc_entry(MOCA_PROCDIR_NAME, NULL);
+    i=0;
+    //Clean must be done after removing the proc entry
+    while((t=Moca_NextTask(&i)))
+    {
         MOCA_DEBUG_PRINT("Moca data %d %p %p ended\n",i, t->data, t->key);
-        //Clean must be done after removing the proc entry
         for(chunkid=0; chunkid < Moca_nbChunks;++chunkid)
         {
             MOCA_DEBUG_PRINT("Memap Freeing data %p chunk %d\n",
@@ -221,12 +226,8 @@ void Moca_ClearAllData(void)
         kfree(t->data->chunks);
         kfree(t->data);
         Moca_RemoveTask(t->key);
-        MOCA_DEBUG_PRINT("Memap Freed data %d \n", i);
+        MOCA_DEBUG_PRINT("Moca Freed data %d \n", i);
     }
-    MOCA_DEBUG_PRINT("Moca Removing proc root\n");
-    remove_proc_entry(MOCA_PROC_TRACE, Moca_proc_root);
-    remove_proc_entry(MOCA_PROCDIR_NAME, NULL);
-
     MOCA_DEBUG_PRINT("Moca all data cleaned\n");
 }
 
@@ -381,12 +382,15 @@ int Moca_CpuMask(int cpu, char *buf, size_t size)
 static moca_task Moca_currentlyFlushedTask=NULL;
 static int Moca_currentlyFlushedTaskid=0;
 
-#define LINE_WIDTH 320
+#define LINE_WIDTH 512 // Way more then what we need
+#define PROC_BUF_SIZE 131072 // Usual proc buf size
+static char FLUSH_BUF[PROC_BUF_SIZE];
 static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
         size_t length, loff_t * offp)
 {
     int chunkid, ind, nelt;
-    size_t sz=0;
+    static int csvinit=0;
+    size_t sz=0,len=MIN(PROC_BUF_SIZE,length);
     chunk_entry e;
     task_data data=NULL;
 
@@ -395,27 +399,28 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
     {
         // Not in the middle of a flush, get the next task
         if(!(Moca_currentlyFlushedTask=Moca_NextTask(&Moca_currentlyFlushedTaskid)))
-            goto out; // No more task
+            goto end; // No more task
 
-        if(Moca_currentlyFlushedTaskid == 1 &&
-                Moca_currentlyFlushedTask->data->nbflush == 0)
+        if(csvinit == 0)
         {
             // First flush ever
-            sz+=sprintf(buffer+sz,"@Virt, @Phy, Nreads, Nwrites, CPUMask, Start, End, TaskId\n");
+            sz+=snprintf(FLUSH_BUF+sz,len-sz,"@Virt, @Phy, Nreads, Nwrites, CPUMask, Start, End, TaskId\n");
+            csvinit=1;
         }
     }
 
     do{
         data=Moca_currentlyFlushedTask->data;
 
-        printk("Moca_Flushing data %p id %d allowed len %lu\n", data,
-                Moca_currentlyFlushedTaskid, length);
+        MOCA_DEBUG_PRINT("Moca_Flushing data %p id %d allowed len %lu\n", data,
+                Moca_currentlyFlushedTaskid, len);
 
-        if(MOCA_DATA_STATUS_DYING_OR_ZOMBIE(data))
+        if(!MOCA_DATA_STATUS_DYING_OR_ZOMBIE(data))
         {
             //Data already flush, do noting and wait for kfreedom
+            MOCA_DEBUG_PRINT("Moca dying data aborting flush%p\n",data);
             data->status=MOCA_DATA_STATUS_ZOMBIE;
-            goto out;
+            continue;
         }
 
         //Iterate on all chunks, start where we stopped if needed
@@ -431,28 +436,36 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
             else
             {
                 ind=data->currentlyFlushedPos;
-                printk("Moca resuming flush for data %p : %d chunk %d \n", data,
-                        data->internalId, chunkid);
+                MOCA_DEBUG_PRINT("Moca resuming flush for data %p : %d chunk %d \n",
+                        data, data->internalId, chunkid);
             }
-            printk("Moca flushing data %p : %d chunk %d  chz %d\n", data, data->internalId,
-                    chunkid,Moca_NbElementInMap(data->chunks[chunkid]->map));
+            MOCA_DEBUG_PRINT("Moca flushing data %p : %d chunk %d  chz %d\n",
+                    data, data->internalId, chunkid,
+                    Moca_NbElementInMap(data->chunks[chunkid]->map));
             // Flush if needed
             if( (data->status==MOCA_DATA_STATUS_NEEDFLUSH
                         || data->chunks[chunkid]->used==MOCA_CHUNK_USED) &&
                     (nelt=Moca_NbElementInMap(data->chunks[chunkid]->map))>0)
             {
-                while((e=(chunk_entry)Moca_NextEntryPos(data->chunks[chunkid]->map,&ind)))
+                while((e=(chunk_entry)Moca_NextEntryPos(
+                                data->chunks[chunkid]->map,&ind)))
                 {
-                    if(LINE_WIDTH >= length-sz)
-                        goto incomplete;
+                    if(LINE_WIDTH >= len-sz)
+                    {
+                        data->currentlyFlushed=chunkid;
+                        data->currentlyFlushedPos=ind;
+                        MOCA_DEBUG_PRINT("Moca incomplete flush size %lu for data %p : %d chunk %d\n", sz,
+                                data, data->internalId, chunkid);
+                        goto out;
+                    }
                     //@Virt @Phy countread countwrite cpumask start end
                     //taskid
-                    sz+=snprintf(buffer+sz,length-sz, "%p, %p, %d, %d,",
+                    sz+=snprintf(FLUSH_BUF+sz,len-sz, "%p, %p, %d, %d, ",
                             e->key,
                             Moca_PhyFromVirt(e->key, data->task->mm),
                             e->countR, e->countW);
-                    sz+=Moca_CpuMask(e->cpu,buffer+sz,length-sz);
-                    sz+=snprintf(buffer+sz,length-sz,", %lu, %lu, %d\n",
+                    sz+=Moca_CpuMask(e->cpu,FLUSH_BUF+sz,len-sz);
+                    sz+=snprintf(FLUSH_BUF+sz,len-sz,", %lu, %lu, %d\n",
                             data->chunks[chunkid]->startClock,
                             data->chunks[chunkid]->endClock,
                             data->internalId);
@@ -469,29 +482,23 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
             spin_unlock(&data->chunks[chunkid]->lock);
         }
         spin_lock(&data->lock);
-        ++data->nbflush;
         data->currentlyFlushed=-1;
         data->currentlyFlushedPos=-1;
         if(data->status==MOCA_DATA_STATUS_NEEDFLUSH )
             data->status=MOCA_DATA_STATUS_DYING;
-        printk("Moca Complete Flush data %p : %d st: %d sz %lu\n",
+        MOCA_DEBUG_PRINT("Moca Complete Flush data %p : %d st: %d sz %lu\n",
                 data,data->internalId,data->status, sz);
         spin_unlock(&data->lock);
 
-    }while((Moca_currentlyFlushedTask=Moca_NextTask(&Moca_currentlyFlushedTaskid)));
+    }while((Moca_currentlyFlushedTask=Moca_NextTask(
+                    &Moca_currentlyFlushedTaskid)));
     // Restart the flush
-    printk("Moca finished flush of all task\n");
+end:
+    MOCA_DEBUG_PRINT("Moca finished flush of all task\n");
     Moca_currentlyFlushedTaskid=0;
 
 out:
-    printk("Moca complete flush size %lu\n", sz);
+    MOCA_DEBUG_PRINT("Moca complete flush size %lu\n", sz);
+    sz-=copy_to_user(buffer,FLUSH_BUF,sz);
     return sz;
-
-incomplete:
-    data->currentlyFlushed=chunkid;
-    data->currentlyFlushedPos=ind;
-    printk("Moca incomplete flush size %lu for data %p : %d chunk %d\n", sz,
-            data, data->internalId, chunkid);
-    return sz;
-
 }

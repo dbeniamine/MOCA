@@ -26,6 +26,7 @@
 #define MOCA_DEBUG_PRINT(...)
 #endif //MOCA_DEBUG
 #define MAX(A,B) ((A)>(B) ? (A) : (B) )
+#define MIN(A,B) ((A)<(B) ? (A) : (B) )
 
 
 #include <linux/module.h>
