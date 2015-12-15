@@ -66,17 +66,7 @@ int Moca_RecentlyFixed(unsigned long addr)
     return 1;
 }
 
-void *Moca_PhyFromVirt(void *addr, struct mm_struct *mm)
-{
-    return addr;
-    /* Add PteUnmap inconditionnaly */
-    /* pte_t *pte=Moca_PteFromAdress((unsigned long)addr,mm); */
-    /* if(!pte || pte_none(*pte)) */
-    /*     return addr; //Kernel address no translation needed */
-    /* return (void *)__pa(pte_page(*pte)); */
-}
-
- /* 
+ /*
   * Unmap pte and release lock
   * do nothing if pte is NULL
   */
@@ -129,6 +119,17 @@ static int Moca_FixPte(pte_t *pte, struct mm_struct *mm)
     MOCA_DEBUG_PRINT("Moca fixing false pte_fault %p mm %p\n",pte,mm);
     res=0;
     return res;
+}
+
+void *Moca_PhyFromVirt(void *addr, struct mm_struct *mm)
+{
+    spinlock_t *ptl=NULL;
+    void *ret=addr;
+    pte_t *pte=Moca_PteFromAdress((unsigned long)addr,mm, &ptl);
+    if(pte && !pte_none(*pte))
+        ret=(void *)__pa(pte_page(*pte));
+    Moca_UnmapPte(pte,ptl);
+    return ret;
 }
 
 static int Moca_ClearAddr(unsigned long addr,struct mm_struct *mm)
