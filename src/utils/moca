@@ -286,18 +286,18 @@ line=$(($line-1))
 line+='d'
 sed 1,$line /var/log/kern.log | grep -i "moca" > $logdir/$Moca_log
 echo "File $logdir/$Moca_log created with Moca output in $(timer $t)"
-pgsize=$(head -n 1 $kernLogFile-task0.log  | cut -d ' ' -f 4)
-if $framesoc
-then
-    # Create the event poducers log (required by framesoc)
-    echo "Creating files for Framesoc"
-    cd $logdir
-    $install_dir/src/utils/create_event_producer.pl $pgsize $kernLogFile-task*
-    echo -e "\tdone in $(timer $t)"
-    cd -
-else
-    echo "Not creating framesoc files"
-    echo "You can generate them later by running:"
-    echo "cd $logdir; $install_dir/src/utils/create_event_producer.pl $pgsize $kernLogFile-task*"
-fi
+# if $framesoc
+# then
+#     pgsize=$(head -n 1 $kernLogFile-task0.log  | cut -d ' ' -f 4)
+#     # Create the event poducers log (required by framesoc)
+#     echo "Creating files for Framesoc"
+#     cd $logdir
+#     $install_dir/src/utils/create_event_producer.pl $pgsize $kernLogFile-task*
+#     echo -e "\tdone in $(timer $t)"
+#     cd -
+# else
+#     echo "Not creating framesoc files"
+#     echo "You can generate them later by running:"
+#     echo "cd $logdir; $install_dir/src/utils/create_event_producer.pl $pgsize $kernLogFile-task*"
+# fi
 echo -e "Moca analysis done\nTotal time: $(timer $initime)\nLog directory: $logdir\nBye!"
