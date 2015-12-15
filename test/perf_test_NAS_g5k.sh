@@ -27,9 +27,9 @@ WORKPATH="/tmp"
 NAS="NPB3.3-OMP/"
 MOCAPATH="Moca"
 #MEMPROFPATH="MemProf"
-TABARNACPATH="tabarnac"
+# TABARNACPATH="tabarnac"
 export PATH=$PATH:/opt/pin
-CONFIGS=('Moca' 'Base' 'Pin' ) #'Memprof')
+CONFIGS=('Moca' 'Base' 'MocaPin' ) #'Memprof')
 declare -A TARGETS
 
 #report error if needed
@@ -136,7 +136,7 @@ then
     cp -rv $PREFIX/$NAS $WORKPATH/
     cp -rv $PREFIX/$MOCAPATH $WORKPATH/
     #cp -rv $PREFIX/$MEMPROFPATH $WORKPATH/
-    cp -rv $PREFIX/$TABARNACPATH $WORKPATH/
+    #cp -rv $PREFIX/$TABARNACPATH $WORKPATH/
 fi
 
 #Do the first compilation
@@ -164,8 +164,8 @@ do
         LOGDIR="$EXP_DIR/$benchname/run-$run"
         mkdir -p $LOGDIR
 	TARGETS=([Base]='' [MemProf]="$WORKPATH/$MEMPROFPATH/scripts/profile_app.sh" \
-		[Moca]="$WORKPATH/$MOCAPATH/src/utils/moca -d $WORKPATH/$MOCAPATH -G -D $LOGDIR/Moca-$benchname -c" \
-    		[Pin]="$WORKPATH/$TABARNACPATH/tabarnac -r --")
+		[Moca]="$WORKPATH/$MOCAPATH/src/utils/moca -d $WORKPATH/$MOCAPATH -D $LOGDIR/Moca-$benchname -c" \
+    		[MocaPin]="$WORKPATH/$MOCAPATH/src/utils/moca -d $WORKPATH/$MOCAPATH -D $LOGDIR/MocaPin-$benchname -P -c")
         echo $LOGDIR
         #Actual experiment
         for conf in ${CONFIGS[@]}
@@ -181,7 +181,7 @@ do
         mv $LOGDIR/Moca.log $LOGDIR/Moca-$benchname/
         mv $LOGDIR/Moca-$benchname/Moca-$benchname.log $LOGDIR/Moca.log
         #tar cvJf $LOGDIR/traces.tar.xz $LOGDIR/Moca-$benchname *.csv
-        mv *.csv $LOGDIR/
+        # mv *.csv $LOGDIR/
         #echo "Done"
     done
     echo "Saving files"
