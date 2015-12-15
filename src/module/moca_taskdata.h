@@ -56,7 +56,4 @@ void Moca_EndChunk(task_data data, int ch);
  */
 void *Moca_AddrInChunkPos(task_data data,int *pos, int ch);
 
-void Moca_LockChunk(task_data data);
-void Moca_UnlockChunk(task_data data);
-
 #endif //__MOCA_TASK_DATA__
