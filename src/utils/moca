@@ -223,6 +223,7 @@ log()
         done
         sleep $log_thread_interval
     done
+    echo "Moca trace completly flushed"
 }
 
 abort_on_error()
@@ -278,6 +279,7 @@ rmmod moca
 echo "done in $(timer $t)"
 t=$(timer)
 echo "Retrieving Moca log"
+wait $logpid
 # Create the log
 line=$(grep -n "Moca started" /var/log/kern.log | tail -n 1 | cut -d ':' -f 1)
 line=$(($line-1))
