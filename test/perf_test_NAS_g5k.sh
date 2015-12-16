@@ -178,8 +178,11 @@ do
             rm $WORKPATH/$NAS/ADC.*
         done
         #echo "Compressing traces"
-        mv $LOGDIR/Moca.log $LOGDIR/Moca-$benchname/
-        mv $LOGDIR/Moca-$benchname/Moca-$benchname.log $LOGDIR/Moca.log
+        if [ ! -z "$(echo $conf | grep Moca)" ]
+        then
+            mv $LOGDIR/$conf.log $LOGDIR/$conf-$benchname/
+            mv $LOGDIR/$conf-$benchname/$conf-$benchname.log $LOGDIR/$conf.log
+        fi
         #tar cvJf $LOGDIR/traces.tar.xz $LOGDIR/Moca-$benchname *.csv
         # mv *.csv $LOGDIR/
         #echo "Done"
