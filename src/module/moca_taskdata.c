@@ -188,11 +188,10 @@ fail:
 
 void Moca_ClearAllData(void)
 {
-    int i=0, nbTasks,chunkid;
+    int i=0, chunkid;
     int cpt;
     moca_task t;
     MOCA_DEBUG_PRINT("Moca Cleaning data\n");
-    nbTasks=Moca_GetNumTasks();
     while((t=Moca_NextTask(&i)))
     {
         MOCA_DEBUG_PRINT("Moca asking data %d %p %p to end\n",i, t->data, t->key);
