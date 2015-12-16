@@ -30,6 +30,7 @@
 
 // The first bits are not random enough, 14 bits should be enough for pids
 unsigned long Moca_tasksHashBits=14;
+int Moca_ignorePinTask=0;
 DEFINE_RWLOCK(Moca_tasksLock);
 
 // Monitored process
@@ -83,18 +84,29 @@ void Moca_CleanProcessData(void)
     }
 }
 
+
+// Test if t is an unknown init task aka its name is "sh", "pin" or "pinbin"
+int Moca_HaveInitTaskName(struct task_struct *t)
+{
+    return t->comm && (!strcmp(t->comm, "sh") || !strcmp(t->comm, "pin")
+            || !strcmp(t->comm, "pinbin"));
+}
+
+
 static inline int Moca_ShouldMonitorTask(struct task_struct *t)
 {
     int ret=0;
     struct _moca_task tsk;
-    if(t->real_parent==Moca_initTask)
-        return 1;
-    tsk.key=t->real_parent;
     read_lock(&Moca_tasksLock);
-    ret=Moca_EntryFromKey(Moca_tasksMap, (hash_entry)&tsk)!=NULL;
+    if(!(ret=(t->real_parent == Moca_initTask)))
+    {
+        tsk.key=t->real_parent;
+        ret=Moca_EntryFromKey(Moca_tasksMap, (hash_entry)&tsk)!=NULL;
+    }
+    if(ret && Moca_ignorePinTask && Moca_HaveInitTaskName(t))
+        ret=0;
     read_unlock(&Moca_tasksLock);
     return ret;
-
 }
 
 // Add pid to the monitored process if pid is a monitored process
@@ -142,7 +154,6 @@ task_data Moca_GetData(struct task_struct *t)
     return ret;
 }
 
-
 // Add t to the monitored pids
 moca_task Moca_AddTask(struct task_struct *t)
 {
@@ -150,7 +161,7 @@ moca_task Moca_AddTask(struct task_struct *t)
     moca_task tsk;
     struct _moca_task tmptsk;
     int status;
-    MOCA_DEBUG_PRINT("Moca Adding task %p\n",t );
+    printk("Moca monitoring task %p [%s] \n",t, t->comm);
 
 
     //Create the task data

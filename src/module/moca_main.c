@@ -47,6 +47,7 @@ extern int Moca_taskDataChunkSize;
 extern int Moca_nbChunks;
 extern int Moca_use_false_pf;
 extern int Moca_false_pf_ugly;
+extern int Moca_ignorePinTask;
 // Priority for FIFO scheduler
 int Moca_schedulerPriority=MOCA_DEFAULT_SCHED_PRIO;
 int Moca_Activated=0;
@@ -59,6 +60,7 @@ module_param(Moca_taskDataChunkSize,int,0);
 module_param(Moca_nbChunks,int,0);
 module_param(Moca_use_false_pf,int,0);
 module_param(Moca_false_pf_ugly,int,0);
+module_param(Moca_ignorePinTask,int,0);
 
 // Thread task representation
 struct task_struct *Moca_threadTask=NULL;
@@ -78,10 +80,11 @@ void Moca_PrintConfig(void)
 {
     printk("Moca parameters:\nMoca_mainPid\t%d\nMoca_wakeupInterval\t%d\nMoca_SchedulerPriority\t%d\n"
             "Moca_taskDataHashBits\t%d\nMoca_taskDataChunkSize\t%d\n"
-            "Moca_nbChunks\t%d\nMoca_use_false_pf\t%d\nMoca_false_pf_ugly\t%d\n",
+            "Moca_nbChunks\t%d\nMoca_use_false_pf\t%d\nMoca_false_pf_ugly\t%d\n"
+            "Moca_ignorePinTask\t%d\n",
             Moca_mainPid, Moca_wakeupInterval,Moca_schedulerPriority,
             Moca_taskDataHashBits, Moca_taskDataChunkSize,Moca_nbChunks,
-            Moca_use_false_pf, Moca_false_pf_ugly);
+            Moca_use_false_pf, Moca_false_pf_ugly,Moca_ignorePinTask);
 }
 
 // Initializes threads data structures
