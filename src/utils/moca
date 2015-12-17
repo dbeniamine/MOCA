@@ -206,13 +206,10 @@ child()
     kill -s SIGSTOP $BASHPID
     if [ -z "$logfile" ]
     then
-        $pincmd $cmd $args &
-        pid=$!
+        $pincmd $cmd $args
     else
-        $pincmd $cmd $args > $logfile 2> $logfile.err &
-        pid=$!
+        $pincmd $cmd $args > $logfile 2> $logfile.err
     fi
-    wait $pid
     ret=$?
     echo "$program ended code $ret"
     exit $ret
