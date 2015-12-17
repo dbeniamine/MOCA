@@ -140,7 +140,7 @@ static int Moca_ClearAddr(unsigned long addr,struct mm_struct *mm)
     if(Moca_RecentlyFixed(addr)==0) // No clear allowed
         return ret;
     pte=Moca_PteFromAdress(addr,mm,&ptl);
-    if(pte && !pte_none(*pte) && !pte_special(*pte) && !pte_present(*pte))
+    if(pte && !pte_none(*pte) && !pte_special(*pte) && pte_present(*pte))
     {
         MOCA_DEBUG_PRINT("Moca clearing pte %p addr %lx mm %p\n",pte,addr,mm);
         *pte=pte_clear_flags(*pte,_PAGE_PRESENT);

@@ -26,6 +26,7 @@ typedef struct _moca_task
     void *key; //struct task*
     int next;
     task_data data;
+    int touched;
 }*moca_task;
 
 int Moca_InitProcessManagment(int mainpid);
@@ -45,4 +46,7 @@ moca_task Moca_NextTask(int *pos);
 task_data Moca_GetData(struct task_struct *t);
 
 void Moca_RemoveTask(struct task_struct *t);
+
+// Mark tsk as touched, return 1 ifit is the first touch, 0 else
+int Moca_FirstTouchTask(moca_task tsk);
 #endif //__MOCA_TASKS__

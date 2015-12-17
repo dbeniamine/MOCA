@@ -194,6 +194,7 @@ moca_task Moca_AddTask(struct task_struct *t)
         goto fail;
     }
     tsk->data=data;
+    tsk->touched=0;
     write_unlock(&Moca_tasksLock);
     return tsk;
 fail:
@@ -209,4 +210,18 @@ void Moca_RemoveTask(struct task_struct *t)
     Moca_RemoveFromMap(Moca_tasksMap, (hash_entry)&tsk);
     write_unlock(&Moca_tasksLock);
     put_task_struct(t);
+}
+
+
+// Mark tsk as touched, return 1 ifit is the first touch, 0 else
+int Moca_FirstTouchTask(moca_task tsk)
+{
+    if(!tsk)
+        return -1;
+    if(!tsk->touched)
+    {
+        tsk->touched=1;
+        return 1;
+    }
+    return 0;
 }

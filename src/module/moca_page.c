@@ -80,6 +80,8 @@ int Moca_MonitorThread(void * arg)
         pos=0;
         while((t=Moca_NextTask(&pos)))
         {
+            if(Moca_FirstTouchTask(t))
+                continue;
             data=t->data;
             task=(struct task_struct *)(t->key);
             MOCA_DEBUG_PRINT("Moca monitor thread testing task %p\n", task);
