@@ -189,7 +189,6 @@ fail:
 void Moca_ClearAllData(void)
 {
     int i=0, chunkid;
-    int cpt;
     moca_task t;
     MOCA_DEBUG_PRINT("Moca Cleaning data\n");
     while((t=Moca_NextTask(&i)))
@@ -204,20 +203,9 @@ void Moca_ClearAllData(void)
     while((t=Moca_NextTask(&i)))
     {
         //Wait for the task to be dead
-        cpt=0;
         MOCA_DEBUG_PRINT("Moca waiting data %p : %d to end\n",t->data,i);
         while(!MOCA_DATA_STATUS_DYING_OR_ZOMBIE(t->data))
-        {
             msleep(100);
-            if(cpt > 1000)
-            {
-                // TODO Remove me if not used
-                printk(KERN_ALERT "Moca %d ms wait for data %p : %d to end, dismissed",
-                        cpt*100,t->data, t->data->internalId);
-                break;
-            }
-            ++cpt;
-        }
     }
     MOCA_DEBUG_PRINT("Moca Removing proc root\n");
     remove_proc_entry(MOCA_PROC_TRACE, Moca_proc_root);
