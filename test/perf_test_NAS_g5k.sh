@@ -1,21 +1,4 @@
 #!/bin/bash
-
-# Copyright (C) 2015  Beniamine, David <David@Beniamine.net>
-# Author: Beniamine, David <David@Beniamine.net>
-#
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 START_TIME=$(date +%y%m%d_%H%M%S)
 CMDLINE="$0 $@"
 EXP_NAME=$(basename $0 .sh)
@@ -27,9 +10,9 @@ WORKPATH="/tmp"
 NAS="NPB3.3-OMP/"
 MOCAPATH="Moca"
 #MEMPROFPATH="MemProf"
-# TABARNACPATH="tabarnac"
+TABARNACPATH="tabarnac"
 export PATH=$PATH:/opt/pin
-CONFIGS=('Moca' 'Base' 'MocaPin' ) #'Memprof')
+CONFIGS=('Moca' 'Base' 'Pin' 'MocaPin' ) #'Memprof')
 declare -A TARGETS
 
 #report error if needed
@@ -136,7 +119,7 @@ then
     cp -rv $PREFIX/$NAS $WORKPATH/
     cp -rv $PREFIX/$MOCAPATH $WORKPATH/
     #cp -rv $PREFIX/$MEMPROFPATH $WORKPATH/
-    #cp -rv $PREFIX/$TABARNACPATH $WORKPATH/
+    cp -rv $PREFIX/$TABARNACPATH $WORKPATH/
 fi
 
 #Do the first compilation
@@ -165,7 +148,8 @@ do
         mkdir -p $LOGDIR
 	TARGETS=([Base]='' [MemProf]="$WORKPATH/$MEMPROFPATH/scripts/profile_app.sh" \
 		[Moca]="$WORKPATH/$MOCAPATH/src/utils/moca -d $WORKPATH/$MOCAPATH -D $LOGDIR/Moca-$benchname -c" \
-    		[MocaPin]="$WORKPATH/$MOCAPATH/src/utils/moca -d $WORKPATH/$MOCAPATH -D $LOGDIR/MocaPin-$benchname -P -c")
+		[MocaPin]="$WORKPATH/$MOCAPATH/src/utils/moca -d $WORKPATH/$MOCAPATH -P -D $LOGDIR/MocaPin-$benchname -c" \
+    		[Pin]="$WORKPATH/$TABARNACPATH/tabarnac -r --")
         echo $LOGDIR
         #Actual experiment
         for conf in ${CONFIGS[@]}
@@ -178,13 +162,12 @@ do
             rm $WORKPATH/$NAS/ADC.*
         done
         #echo "Compressing traces"
-        if [ ! -z "$(echo $conf | grep Moca)" ]
-        then
-            mv $LOGDIR/$conf.log $LOGDIR/$conf-$benchname/
-            mv $LOGDIR/$conf-$benchname/$conf-$benchname.log $LOGDIR/$conf.log
-        fi
+        mv $LOGDIR/Moca.log $LOGDIR/Moca-$benchname/
+        mv $LOGDIR/MocaPin.log $LOGDIR/MocaPin-$benchname/
+        mv $LOGDIR/Moca-$benchname/Moca-$benchname.log $LOGDIR/Moca.log
+        mv $LOGDIR/MocaPin-$benchname/MocaPin-$benchname.log $LOGDIR/MocaPin.log
         #tar cvJf $LOGDIR/traces.tar.xz $LOGDIR/Moca-$benchname *.csv
-        # mv *.csv $LOGDIR/
+        mv *.csv $LOGDIR/
         #echo "Done"
     done
     echo "Saving files"
