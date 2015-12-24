@@ -135,6 +135,11 @@ make clean
 make
 cd -
 
+cd $WORKPATH/$MOCAPATH/src
+make clean
+make
+cd -
+
 for run in $(seq $FIRSTRUN $LASTRUN)
 do
     echo "RUN : $run"

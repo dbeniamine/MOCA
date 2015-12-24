@@ -142,6 +142,11 @@ rm bin/*.x
 cd -
 
 bench="$WORKPATH/$NAS/bin/$BENCH.$CLASS"
+cd $WORKPATH/$MOCAPATH/src
+make clean
+make
+cd -
+
 for run in $(seq $FIRSTRUN $LASTRUN)
 do
     echo "RUN : $run"
@@ -153,7 +158,7 @@ do
             LOGDIR="$EXP_DIR/mon-$wint/log-$lint/run-$run"
             mkdir -p $LOGDIR
             echo $LOGDIR
-	        cmd="$WORKPATH/$MOCAPATH/src/utils/moca -G -w $wint -L .$lint \
+	        cmd="$WORKPATH/$MOCAPATH/src/utils/moca -G -P -w $wint -L .$lint \
                 -D $LOGDIR/Moca-$BENCH -c $bench"
             #Actual experiment
             set -x
