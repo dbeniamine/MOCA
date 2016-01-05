@@ -12,8 +12,10 @@ MOCAPATH="Moca"
 #MEMPROFPATH="MemProf"
 TABARNACPATH="tabarnac"
 export PATH=$PATH:/opt/pin
-CONFIGS=('Moca' 'Base' 'Pin' 'MocaPin' ) #'Memprof')
+CONFIGS=('MocaPin' 'Base' 'Moca' 'Pin' ) #'Memprof')
 declare -A TARGETS
+declare -A RUN_DONE
+declare -a RAND_RUNS
 
 #report error if needed
 function testAndExitOnError
@@ -140,41 +142,69 @@ make clean
 make
 cd -
 
-for run in $(seq $FIRSTRUN $LASTRUN)
-do
-    echo "RUN : $run"
-    #Actual exp
-    for bench in $WORKPATH/$NAS/bin/*
+init_runs(){
+    id=0
+    declare -a COMBI
+    for r in $(seq $FIRSTRUN $LASTRUN)
     do
+        for c in ${CONFIGS[*]}
+        do
+            for b in $WORKPATH/$NAS/bin/*
+            do
+                COMBI[$id]="$c%$b"
+                id=$(($id+1))
+            done
+        done
+    done
+    RAND_RUNS=$(echo "${COMBI[*]}" | tr " " "\n" | shuf | tr "\n" " ")
+}
 
-	benchname=$(basename $bench)
-        echo "$benchname"
-        LOGDIR="$EXP_DIR/$benchname/run-$run"
-        mkdir -p $LOGDIR
+do_run()
+{
+    run=$1
+    conf=$2
+    benchname=$3
+    benchname=$(basename $bench)
+    # Init constants
+    echo "$benchname"
+    LOGDIR="$EXP_DIR/$benchname/run-$run"
+	echo $LOGDIR
+    mkdir -p $LOGDIR
 	TARGETS=([Base]='' [MemProf]="$WORKPATH/$MEMPROFPATH/scripts/profile_app.sh" \
 		[Moca]="$WORKPATH/$MOCAPATH/src/utils/moca -d $WORKPATH/$MOCAPATH -D $LOGDIR/Moca-$benchname -c" \
-		[MocaPin]="$WORKPATH/$MOCAPATH/src/utils/moca -d $WORKPATH/$MOCAPATH -P -D $LOGDIR/MocaPin-$benchname -c" \
-    		[Pin]="$WORKPATH/$TABARNACPATH/tabarnac -r --")
-        echo $LOGDIR
-        #Actual experiment
-        for conf in ${CONFIGS[@]}
-        do
-            cmd="${TARGETS[$conf]} $bench"
-            set -x
-            $cmd > $LOGDIR/$conf.log 2> $LOGDIR/$conf.err
-            #testAndExitOnError "Exec failed $conf $benchname run-$run"
-            set +x
-            rm $WORKPATH/$NAS/ADC.*
-        done
-        #echo "Compressing traces"
-        mv $LOGDIR/Moca.log $LOGDIR/Moca-$benchname/
-        mv $LOGDIR/MocaPin.log $LOGDIR/MocaPin-$benchname/
-        mv $LOGDIR/Moca-$benchname/Moca-$benchname.log $LOGDIR/Moca.log
-        mv $LOGDIR/MocaPin-$benchname/MocaPin-$benchname.log $LOGDIR/MocaPin.log
-        #tar cvJf $LOGDIR/traces.tar.xz $LOGDIR/Moca-$benchname *.csv
-        mv *.csv $LOGDIR/
-        #echo "Done"
-    done
+        [MocaPin]="$WORKPATH/$MOCAPATH/src/utils/moca -d $WORKPATH/$MOCAPATH -P -D $LOGDIR/MocaPin-$benchname -c" \
+        [Pin]="$WORKPATH/$TABARNACPATH/tabarnac -r --")
+    # Do experiments
+    cmd="${TARGETS[$conf]} $bench"
+    set -x
+    echo $cmd > $LOGDIR/$conf.log 2> $LOGDIR/$conf.err
+    set +x
+    rm $WORKPATH/$NAS/ADC.*
+    mv $LOGDIR/Moca.log $LOGDIR/Moca-$benchname/
+    mv $LOGDIR/MocaPin.log $LOGDIR/MocaPin-$benchname/
+    mv $LOGDIR/Moca-$benchname/Moca-$benchname.log $LOGDIR/Moca.log
+    mv $LOGDIR/MocaPin-$benchname/Moca-$benchname.log $LOGDIR/MocaPin.log
+    mv *.csv $LOGDIR/
+}
+
+init_runs
+
+
+for comb in ${RAND_RUNS[*]}
+do
+    # Find actual run number
+    if [ -z "${RUN_DONE[$comb]}" ]
+    then
+        run=$FIRSTRUN
+    else
+        run=$((${RUN_DONE[$comb]}+1))
+    fi
+    echo "RUN : $run"
+    conf=$(echo $comb | cut -d  '%' -f 1)
+    bench=$(echo $comb | cut -d  '%' -f 2)
+    do_run $run $conf $bench
+    RUN_DONE[$comb]=$run
+    # Save
     echo "Saving files"
 	sudo chmod -R 777 $EXP_DIR
 	chown -R $OWNER: $EXP_DIR
@@ -186,11 +216,11 @@ done
 #./parseAndPlot.sh
 #cd -
 #Echo thermal throttle info
-echo "retrieving expe files"
-sudo chmod -R 777 $EXP_DIR
-chown -R $OWNER: $EXP_DIR
-su $OWNER -c "cp -ur $EXP_DIR /home/$OWNER/"
-echo "thermal_throttle infos :"
-cat /sys/devices/system/cpu/cpu0/thermal_throttle/*
-END_TIME=$(date +%y%m%d_%H%M%S)
+# echo "retrieving expe files"
+# sudo chmod -R 777 $EXP_DIR
+# chown -R $OWNER: $EXP_DIR
+# su $OWNER -c "cp -ur $EXP_DIR /home/$OWNER/"
+# echo "thermal_throttle infos :"
+# cat /sys/devices/system/cpu/cpu0/thermal_throttle/*
+# END_TIME=$(date +%y%m%d_%H%M%S)
 echo "Expe ended at $END_TIME"

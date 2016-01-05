@@ -5,6 +5,7 @@ Analysis Moca overhead and traces quality on NPB
 ```{r parsing ,echo=F}
 library(ggplot2)
 library(plyr)
+library(methods)
 data<-data.frame(read.csv2(file="results.csv",sep=',',dec='.'))
 #str(data)
 #show(data)
@@ -70,7 +71,7 @@ show(p)
 ```{r Slowdown, echo=F}
 #show(data)
 #show(subset(data, data$Type=="Base")$Time)
-norm_vect <- rep(subset(data, data$Type=="Base")$Time,each=3)
+norm_vect <- rep(subset(data, data$Type=="Base")$Time,each=4)
 #show(norm_vect)
 data$slowdown <- data$Time / norm_vect
 stat<-ddply(data,c("Bench", "Class", "Type"),summarise,
@@ -91,6 +92,7 @@ p <-  p + theme(panel.grid.minor = element_line(colour = "black", linetype="dash
         panel.grid.major = element_line(colour = "black", size = 0.1),
         legend.position="bottom")
 p <- p + scale_fill_brewer(palette="YlOrRd")
+#p <- p + scale_y_log10()
 #p <- p + scale_fill_grey()
 #p <- p+ theme(legend.position="none")
 show(p)
@@ -150,6 +152,7 @@ p <-  p + theme(panel.grid.minor = element_line(colour = "black", linetype="dash
         panel.grid.major = element_line(colour = "black", size = 0.1),
         legend.position="bottom")
 p <- p + scale_fill_brewer(palette="YlOrRd")
+p <- p + scale_y_log10()
 show(p)
 
 ```
@@ -171,6 +174,7 @@ p <-  p + theme(panel.grid.minor = element_line(colour = "black", linetype="dash
         panel.grid.major = element_line(colour = "black", size = 0.1),
         legend.position="bottom")
 p <- p + scale_fill_brewer(palette="YlOrRd")
+p <- p + scale_y_log10()
 show(p)
 
 ```
