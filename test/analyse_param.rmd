@@ -1,0 +1,80 @@
+Analysis Moca overhead and traces quality on NPB
+================================================
+
+
+```{r parsing ,echo=F}
+library(ggplot2)
+library(plyr)
+library(grid)
+library(methods)
+data<-data.frame(read.csv2(file="results.csv",sep=',',dec='.'))
+#str(data)
+#show(data)
+```
+
+
+Results
+-------
+
+###   Execution time
+
+```{r ExecTime, echo=F,width=40}
+stat<-ddply(data,c("Bench", "Class", "Monitor", "Log"),summarise,
+            N=length(Time),mean=mean(Time),sd=sd(Time),se=sd/sqrt(N))
+p  <- ggplot(stat,aes(x=Monitor,y=mean,fill=Log,group=Log))
+p  <-  p + geom_bar(stat="identity", position="dodge")
+p  <-  p + geom_errorbar(aes(ymin=mean-se, ymax=mean+se),
+#                  width=.2,                    # Width of the error bars
+                  position="dodge")
+p <- p + xlab("Monitoring interval (ms)")
+p <- p + ylab("Execution time (s)")
+p <- p + expand_limits(y=0)
+# BW theme
+p <- p + theme_bw()
+p <-  p + theme(panel.grid.minor = element_line(colour = "black", linetype="dashed", size = 0.1),
+        panel.grid.major = element_line(colour = "black", size = 0.1),
+        legend.position="bottom", legend.key.size = unit(.5, "cm"))
+p <- p + scale_fill_gradient2(low="#FFFFCC", high="#F03B20",mid="#FEB24C",
+                              midpoint=0.5,name="Logging\ninterval (s)")
+#p <- p+ theme(legend.position="none")
+show(p)
+ggsave("moca_param.pdf",scale=.65,device=cairo_pdf)
+
+```
+
+
+### Events
+
+```{r Events, echo=F}
+events<-data.frame(read.csv2(file="events.csv",sep=',',dec='.',stringsAsFactors=FALSE))
+events$Nacc <- events$Nacc / 1000
+evtstat<-ddply(events,c("Bench", "Monitor", "Log"),summarise,
+            N=length(Nacc),mean=mean(Nacc),sd=sd(Nacc),se=sd/sqrt(N))
+p  <- ggplot(evtstat,aes(x=Monitor,y=mean,fill=Log,group=Log))
+p  <-  p + geom_bar(stat="identity", position="dodge")
+p  <-  p + geom_errorbar(aes(ymin=mean-se, ymax=mean+se),
+#                  width=.2,                    # Width of the error bars
+                  position="dodge")
+p <- p + xlab("Monitoring interval (ms)")
+p <- p + ylab("Captured events (x10^3)")
+p <- p + expand_limits(y=0)
+p <- p + theme_bw()
+p <-  p + theme(panel.grid.minor = element_line(colour = "black", linetype="dashed", size = 0.1),
+        panel.grid.major = element_line(colour = "black", size = 0.1),
+        legend.position="bottom")
+p <- p + scale_fill_gradient2(low="#FFFFCC", high="#F03B20",mid="#FEB24C",
+                              midpoint=0.5,name="Logging\ninterval (s)")
+show(p)
+ggsave("moca_param_events.pdf",scale=.65,device=cairo_pdf)
+```
+
+
+
+Conclusions
+-----------
+
+```{r free, echo=F}
+remove(p)
+remove(stat)
+remove(data)
+```

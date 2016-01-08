@@ -224,8 +224,8 @@ do_run()
         [MocaPin]="$WORKPATH/$MOCAPATH/src/utils/moca -d $WORKPATH/$MOCAPATH -P -D $LOGDIR/MocaPin-$benchname -c" \
         [Pin]="$WORKPATH/$TABARNACPATH/tabarnac -r --" [Mitos]="mitosrun" \
         [MitosTun]="mitosrun -p 1 -t 1")
-    POST_ACTIONS=([Pin]="mv *.csv $LOGDIR/" [Mitos]="mv $BASEDIR/mitos_* $LOGDIR/" \
-        [MitosTun]="mv $BASEDIR/mitos_* $LOGDIR/")
+    POST_ACTIONS=([Pin]="mv *.csv $LOGDIR/" [Mitos]="mv $BASEDIR/mitos_* $LOGDIR/Mitos" \
+        [MitosTun]="mv $BASEDIR/mitos_* $LOGDIR/MitosTun")
         # [MocaPin]="mv $LOGDIR/MocaPin.log $LOGDIR/MocaPin-$benchname/ mv $LOGDIR/MocaPin-$benchname/Moca-$benchname.log $LOGDIR/MocaPin.log" \
         # [Moca]="mv $LOGDIR/Moca.log $LOGDIR/Moca-$benchname/; mv $LOGDIR/Moca-$benchname/Moca-$benchname.log $LOGDIR/Moca.log" \
 

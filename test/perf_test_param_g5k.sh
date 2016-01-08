@@ -26,7 +26,7 @@ PREFIX="/home/dbeniamine"
 WORKPATH="/tmp"
 NAS="NPB3.3-OMP/"
 MOCAPATH="Moca"
-BENCH=mg
+BENCH=is
 CLASS=A
 
 #report error if needed

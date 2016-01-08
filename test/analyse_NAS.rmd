@@ -1,0 +1,225 @@
+Analysis Moca overhead and traces quality on NPB
+================================================
+
+
+```{r parsing ,echo=F}
+library(ggplot2)
+library(plyr)
+library(methods)
+data<-data.frame(read.csv2(file="results.csv",sep=',',dec='.'))
+#str(data)
+#show(data)
+```
+
+Setup
+-----
+
++ Experiment executed 2015-10-01 on G5K nodes (grenoble cluster edel).
++ Benchmarks: All NAS bench, CLASS A
+
+Expectations
+-------------
+
+### Moca
+
+3 groups of applications :
+
++ Overhead factor > 30
+    + *is* and *mg*
++ 5 < Overhead factor < 15
+    +  *lu*,*ft*,*bt*
++ Overhead factor < 5
+    + *cg*,*ep*,*ua*
+
+### Pin (Tabarnac)
+
++ Same groups
++ Higher overhead (30x more or less)
+
+Results
+-------
+
+###   Execution time
+
+```{r ExecTime, echo=F}
+stat<-ddply(data,c("Bench", "Class", "Type"),summarise,
+            N=length(Time),mean=mean(Time),sd=sd(Time),se=sd/sqrt(N))
+p  <- ggplot(stat,aes(x=Bench,y=mean, fill=Type))
+#p  <- ggplot(stat,aes(x=Bench,y=speedup, fill=Type))
+p  <-  p + geom_bar(stat="identity", position=position_dodge(.9) )
+p  <-  p + geom_errorbar(aes(ymin=mean-se, ymax=mean+se),
+                  width=.2,                    # Width of the error bars
+                  position=position_dodge(.9))
+#p  <- p + facet_grid(Balancing ~ Interleave)
+p <- p + xlab("Benchmark")
+p <- p + ylab("Exec time (s)")
+p <- p + guides(fill=guide_legend(title="Tracing mechanism"))
+# BW theme
+#p <- p + theme_bw()
+p <-  p + theme(panel.grid.minor = element_line(colour = "black", linetype="dashed", size = 0.1),
+        panel.grid.major = element_line(colour = "black", size = 0.1),
+        legend.position="bottom")
+p <- p + scale_fill_brewer(palette="YlOrRd")
+#p <- p + scale_fill_grey()
+#p <- p+ theme(legend.position="none")
+show(p)
+
+```
+
+### Slowdown Factor
+
+```{r Slowdown, echo=F}
+# show(data)
+# show(subset(data, data$Type=="Base")$Time)
+# norm_vect <- rep(subset(data,
+#                         data$Type=="Base")$Time,each=length(unique(data$Type)))
+# data$slowdown <- data$Time / norm_vect
+# stat<-ddply(data,c("Bench", "Class", "Type"),summarise,
+#             N=length(slowdown),mean=mean(slowdown),sd=sd(slowdown),se=sd/sqrt(N))
+norm_vect  <- rep(subset(stat, stat$Type=="Base")$mean,each=length(unique(stat$Type)))
+stat$mean <- stat$mean / norm_vect
+stat$se <- stat$se / norm_vect
+p  <- ggplot(stat,aes(x=Bench,y=mean, fill=Type))
+#p  <- ggplot(stat,aes(x=Bench,y=speedup, fill=Type))
+p  <-  p + geom_bar(stat="identity", position=position_dodge(.9) )
+p  <-  p + geom_errorbar(aes(ymin=mean-se, ymax=mean+se),
+                  width=.2,                    # Width of the error bars
+                  position=position_dodge(.9))
+#p  <- p + facet_grid(Balancing ~ Interleave)
+p <- p + xlab("Benchmark")
+p <- p + ylab("Slowdown factor")
+p <- p + guides(fill=guide_legend(title="Execution type"))
+# BW theme
+#p <- p + theme_bw()
+p <-  p + theme(panel.grid.minor = element_line(colour = "black", linetype="dashed", size = 0.1),
+        panel.grid.major = element_line(colour = "black", size = 0.1),
+        legend.position="bottom")
+p <- p + scale_fill_brewer(palette="YlOrRd")
+p <- p + scale_y_log10()
+#p <- p + scale_fill_grey()
+#p <- p+ theme(legend.position="none")
+show(p)
+ggsave("moca_overhead.png")
+```
+Detailled Values:
+
+```{r DetailledValues, echo=F}
+show(stat)
+```
+
+
+
+### Traces:
+
+
+#### Captured pages
+
+```{r Events, echo=F}
+events<-data.frame(read.csv2(file="events.csv",sep=',',dec='.',stringsAsFactors=FALSE))
+events$Pages=as.numeric(events$Pages)
+events$Accesses=as.numeric(events$Accesses)
+events$app <- events$Accesses/ events$Page
+evtstat <- ddply(events,c("Bench","Type"),summarize,
+               N=length(Pages),mp=mean(Pages),sdp=sd(Pages),sep=sdp/sqrt(N),
+               ma=mean(Accesses),sda=sd(Accesses),sea=sda/sqrt(N),
+               map=mean(app),sdap=sd(app),seap=sdap/sqrt(N),
+               mad=mean(Address),sdad=sd(Address),sead=sdad/sqrt(N))
+#show(evtstat)
+p <- ggplot(evtstat,aes(x=Bench,y=mp,fill=Type))
+p  <-  p + geom_bar(stat="identity", position=position_dodge(.9) )
+p  <-  p + geom_errorbar(aes(ymin=mp-sep, ymax=mp+sep),
+                  width=.2,                    # Width of the error bars
+                  position=position_dodge(.9))
+p <- p + xlab("Benchmark")
+p <- p + ylab("Captured pages")
+p <- p + guides(fill=guide_legend(title="Execution type"))
+p <-  p + theme(panel.grid.minor = element_line(colour = "black", linetype="dashed", size = 0.1),
+        panel.grid.major = element_line(colour = "black", size = 0.1),
+        legend.position="bottom")
+p <- p + scale_fill_brewer(palette="YlOrRd")
+show(p)
+```
+
+#### Unique addresses
+
+```{r nbaddr, echo=F}
+p <- ggplot(evtstat,aes(x=Bench,y=mad,fill=Type))
+p  <-  p + geom_bar(stat="identity", position=position_dodge(.9) )
+p  <-  p + geom_errorbar(aes(ymin=mad-sead, ymax=mad+sead),
+                  width=.2,                    # Width of the error bars
+                  position=position_dodge(.9))
+p <- p + xlab("Benchmark")
+p <- p + ylab("Unique Addresses")
+p <- p + guides(fill=guide_legend(title="Execution type"))
+p <-  p + theme(panel.grid.minor = element_line(colour = "black", linetype="dashed", size = 0.1),
+        panel.grid.major = element_line(colour = "black", size = 0.1),
+        legend.position="bottom")
+p <- p + scale_fill_brewer(palette="YlOrRd")
+p <- p + scale_y_log10()
+show(p)
+
+```
+
+
+
+#### Captured events
+
+```{r nbevnts, echo=F}
+p <- ggplot(evtstat,aes(x=Bench,y=ma,fill=Type))
+p  <-  p + geom_bar(stat="identity", position=position_dodge(.9) )
+p  <-  p + geom_errorbar(aes(ymin=ma-sea, ymax=ma+sea),
+                  width=.2,                    # Width of the error bars
+                  position=position_dodge(.9))
+p <- p + xlab("Benchmark")
+p <- p + ylab("Captured accesses")
+p <- p + guides(fill=guide_legend(title="Execution type"))
+p <-  p + theme(panel.grid.minor = element_line(colour = "black", linetype="dashed", size = 0.1),
+        panel.grid.major = element_line(colour = "black", size = 0.1),
+        legend.position="bottom")
+p <- p + scale_fill_brewer(palette="YlOrRd")
+p <- p + scale_y_log10()
+show(p)
+
+```
+
+
+#### Captured events / pages
+
+```{r evtpp, echo=F}
+p <- ggplot(evtstat,aes(x=Bench,y=map,fill=Type))
+p  <-  p + geom_bar(stat="identity", position=position_dodge(.9) )
+p  <-  p + geom_errorbar(aes(ymin=map-seap, ymax=map+seap),
+                  width=.2,                    # Width of the error bars
+                  position=position_dodge(.9))
+p <- p + xlab("Benchmark")
+p <- p + ylab("Captured accesses per page")
+p <- p + guides(fill=guide_legend(title="Execution type"))
+p <-  p + theme(panel.grid.minor = element_line(colour = "black", linetype="dashed", size = 0.1),
+        panel.grid.major = element_line(colour = "black", size = 0.1),
+        legend.position="bottom")
+p <- p + scale_fill_brewer(palette="YlOrRd")
+show(p)
+```
+
+#### Detailed values
+
+```{r valuesevt, echo=F}
+show(evtstat)
+```
+
++ ma, sda, sea:  mean, standard error and deviation for: Accesses
++ mp, sdp, sep:  mean, standard error and deviation for: Pages
++ mad, sdad, sead:  mean, standard error and deviation for: unique Addresses
++ map, sdap, seap:  mean, standard error and deviation for: Accesses/Pages
+
+Conclusions
+-----------
+
+```{r free, echo=F}
+remove(p)
+remove(stat)
+remove(data)
+remove(evtstat)
+remove(norm_vect)
+remove(events)
+```
