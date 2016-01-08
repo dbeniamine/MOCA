@@ -26,7 +26,7 @@ PREFIX="/home/dbeniamine"
 WORKPATH="/tmp"
 NAS="NPB3.3-OMP/"
 MOCAPATH="Moca"
-BENCH=is
+BENCH=mg
 CLASS=A
 
 #report error if needed
@@ -151,14 +151,14 @@ for run in $(seq $FIRSTRUN $LASTRUN)
 do
     echo "RUN : $run"
     #Actual exp
-    for wint in $(seq 20 10 100) #ms
+    for wint in $(seq 20 10 100 | shuf) #ms
     do
-        for lint in $(seq 1 9) #sec
+        for lint in $(seq 1 9 | shuf) #sec
         do
             LOGDIR="$EXP_DIR/mon-$wint/log-$lint/run-$run"
             mkdir -p $LOGDIR
             echo $LOGDIR
-	        cmd="$WORKPATH/$MOCAPATH/src/utils/moca -G -P -w $wint -L .$lint \
+	        cmd="$WORKPATH/$MOCAPATH/src/utils/moca -w $wint -L .$lint \
                 -D $LOGDIR/Moca-$BENCH -c $bench"
             #Actual experiment
             set -x

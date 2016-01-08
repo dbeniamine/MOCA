@@ -27,7 +27,7 @@
 #include <linux/slab.h>
 #include <linux/sched.h>
 
-#define MOCA_FALSE_PF_HASH_BITS 15
+#define MOCA_FALSE_PF_HASH_BITS 16
 #define MOCA_FALSE_PF_VALID 0
 #define MOCA_FALSE_PF_BAD 1
 

@@ -9,13 +9,16 @@ PREFIX="/home/dbeniamine"
 WORKPATH="/tmp"
 NAS="NPB3.3-OMP/"
 MOCAPATH="Moca"
+MITOSPATH="Mitos"
 #MEMPROFPATH="MemProf"
 TABARNACPATH="tabarnac"
 export PATH=$PATH:/opt/pin
-CONFIGS=('MocaPin' 'Base' 'Moca' 'Pin' ) #'Memprof')
+CONFIGS=('MocaPin' 'Base' 'Moca' 'Mitos' 'Pin' 'MitosTun')
 declare -A TARGETS
 declare -A RUN_DONE
+declare -A POST_ACTIONS
 declare -a RAND_RUNS
+BASEDIR=$PWD
 
 #report error if needed
 function testAndExitOnError
@@ -122,25 +125,71 @@ then
     cp -rv $PREFIX/$MOCAPATH $WORKPATH/
     #cp -rv $PREFIX/$MEMPROFPATH $WORKPATH/
     cp -rv $PREFIX/$TABARNACPATH $WORKPATH/
+    cp -rv $PREFIX/$MITOSPATH $WORKPATH/
 fi
 
 #Do the first compilation
 cd $WORKPATH/$NAS
+echo "########################"
+echo "##### NPB ##############"
+echo "########################"
+echo "##### git log: #########"
+git log | head
+echo "########################"
+echo "#### git diff: #########"
+git diff
+echo "########################"
+
 make clean
 make suite
 #make dc CLASS=A
 rm bin/*.x
-cd -
+cd $BASEDIR
 
 cd $WORKPATH/$TABARNACPATH
+echo "########################"
+echo "##### TABARNAC #########"
+echo "########################"
+echo "##### git log: #########"
+git log | head
+echo "########################"
+echo "#### git diff: #########"
+git diff
+echo "########################"
 make clean
 make
-cd -
+cd $BASEDIR
 
 cd $WORKPATH/$MOCAPATH/src
+echo "########################"
+echo "##### Moca #############"
+echo "########################"
+echo "##### git log: #########"
+git log | head
+echo "########################"
+echo "#### git diff: #########"
+git diff
+echo "########################"
 make clean
 make
-cd -
+cd $BASEDIR
+
+cd $WORKPATH/$MITOSPATH
+echo "########################"
+echo "##### Mitos ############"
+echo "########################"
+echo "##### git log: #########"
+git log | head
+echo "########################"
+echo "#### git diff: #########"
+git diff
+echo "########################"
+cd build
+rm ./*
+cmake ..
+make
+make install
+cd $BASEDIR
 
 init_runs(){
     id=0
@@ -173,18 +222,20 @@ do_run()
 	TARGETS=([Base]='' [MemProf]="$WORKPATH/$MEMPROFPATH/scripts/profile_app.sh" \
 		[Moca]="$WORKPATH/$MOCAPATH/src/utils/moca -d $WORKPATH/$MOCAPATH -D $LOGDIR/Moca-$benchname -c" \
         [MocaPin]="$WORKPATH/$MOCAPATH/src/utils/moca -d $WORKPATH/$MOCAPATH -P -D $LOGDIR/MocaPin-$benchname -c" \
-        [Pin]="$WORKPATH/$TABARNACPATH/tabarnac -r --")
+        [Pin]="$WORKPATH/$TABARNACPATH/tabarnac -r --" [Mitos]="mitosrun" \
+        [MitosTun]="mitosrun -p 1 -t 1")
+    POST_ACTIONS=([Pin]="mv *.csv $LOGDIR/" [Mitos]="mv $BASEDIR/mitos_* $LOGDIR/" \
+        [MitosTun]="mv $BASEDIR/mitos_* $LOGDIR/")
+        # [MocaPin]="mv $LOGDIR/MocaPin.log $LOGDIR/MocaPin-$benchname/ mv $LOGDIR/MocaPin-$benchname/Moca-$benchname.log $LOGDIR/MocaPin.log" \
+        # [Moca]="mv $LOGDIR/Moca.log $LOGDIR/Moca-$benchname/; mv $LOGDIR/Moca-$benchname/Moca-$benchname.log $LOGDIR/Moca.log" \
+
     # Do experiments
     cmd="${TARGETS[$conf]} $bench"
     set -x
-    echo $cmd > $LOGDIR/$conf.log 2> $LOGDIR/$conf.err
+    $cmd > $LOGDIR/$conf.log 2> $LOGDIR/$conf.err
+    ${POST_ACTIONS[$conf]}
     set +x
-    rm $WORKPATH/$NAS/ADC.*
-    mv $LOGDIR/Moca.log $LOGDIR/Moca-$benchname/
-    mv $LOGDIR/MocaPin.log $LOGDIR/MocaPin-$benchname/
-    mv $LOGDIR/Moca-$benchname/Moca-$benchname.log $LOGDIR/Moca.log
-    mv $LOGDIR/MocaPin-$benchname/Moca-$benchname.log $LOGDIR/MocaPin.log
-    mv *.csv $LOGDIR/
+    [[ "$benchname" =~ dc ]] && rm $BASEDIR/ADC.*
 }
 
 init_runs
