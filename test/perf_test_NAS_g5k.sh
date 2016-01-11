@@ -10,10 +10,15 @@ WORKPATH="/tmp"
 NAS="NPB3.3-OMP/"
 MOCAPATH="Moca"
 MITOSPATH="Mitos"
-#MEMPROFPATH="MemProf"
+MEMPROFPATH="MemProf"
 TABARNACPATH="tabarnac"
 export PATH=$PATH:/opt/pin
-CONFIGS=('MocaPin' 'Base' 'Moca' 'Mitos' 'Pin' 'MitosTun')
+if [[ $(hostname) =~ idfreeze ]]
+then
+    CONFIGS=('MocaPin' 'Base' 'Moca' 'MemProf')
+else
+    CONFIGS=('MocaPin' 'Base' 'Moca' 'Mitos' 'Pin' 'MitosTun')
+fi
 declare -A TARGETS
 declare -A RUN_DONE
 declare -A POST_ACTIONS
@@ -47,6 +52,8 @@ function dumpInfos
     # DUMP environement important stuff
     echo "#### Hostname: #########"
     hostname
+    echo "#### Kernel:   #########"
+    uname -a
     echo "#### Path:     #########"
     echo "$PATH"
     echo "########################"
@@ -123,7 +130,6 @@ if [ $PREFIX != $WORKPATH ]
 then
     cp -rv $PREFIX/$NAS $WORKPATH/
     cp -rv $PREFIX/$MOCAPATH $WORKPATH/
-    #cp -rv $PREFIX/$MEMPROFPATH $WORKPATH/
     cp -rv $PREFIX/$TABARNACPATH $WORKPATH/
     cp -rv $PREFIX/$MITOSPATH $WORKPATH/
 fi
@@ -191,6 +197,35 @@ make
 make install
 cd $BASEDIR
 
+if [[ $(hostname) =~ idfreeze ]]
+then
+    cp -rv $PREFIX/$MEMPROFPATH $WORKPATH/
+    export http_proxy="http://proxy.grenoble.grid5000.fr:3128"
+    export https_proxy="http://proxy.grenoble.grid5000.fr:3128"
+    export ftp_proxy="http://proxy.grenoble.grid5000.fr:3128"
+    aptitude -y install libelf-dev libglib2.0-dev
+    cd $WORKPATH/$MEMPROFPATH
+    echo "########################"
+    echo "##### MemProf ##########"
+    echo "########################"
+    echo "##### git log: #########"
+    git log | head
+    echo "########################"
+    echo "#### git diff: #########"
+    git diff
+    echo "########################"
+    cd module
+    make clean
+    make
+    cd ../library
+    make clean
+    make
+    cd parser
+    make clean
+    make
+    cd $BASEDIR
+fi
+
 init_runs(){
     id=0
     declare -a COMBI
@@ -223,9 +258,11 @@ do_run()
 		[Moca]="$WORKPATH/$MOCAPATH/src/utils/moca -d $WORKPATH/$MOCAPATH -D $LOGDIR/Moca-$benchname -c" \
         [MocaPin]="$WORKPATH/$MOCAPATH/src/utils/moca -d $WORKPATH/$MOCAPATH -P -D $LOGDIR/MocaPin-$benchname -c" \
         [Pin]="$WORKPATH/$TABARNACPATH/tabarnac -r --" [Mitos]="mitosrun" \
-        [MitosTun]="mitosrun -p 1 -t 1")
+        [MitosTun]="mitosrun -p 20")
+        
     POST_ACTIONS=([Pin]="mv *.csv $LOGDIR/" [Mitos]="mv $BASEDIR/mitos_* $LOGDIR/Mitos" \
-        [MitosTun]="mv $BASEDIR/mitos_* $LOGDIR/MitosTun")
+        [MitosTun]="mv $BASEDIR/mitos_* $LOGDIR/MitosTun"\
+        [MemProf]="$WORKPATH/$MEMPROFPATH/parser/parse --stdout -d1 ibs.raw | tee $LOGDIR/MemProf.out")
         # [MocaPin]="mv $LOGDIR/MocaPin.log $LOGDIR/MocaPin-$benchname/ mv $LOGDIR/MocaPin-$benchname/Moca-$benchname.log $LOGDIR/MocaPin.log" \
         # [Moca]="mv $LOGDIR/Moca.log $LOGDIR/Moca-$benchname/; mv $LOGDIR/Moca-$benchname/Moca-$benchname.log $LOGDIR/Moca.log" \
 
@@ -233,7 +270,7 @@ do_run()
     cmd="${TARGETS[$conf]} $bench"
     set -x
     $cmd > $LOGDIR/$conf.log 2> $LOGDIR/$conf.err
-    ${POST_ACTIONS[$conf]}
+    bash -c "${POST_ACTIONS[$conf]}"
     set +x
     [[ "$benchname" =~ dc ]] && rm $BASEDIR/ADC.*
 }
