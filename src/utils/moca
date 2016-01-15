@@ -197,18 +197,12 @@ kernLogFile="$logdir/$kernLogFile"
 child()
 {
     # Wait for the kernel module to start
-    if $pin
-    then
-        pincmd="pin -xyzzy -enable_vsm 0 -t $pintooldir/obj-*/*.so -o $logdir --"
-    else
-        pincmd=""
-    fi
     kill -s SIGSTOP $BASHPID
     if [ -z "$logfile" ]
     then
-        $pincmd $cmd $args
+        $cmd $args
     else
-        $pincmd $cmd $args > $logfile 2> $logfile.err
+        $cmd $args > $logfile 2> $logfile.err
     fi
     ret=$?
     echo "$program ended code $ret"
@@ -237,8 +231,7 @@ abort_on_error()
         exit 1
     fi
 }
-child &
-pid=$!
+
 
 if [ ! -z $prio ]
 then
@@ -259,6 +252,18 @@ then
     make $target
     abort_on_error $? "make fail"
 fi
+
+if $pin
+then
+# disable randomisation
+# Do pin execution
+    randomize=$(cat /proc/sys/kernel/randomize_va_space)
+    echo 0  > /proc/sys/kernel/randomize_va_space
+    pin -xyzzy -enable_vsm 0 -t $pintooldir/obj-*/*.so -o $logdir -- $cmd $args
+fi
+child &
+pid=$!
+
 insmod $install_dir/src/module/moca.ko Moca_mainPid=$pid $moca_interval $moca_bits $moca_factor \
     $Moca_false_pf $Moca_ugly $moca_chunks $moca_prio $Moca_ignorePinTask
 abort_on_error $? "unable to load module"
@@ -278,6 +283,11 @@ t=$(timer)
 echo "Unloading Moca module"
 rmmod moca
 echo "done in $(timer $t)"
+if $pin
+then
+    echo $randomize > /proc/sys/kernel/randomize_va_space
+fi
+
 t=$(timer)
 echo "Retrieving Moca log"
 wait $logpid

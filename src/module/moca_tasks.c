@@ -30,7 +30,6 @@
 
 // The first bits are not random enough, 14 bits should be enough for pids
 unsigned long Moca_tasksHashBits=14;
-int Moca_ignorePinTask=0;
 DEFINE_RWLOCK(Moca_tasksLock);
 
 // Monitored process
@@ -85,14 +84,6 @@ void Moca_CleanProcessData(void)
 }
 
 
-// Test if t is an unknown init task aka its name is "sh", "pin" or "pinbin"
-int Moca_HaveInitTaskName(struct task_struct *t)
-{
-    return t->comm && (!strcmp(t->comm, "sh") || !strcmp(t->comm, "pin")
-            || !strcmp(t->comm, "pinbin"));
-}
-
-
 static inline int Moca_ShouldMonitorTask(struct task_struct *t)
 {
     int ret=0;
@@ -103,8 +94,6 @@ static inline int Moca_ShouldMonitorTask(struct task_struct *t)
         tsk.key=t->real_parent;
         ret=Moca_EntryFromKey(Moca_tasksMap, (hash_entry)&tsk)!=NULL;
     }
-    if(ret && Moca_ignorePinTask && Moca_HaveInitTaskName(t))
-        ret=0;
     read_unlock(&Moca_tasksLock);
     return ret;
 }
