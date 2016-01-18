@@ -405,7 +405,7 @@ static ssize_t Moca_FlushData(struct file *filp,  char *buffer,
         MOCA_DEBUG_PRINT("Moca_Flushing data %p id %d allowed len %lu\n", data,
                 Moca_currentlyFlushedTaskid, len);
 
-        if(!MOCA_DATA_STATUS_DYING_OR_ZOMBIE(data))
+        if(MOCA_DATA_STATUS_DYING_OR_ZOMBIE(data))
         {
             //Data already flush, do noting and wait for kfreedom
             MOCA_DEBUG_PRINT("Moca dying data aborting flush%p\n",data);
