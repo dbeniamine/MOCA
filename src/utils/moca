@@ -157,7 +157,6 @@ do
             ;;
         P)
             pin=true
-            Moca_ignorePinTask="Moca_ignorePinTask=1"
             ;;
         *)
             usage
@@ -265,7 +264,7 @@ child &
 pid=$!
 
 insmod $install_dir/src/module/moca.ko Moca_mainPid=$pid $moca_interval $moca_bits $moca_factor \
-    $Moca_false_pf $Moca_ugly $moca_chunks $moca_prio $Moca_ignorePinTask
+    $Moca_false_pf $Moca_ugly $moca_chunks $moca_prio
 abort_on_error $? "unable to load module"
 cd -
 log &
