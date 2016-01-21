@@ -4,7 +4,7 @@ CMDLINE="$0 $@"
 EXP_NAME=$(basename $0 .sh)
 OUTPUT="exp.log"
 OWNER=dbeniamine
-RUN=30
+RUN=10
 PREFIX="/home/dbeniamine"
 WORKPATH="/tmp"
 NAS="NPB3.3-OMP/"
@@ -12,12 +12,13 @@ MOCAPATH="Moca"
 MITOSPATH="Mitos"
 MEMPROFPATH="MemProf"
 TABARNACPATH="tabarnac"
+THREADS=8
 export PATH=$PATH:/opt/pin
-if [[ $(hostname) =~ idfreeze ]]
+if [[ $(hostname) =~ stremi ]]
 then
-    CONFIGS=('MocaPin' 'Base' 'Moca' 'MemProf')
+    CONFIGS=('MocaPin' 'Base' 'MemProf')
 else
-    CONFIGS=('MocaPin' 'Base' 'Moca' 'Mitos' 'Pin' 'MitosTun')
+    CONFIGS=('MocaPin' 'Base' 'Mitos' 'Pin' 'MitosTun')
 fi
 declare -A TARGETS
 declare -A RUN_DONE
@@ -197,12 +198,12 @@ make
 make install
 cd $BASEDIR
 
-if [[ $(hostname) =~ idfreeze ]]
+if [[ $(hostname) =~ stremi ]]
 then
     cp -rv $PREFIX/$MEMPROFPATH $WORKPATH/
-    export http_proxy="http://proxy.grenoble.grid5000.fr:3128"
-    export https_proxy="http://proxy.grenoble.grid5000.fr:3128"
-    export ftp_proxy="http://proxy.grenoble.grid5000.fr:3128"
+    export http_proxy="http://proxy.reims.grid5000.fr:3128"
+    export https_proxy="http://proxy.reims.grid5000.fr:3128"
+    export ftp_proxy="http://proxy.reims.grid5000.fr:3128"
     aptitude -y install libelf-dev libglib2.0-dev
     cd $WORKPATH/$MEMPROFPATH
     echo "########################"
@@ -266,9 +267,12 @@ do_run()
         # [MocaPin]="mv $LOGDIR/MocaPin.log $LOGDIR/MocaPin-$benchname/ mv $LOGDIR/MocaPin-$benchname/Moca-$benchname.log $LOGDIR/MocaPin.log" \
         # [Moca]="mv $LOGDIR/Moca.log $LOGDIR/Moca-$benchname/; mv $LOGDIR/Moca-$benchname/Moca-$benchname.log $LOGDIR/Moca.log" \
 
+    # Unsure no addresse space randomization
+    echo 0  > /proc/sys/kernel/randomize_va_space
     # Do experiments
     cmd="${TARGETS[$conf]} $bench"
     set -x
+    export OMP_NUM_THREADS=$THREADS
     $cmd > $LOGDIR/$conf.log 2> $LOGDIR/$conf.err
     bash -c "${POST_ACTIONS[$conf]}"
     set +x
