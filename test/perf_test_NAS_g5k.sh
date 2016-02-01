@@ -4,19 +4,20 @@ CMDLINE="$0 $@"
 EXP_NAME=$(basename $0 .sh)
 OUTPUT="exp.log"
 OWNER=dbeniamine
-RUN=10
+RUN=5
 PREFIX="/home/dbeniamine"
 WORKPATH="/tmp"
 NAS="NPB3.3-OMP/"
 MOCAPATH="Moca"
 MITOSPATH="Mitos"
 MEMPROFPATH="MemProf"
+MEMPROFTUNPATH="MemProf"
 TABARNACPATH="tabarnac"
 THREADS=8
 export PATH=$PATH:/opt/pin
 if [[ $(hostname) =~ stremi ]]
 then
-    CONFIGS=('MocaPin' 'Base' 'MemProf')
+    CONFIGS=('MocaPin' 'Base' 'MemProf' 'MemProfTun')
 else
     CONFIGS=('MocaPin' 'Base' 'Mitos' 'Pin' 'MitosTun')
 fi
@@ -200,14 +201,35 @@ cd $BASEDIR
 
 if [[ $(hostname) =~ stremi ]]
 then
-    cp -rv $PREFIX/$MEMPROFPATH $WORKPATH/
     export http_proxy="http://proxy.reims.grid5000.fr:3128"
     export https_proxy="http://proxy.reims.grid5000.fr:3128"
     export ftp_proxy="http://proxy.reims.grid5000.fr:3128"
     aptitude -y install libelf-dev libglib2.0-dev
+    cp -rv $PREFIX/$MEMPROFPATH $WORKPATH/
     cd $WORKPATH/$MEMPROFPATH
     echo "########################"
     echo "##### MemProf ##########"
+    echo "########################"
+    echo "##### git log: #########"
+    git log | head
+    echo "########################"
+    echo "#### git diff: #########"
+    git diff
+    echo "########################"
+    cd module
+    make clean
+    make
+    cd ../library
+    make clean
+    make
+    cd parser
+    make clean
+    make
+    cd $BASEDIR
+    cp -rv $PREFIX/$MEMPROFTUNPATH $WORKPATH/
+    cd $WORKPATH/$MEMPROFTUNPATH
+    echo "########################"
+    echo "##### MemProfTun ##########"
     echo "########################"
     echo "##### git log: #########"
     git log | head
@@ -256,6 +278,7 @@ do_run()
 	echo $LOGDIR
     mkdir -p $LOGDIR
 	TARGETS=([Base]='' [MemProf]="$WORKPATH/$MEMPROFPATH/scripts/profile_app.sh" \
+		[MemProfTun]="$WORKPATH/$MEMPROFTUNPATH/scripts/profile_app.sh" \
 		[Moca]="$WORKPATH/$MOCAPATH/src/utils/moca -d $WORKPATH/$MOCAPATH -D $LOGDIR/Moca-$benchname -c" \
         [MocaPin]="$WORKPATH/$MOCAPATH/src/utils/moca -d $WORKPATH/$MOCAPATH -P -D $LOGDIR/MocaPin-$benchname -c" \
         [Pin]="$WORKPATH/$TABARNACPATH/tabarnac -r --" [Mitos]="mitosrun" \
@@ -263,7 +286,8 @@ do_run()
         
     POST_ACTIONS=([Pin]="mv *.csv $LOGDIR/" [Mitos]="mv $BASEDIR/mitos_* $LOGDIR/Mitos" \
         [MitosTun]="mv $BASEDIR/mitos_* $LOGDIR/MitosTun"\
-        [MemProf]="$WORKPATH/$MEMPROFPATH/parser/parse --stdout -d1 ibs.raw | tee $LOGDIR/MemProf.out")
+        [MemProf]="$WORKPATH/$MEMPROFPATH/parser/parse --stdout -d1 ibs.raw | tee $LOGDIR/MemProf.out"\
+        [MemProfTun]="$WORKPATH/$MEMPROFTUNPATH/parser/parse --stdout -d1 ibs.raw | tee $LOGDIR/MemProfTun.out")
         # [MocaPin]="mv $LOGDIR/MocaPin.log $LOGDIR/MocaPin-$benchname/ mv $LOGDIR/MocaPin-$benchname/Moca-$benchname.log $LOGDIR/MocaPin.log" \
         # [Moca]="mv $LOGDIR/Moca.log $LOGDIR/Moca-$benchname/; mv $LOGDIR/Moca-$benchname/Moca-$benchname.log $LOGDIR/Moca.log" \
 
