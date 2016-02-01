@@ -32,15 +32,15 @@ generate_producers()
     field=$(( $1 + 1 ))
     name=${TYPES[$1]}-producers.log
     echo $2 > $name
-    sed 1d $3 | cut -d , -f 1,8 | sed 's/...,//' | sort -u |\
+    sed 1d $3 | cut -d , -f $field,8  | sort -u |\
         awk 'BEGIN{CUR=-1} {ADDR=sprintf("%s", $1);if(CUR==ADDR)\
-        {TSKS=TSKS","$2}else{if(CUR!=-1){print CUR","TSKS};CUR=ADDR;TSKS=$2}}\
-            END{print CUR","TSKS}' >> $name
+        {TSKS=TSKS","$2}else{if(CUR!=-1){print CUR""TSKS};CUR=ADDR;TSKS=$2}}\
+            END{print CUR""TSKS}' >> $name
 }
 
 generate_producers 0 $1 $2 &
 pid0=$!
-#generate_producers 1 $1 $2 &
+generate_producers 1 $1 $2 &
 pid1=$!
 wait $pid0
 wait $pid1
