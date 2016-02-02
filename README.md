@@ -26,8 +26,22 @@ in [framesoc importer repository](https://github.com/soctrace-inria/framesoc.imp
 
 To monitor a program with Moca, you can run the following command as root
 
-    moca -c "my_command" -a "my_arguments"
+    # moca -c "my_command" -a "my_arguments"
 
+### Retrieving data structure informations
+
+It is also possible to retrieve data structure name addresses and size, this
+is done using a Pin instrumentation. To do so first install Pin from
+[here](https://software.intel.com/en-us/articles/pintool-downloads). On 64bits
+systems you will also need to install 32 bits support, on debian it will be
+something like `sudo apt-get install libc6-i386`.
+
+One this is done just tell Moca to use pin for structure detections:
+
+    # moca -c "my_command" -a "my_arguments"
+
+At this point `pin` must be in root's path and either pin is installed in
+`/opt/pin/` or `PIN_HOME` should point to pin installation directory.
 
 ### Log
 
@@ -38,7 +52,7 @@ The command output will be logged in the files <code>Moca-cmd.log</code> and
 The output of Moca is logged in the file <code>Moca-output.log</code>, this
 can be modified by the parameter <code>-l file</code>.
 
-Finally the traces are in the files named <code>Moca-taskX</code>.
+Finally the trace is in the file named <code>Moca-full-trace.csv</code>.
 
 ### Fine tunning
 
@@ -76,34 +90,13 @@ interval the priority than on the storage related parameters.
 
 ### Trace
 
-By default Moca traces are saved in files named Moca-taskX, there is on file
-per task (process or thread), X is the ID of the task (starting at 0, by ordre
-of creation).
-These are plain text easily parsable files, they can be imported and
-visualised into framesoc[3] (see next section).
-
-All files starts with a Line giving the internalID and the system processID:
-
-    T internalId ProcessId
-
-The Task 0 first line ends with a page_size of your machine.
-
-The second is always the beginning of a chunk:
-
-    C id N start end cpumask
-
-These lines contains the identifier of the chunk inside the task, the number N
-of access in this chunk, the timestamp of the beginning and end of the chunk
-and a bitmask telling which processors have accessed to this chunk.
-
-Each Chunk line is followed by N access lines:
-
-    A @Virt @Phy countread countwrite cpumas
-
-Each access lines correspond to one page, it gives the virtual and physical
-address of the page, the number of read and writes observed and a cpumask
-telling which processors are responsible of these access.
-
+Traces are saved as one human readable csv file. Each line indicate one memory
+accesse described by its virtual and physical addresses (`@Virt` and `@Phy`)
+the number of reads and writes (`Nreads` and `Nwrites`) a bitmask indicating
+on which CPUs the access have been detected (`CPUMaask`) a start and end
+timestamp correspondig to the chunk timestamp (̀`Start` and ̀`End`) and finaly
+the internal identifier of the task (thread) responsible for the access
+(`TaskId`).
 
 ### Visualisation
 
@@ -121,6 +114,9 @@ To install Framesoc and ocelotl, go to the [official
 website](http://soctrace-inria.github.io/framesoc/) and follow the
 instruction. Than you can import Moca's trace through Framesoc's Moca importer
 and visualise it with Ocelotl.
+
+**Note: ** This visualisation method is still experimental, the importer will
+soon be publicly accessible.
 
 
 ## Installation
