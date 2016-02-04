@@ -33,7 +33,7 @@ sub printAcc{
 }
 
 my $input   = "Moca-full-trace.csv";
-my $output  = "Moca-sharing.csv";
+my $output  = "Moca-shared.csv";
 my $verbose;
 
 my $result = GetOptions ("input=s" => \$input,
@@ -79,8 +79,9 @@ while ($line=<FIN>){
     push $PAGES{$page}, \%ACCESS;
     ++$cpt;
 }
+my $npages=scalar keys %PAGES;
 close FIN;
-if($verbose){print "$cpt accesses parsed from $input\n";}
+if($verbose){print "$cpt accesses on $npages pages parsed from $input\n";}
 $cpt=0;
 
 
@@ -91,7 +92,7 @@ print FOUT "$head";
 # We consider every accesses to a page as a list of arrival and leave
 # Each event create a new access
 foreach my $page (keys %PAGES){
-    if($verbose){print "Computing sharing for page $page\n";}
+    if($verbose){print "Extracting intervals for page $page\n";}
     # Generate list of arrival and ends
     my @Starts;
     my @Ends;
@@ -99,6 +100,7 @@ foreach my $page (keys %PAGES){
         @Starts[$i]={'Time'=>$PAGES{$page}[$i]{'Start'},'Id'=>$i};
         @Ends[$i]={'Time'=>$PAGES{$page}[$i]{'End'},'Id'=>$i};
     }
+    if($verbose){print "Sorting intervals for page $page\n";}
     # Sort both lists
     @Starts=sort {Time($a) <=> Time($b)} @Starts;
     @Ends=sort {Time($a) <=> Time($b)} @Ends;
@@ -112,9 +114,10 @@ foreach my $page (keys %PAGES){
     my @CURIDS;
     push @CURIDS,$Starts[0]->{'Id'};
 
+    if($verbose){print "Computing intersections for page $page\n";}
     while($idE < $#Ends){
         $old=$cur;
-        if($idS <$#Starts && $Starts[$idS] <= $Ends[$idE]){
+        if($idS < $#Starts && $Starts[$idS]->{'Time'} <= $Ends[$idE]->{'Time'}){
             # Arrival
             $cur=$Starts[$idS]->{'Time'};
             # Save current access
@@ -131,12 +134,13 @@ foreach my $page (keys %PAGES){
             push @ACCESSES, {'Start'=>$old,'End'=>$cur,'IDS'=>[@CURIDS],};
             # Remove id from the current access
             my $index = 0;
-            $index++ until $CURIDS[$index] eq $Ends[$idE]->{'Id'};
+            $index++ until $index >= $#Ends or $CURIDS[$index] eq $Ends[$idE]->{'Id'};
             splice(@CURIDS, $index, 1);
             ++$idE;
         }
     }
 
+    if($verbose){print "dumping accesses for page $page\n";}
     # print the actual list of accesses
     for my $accid (0 .. $#ACCESSES){
         my $shared=(scalar(@{$ACCESSES[$accid]->{'IDS'}}) > 1)?"1":"0";
@@ -146,4 +150,4 @@ foreach my $page (keys %PAGES){
     }
 }
 close FOUT;
-if($verbose){print "$cpt shared accesses detected \n";}
+#TODO: print framesoc files from here
