@@ -67,19 +67,8 @@ usage()
     won't swap or it will crash !"
 }
 
-timer()
-{
-    local fmt="+%H h %M min %S.%3N sec"
-    if [ -z "$1" ]
-    then
-        date +%s.%3N
-    else
-        date -u -d "0 $(date +%s.%3N) sec - $1 sec" "$fmt"
-    fi
-
-}
-
-initime=$(timer)
+timer=$(dirname $0)/timer.sh
+initime=$($timer)
 install_dir="$(dirname $0)/../.."
 pintooldir=$install_dir/src/pintool
 pin=false
@@ -273,21 +262,21 @@ if [ ! -z $prio ]
 then
     schedtool -F -p $prio $logpid
 fi
-t=$(timer)
+t=$($timer)
 echo "Moca correctly loaded, executing: \"$cmd $args\""
 kill -s SIGCONT $pid
 wait $pid
-echo "done in $(timer $t)"
-t=$(timer)
+$timer $t
+t=$($timer)
 echo "Unloading Moca module"
 rmmod moca
-echo "done in $(timer $t)"
+$timer $t
 if $pin
 then
     echo $randomize > /proc/sys/kernel/randomize_va_space
 fi
 
-t=$(timer)
+t=$($timer)
 echo "Retrieving Moca log"
 wait $logpid
 # Create the log
@@ -295,7 +284,7 @@ line=$(grep -n "Moca started" /var/log/kern.log | tail -n 1 | cut -d ':' -f 1)
 line=$(($line-1))
 line+='d'
 sed 1,$line /var/log/kern.log | grep -i "moca" > $logdir/$Moca_log
-echo "File $logdir/$Moca_log created with Moca output in $(timer $t)"
+echo "File $logdir/$Moca_log created with Moca output in $($timer $t)"
 pgsize=4096
 if $framesoc
 then
@@ -303,11 +292,11 @@ then
     echo "Creating files for Framesoc"
     cd $logdir
     $install_dir/src/utils/create_event_producer.sh $pgsize $kernLogFile-$f.csv
-    echo -e "\tdone in $(timer $t)"
+    echo -e "\tdone in $($timer $t)"
     cd -
 else
     echo "Not creating framesoc files"
     echo "You can generate them later by running:"
     echo "cd $logdir; $install_dir/src/utils/create_event_producer.sh $pgsize $kernLogFile-$f.csv"
 fi
-echo -e "Moca analysis done\nTotal time: $(timer $initime)\nLog directory: $logdir\nBye!"
+echo -e "Moca analysis done\nTotal time: $($timer $initime)\nLog directory: $logdir\nBye!"

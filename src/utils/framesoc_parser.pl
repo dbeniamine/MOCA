@@ -32,18 +32,23 @@ sub printAcc{
     print FOUT "$a->{'Virt'},$a->{'Phy'},$a->{'Read'},$a->{'Write'},$a->{'CPU'},$a->{'Start'},$a->{'End'},$a->{'Task'},$shared\n";
 }
 
-my $input   = "Moca-full-trace.csv";
-my $output  = "Moca-framesoc.csv";
+my $input       = "Moca-full-trace.csv";
+my $output      = "Moca-framesoc.csv";
+my $pagesize    = 4096;
 my $verbose;
+my $debug;
 
-my $result = GetOptions ("input=s" => \$input,
-                    "output=s"   => \$output,
-                    "verbose"  => \$verbose);
+my $result = GetOptions ("input=s"  => \$input,
+                    "output=s"      => \$output,
+                    "pagesize=n"    => \$pagesize,
+                    "verbose"       => \$verbose,
+                    "debug"         => \$debug);
 my %PAGES;
-# my $FIN;
-# my $FOUT;
 my $line;
 my $cpt=0;
+my $pageMask = sprintf("%x",$pagesize);
+$pageMask =~ s/1//;
+$pageMask =~ s/0/./g;
 
 open FIN, "<",$input  or die "can't open $input";
 
@@ -70,7 +75,7 @@ while ($line=<FIN>){
             );
 
     my $page=$FIELDS[0];
-    $page=~ s/...$/000/g;
+    $page=~ s/$pageMask$/000/g;
 
     # Add it to the page
     if( !exists $PAGES{$page}){
@@ -92,7 +97,7 @@ print FOUT "$head";
 # We consider every accesses to a page as a list of arrival and leave
 # Each event create a new access
 foreach my $page (keys %PAGES){
-    if($verbose){print "Extracting intervals for page $page\n";}
+    if($debug){print "Extracting intervals for page $page\n";}
     # Generate list of arrival and ends
     my @Starts;
     my @Ends;
@@ -100,7 +105,7 @@ foreach my $page (keys %PAGES){
         @Starts[$i]={'Time'=>$PAGES{$page}[$i]{'Start'},'Id'=>$i};
         @Ends[$i]={'Time'=>$PAGES{$page}[$i]{'End'},'Id'=>$i};
     }
-    if($verbose){print "Sorting intervals for page $page\n";}
+    if($debug){print "Sorting intervals for page $page\n";}
     # Sort both lists
     @Starts=sort {Time($a) <=> Time($b)} @Starts;
     @Ends=sort {Time($a) <=> Time($b)} @Ends;
@@ -114,7 +119,7 @@ foreach my $page (keys %PAGES){
     my @CURIDS;
     push @CURIDS,$Starts[0]->{'Id'};
 
-    if($verbose){print "Computing intersections for page $page\n";}
+    if($debug){print "Computing intersections for page $page\n";}
     while($idE < $#Ends){
         $old=$cur;
         if($idS < $#Starts && $Starts[$idS]->{'Time'} <= $Ends[$idE]->{'Time'}){
@@ -140,7 +145,7 @@ foreach my $page (keys %PAGES){
         }
     }
 
-    if($verbose){print "dumping accesses for page $page\n";}
+    if($debug){print "dumping accesses for page $page\n";}
     # print the actual list of accesses
     for my $accid (0 .. $#ACCESSES){
         my $shared=(scalar(@{$ACCESSES[$accid]->{'IDS'}}) > 1)?"1":"0";
