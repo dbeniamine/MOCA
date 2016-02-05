@@ -33,7 +33,7 @@ sub printAcc{
 }
 
 my $input   = "Moca-full-trace.csv";
-my $output  = "Moca-shared.csv";
+my $output  = "Moca-framesoc.csv";
 my $verbose;
 
 my $result = GetOptions ("input=s" => \$input,
