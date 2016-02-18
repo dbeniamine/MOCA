@@ -25,11 +25,20 @@ sub Time{
     return $_{'Time'};
 }
 
-sub printAcc{
-    my $a=$_[0];
-    my $shared=$_[1];
+my $prevline="";
+sub printAcc($$$$){
+    my $a=shift;
+    my $shared=shift;
+    my $start=shift;
+    my $end=shift;
 
-    print FOUT "$a->{'Virt'},$a->{'Phy'},$a->{'Read'},$a->{'Write'},$a->{'CPU'},$a->{'Start'},$a->{'End'},$a->{'Task'},$shared\n";
+    my $line="$a->{'Virt'},$a->{'Phy'},$a->{'Read'},$a->{'Write'},$a->{'CPU'},$start,$end,$a->{'Task'},$shared\n";
+    if($line ne $prevline){
+        # Lines can be duplicated in some border case, we just have to ignore
+        # them
+        print FOUT $line;
+    }
+    $prevline=$line;
 }
 
 my $input       = "Moca-full-trace.csv";
@@ -39,15 +48,16 @@ my $verbose;
 my $debug;
 
 my $result = GetOptions ("input=s"  => \$input,
-                    "output=s"      => \$output,
-                    "pagesize=n"    => \$pagesize,
-                    "verbose"       => \$verbose,
-                    "debug"         => \$debug);
+    "output=s"      => \$output,
+    "pagesize=n"    => \$pagesize,
+    "verbose"       => \$verbose,
+    "debug"         => \$debug);
 my %PAGES;
 my $line;
 my $cpt=0;
 my $pageMask = sprintf("%x",$pagesize);
 $pageMask =~ s/1//;
+my $pageZeros=$pageMask;
 $pageMask =~ s/0/./g;
 
 open FIN, "<",$input  or die "can't open $input";
@@ -65,17 +75,17 @@ while ($line=<FIN>){
     my @FIELDS=split(',', $line);
 
     my %ACCESS=('Virt'  => $FIELDS[0],
-                'Phy'   => $FIELDS[1],
-                'Read'  => $FIELDS[2],
-                'Write' => $FIELDS[3],
-                'CPU'   => $FIELDS[4],
-                'Start' => $FIELDS[5],
-                'End'   => $FIELDS[6],
-                'Task'  => $FIELDS[7],
-            );
+        'Phy'   => $FIELDS[1],
+        'Read'  => $FIELDS[2],
+        'Write' => $FIELDS[3],
+        'CPU'   => $FIELDS[4],
+        'Start' => $FIELDS[5],
+        'End'   => $FIELDS[6],
+        'Task'  => $FIELDS[7],
+    );
 
     my $page=$FIELDS[0];
-    $page=~ s/$pageMask$/000/g;
+    $page=~ s/$pageMask$/$pageZeros/g;
 
     # Add it to the page
     if( !exists $PAGES{$page}){
@@ -96,7 +106,7 @@ print FOUT "$head";
 # Compute sharing:
 # We consider every accesses to a page as a list of arrival and leave
 # Each event create a new access
-foreach my $page (keys %PAGES){
+foreach my $page (sort keys %PAGES){
     if($debug){print "Extracting intervals for page $page\n";}
     # Generate list of arrival and ends
     my @Starts;
@@ -112,24 +122,25 @@ foreach my $page (keys %PAGES){
 
     # Compute intersections
     my @ACCESSES;
-    my $cur=@Starts[0]->{'Time'};
-    my $idS=1;
+    my $cur=-1;
+    my $idS=0;
     my $idE=0;
-    my $old;
+    my $old=-1;
     my @CURIDS;
-    push @CURIDS,$Starts[0]->{'Id'};
 
     if($debug){print "Computing intersections for page $page\n";}
-    while($idE < $#Ends){
+    while($idE < scalar @Ends){
         $old=$cur;
-        if($idS < $#Starts && $Starts[$idS]->{'Time'} <= $Ends[$idE]->{'Time'}){
+        if($idS < scalar @Starts && $Starts[$idS]->{'Time'} <= $Ends[$idE]->{'Time'}){
             # Arrival
             $cur=$Starts[$idS]->{'Time'};
             # Save current access
-            if($#CURIDS > 0){
+            if(scalar @CURIDS > 0){
                 push @ACCESSES, {'Start'=>$old,'End'=>$cur,'IDS'=>[@CURIDS],};
             }
             # Add id to the current access
+            my $index = 0;
+            $index++ until $index >= scalar @CURIDS or $CURIDS[$index] eq $Starts[$idS]->{'Id'};
             push @CURIDS,$Starts[$idS]->{'Id'};
             ++$idS;
         }else{
@@ -138,11 +149,14 @@ foreach my $page (keys %PAGES){
             # Save current access
             push @ACCESSES, {'Start'=>$old,'End'=>$cur,'IDS'=>[@CURIDS],};
             # Remove id from the current access
-            my $index = 0;
-            $index++ until $index >= $#Ends or $CURIDS[$index] eq $Ends[$idE]->{'Id'};
-            splice(@CURIDS, $index, 1);
+            @CURIDS = grep {$_ != $Ends[$idE]->{'Id'} } @CURIDS;
             ++$idE;
         }
+    }
+    if (scalar @CURIDS != 0){
+        print "After all events for page $page, curids not empty: $#CURIDS: '@CURIDS'\n";
+        print Dumper @ACCESSES;
+        exit 1
     }
 
     if($debug){print "dumping accesses for page $page\n";}
@@ -150,7 +164,9 @@ foreach my $page (keys %PAGES){
     for my $accid (0 .. $#ACCESSES){
         my $shared=(scalar(@{$ACCESSES[$accid]->{'IDS'}}) > 1)?"1":"0";
         foreach my $id (@{$ACCESSES[$accid]->{'IDS'}}){
-            printAcc($PAGES{$page}[$id],$shared);
+            # print "ai: $accid p: $page, i: $id, s: $ACCESSES[$accid]->{'Start'}, e: $ACCESSES[$accid]->{'End'}\n";
+            printAcc($PAGES{$page}[$id],$shared,$ACCESSES[$accid]->{'Start'},
+                $ACCESSES[$accid]->{'End'});
         }
     }
 }

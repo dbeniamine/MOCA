@@ -46,14 +46,16 @@ generate_producers()
 t=$($timer)
 echo "Generating producer files"
 generate_producers 0 $1 $2 &
-pid0=$!
+PIDS="$PIDS $!"
 generate_producers 1 $1 $2 &
-pid1=$!
-wait $pid0
-wait $pid1
-$timer $t
-t=$($timer)
+PIDS="$PIDS $!"
 echo "Generating framesoc trace file"
 cd $(dirname $2)
-$DIR/$parser -v -p $1 -i $(basename $2)
+$parser -v -p $1 -i $(basename $2)
+PIDS="$PIDS $!"
+for p in $PIDS
+do
+    wait $p
+done
 $timer $t
+
