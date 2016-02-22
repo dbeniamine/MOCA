@@ -298,9 +298,12 @@ do_run()
     set -x
     export OMP_NUM_THREADS=$THREADS
     $cmd > $LOGDIR/$conf.log 2> $LOGDIR/$conf.err
-    bash -c "${POST_ACTIONS[$conf]}"
+    if [ ! -z "${POST_ACTIONS[$conf]}" ]
+    then
+        bash -c "${POST_ACTIONS[$conf]}"
+    fi
+    [[ "$benchname" =~ dc ]] && rm $(find $WORKPATH -name 'ADC.*' | grep -v ADC.par)
     set +x
-    [[ "$benchname" =~ dc ]] && rm $BASEDIR/ADC.*
 }
 
 init_runs
