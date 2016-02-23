@@ -21,10 +21,6 @@ use Getopt::Long; # options
 use Data::Dumper; # debug
 use strict;
 
-sub Time{
-    return $_{'Time'};
-}
-
 my $prevline="";
 sub printAcc($$$$){
     my $a=shift;
@@ -117,8 +113,8 @@ foreach my $page (sort keys %PAGES){
     }
     if($debug){print "Sorting intervals for page $page\n";}
     # Sort both lists
-    @Starts=sort {Time($a) <=> Time($b)} @Starts;
-    @Ends=sort {Time($a) <=> Time($b)} @Ends;
+    @Starts=sort {$a->{'Time'} <=> $b->{'Time'}} @Starts;
+    @Ends=sort {$a->{'Time'} <=> $b->{'Time'}} @Ends;
 
     # Compute intersections
     my @ACCESSES;
