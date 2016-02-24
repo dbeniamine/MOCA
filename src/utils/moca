@@ -33,7 +33,7 @@ usage()
     Default: $logdir"
     echo "  -G                Do generate framesoc's files"
     echo "  -P                Do use pin (needed for structure name
-                              detection)"
+    detection)"
     echo -e "\n  The following parameters allows you to do fine tuning on the
     module. By default you shouldn't need to use them.
     + If you encounter performance issues, you can increase the wakeup
@@ -79,6 +79,7 @@ Moca_log="Moca-output.log"
 name=$(basename $0)
 compi=true
 framesoc=false
+preload="$install_dir/src/libs/replace_malloc.so"
 
 while getopts "c:ha:d:f:l:w:p:b:S:C:D:L:nHFGP" opt
 do
@@ -188,22 +189,37 @@ child()
     kill -s SIGSTOP $BASHPID
     if [ -z "$logfile" ]
     then
-        $cmd $args
+        LD_PRELOAD=$preload $cmd $args &
+        pid=$!
     else
-        $cmd $args > $logfile 2> $logfile.err
+        LD_PRELOAD=$preload $cmd $args > $logfile 2> $logfile.err &
+        pid=$!
     fi
+    # Store actual pid for stack detection
+    echo $pid > $logdir/pid
+    wait $pid
     ret=$?
     echo "$program ended code $ret"
     exit $ret
 }
 log()
 {
+    while [ ! -e $logdir/pid ]
+    do
+        sleep 1
+    done
+    #initialize stack detection
+    pid=$(cat $logdir/pid)
+    stackfile="$logdir/stacks.log"
+    touch $stackfile
     while test -e $procdir
     do
         for f in $(\ls $procdir)
         do
             cat $procdir/$f >> $kernLogFile-$f.csv
         done
+        grep stack /proc/$pid/maps $stackfile | sed 's/^[^:]*://' | sort -u > $stackfile-temp
+        mv $stackfile-temp $stackfile
         sleep $log_thread_interval
     done
     echo "Moca trace completly flushed"
@@ -243,8 +259,8 @@ fi
 
 if $pin
 then
-# disable randomisation
-# Do pin execution
+    # disable randomisation
+    # Do pin execution
     randomize=$(cat /proc/sys/kernel/randomize_va_space)
     echo 0  > /proc/sys/kernel/randomize_va_space
     pin -xyzzy -enable_vsm 0 -t $pintooldir/obj-*/*.so -o $logdir -- $cmd $args
@@ -256,8 +272,6 @@ insmod $install_dir/src/module/moca.ko Moca_mainPid=$pid $moca_interval $moca_bi
     $Moca_false_pf $Moca_ugly $moca_chunks $moca_prio
 abort_on_error $? "unable to load module"
 cd -
-log &
-logpid=$!
 if [ ! -z $prio ]
 then
     schedtool -F -p $prio $logpid
@@ -265,6 +279,8 @@ fi
 t=$($timer)
 echo "Moca correctly loaded, executing: \"$cmd $args\""
 kill -s SIGCONT $pid
+log &
+logpid=$!
 wait $pid
 $timer $t
 t=$($timer)
@@ -279,12 +295,20 @@ fi
 t=$($timer)
 echo "Retrieving Moca log"
 wait $logpid
+rm $logdir/pid
 # Create the log
 line=$(grep -n "Moca started" /var/log/kern.log | tail -n 1 | cut -d ':' -f 1)
 line=$(($line-1))
 line+='d'
 sed 1,$line /var/log/kern.log | grep -i "moca" > $logdir/$Moca_log
 echo "File $logdir/$Moca_log created with Moca output in $($timer $t)"
+# Fix pin address
+if $pin
+then
+    cd $logdir
+    $install_dir/src/utils/fix_pin_addr.sh $program 7f0000000000
+    cd -
+fi
 pgsize=4096
 if $framesoc
 then

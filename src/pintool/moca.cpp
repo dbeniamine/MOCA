@@ -75,9 +75,6 @@ ofstream fstructStream;
 int num_threads = 0;
 
 
-array<UINT64, MAXTHREADS> stacksize; // stack size of each thread in pages
-array<UINT64, MAXTHREADS> stackmax;  // tid -> stack base address from file (unpinned application)
-map<UINT32, UINT64> stackmap;        // stack base address from pinned application
 
 string img_name;
 
@@ -100,22 +97,6 @@ VOID ThreadStart(THREADID tid, CONTEXT *ctxt, INT32 flags, VOID *v)
     if (num_threads>=MAXTHREADS+1) {
         cerr << "ERROR: num_threads (" << num_threads << ") higher than MAXTHREADS (" << MAXTHREADS << ")." << endl;
     }
-
-    int pid = PIN_GetTid();
-    stackmap[pid] = PIN_GetContextReg(ctxt, REG_STACK_PTR) >> PAGESIZE;
-    // Print Tid, StackMin, StackSize
-    ofstream ofs;
-    if(tid==0)
-    {
-        ofs.open(output_path.Value()+string("/")+img_name + ".stackmap.csv");
-        ofs << "tid,stackmax,sz"<<endl;
-    }
-    else
-    {
-        ofs.open(output_path.Value()+string("/")+img_name + ".stackmap.csv", std::ios_base::app);
-    }
-    ofs << REAL_TID(tid) <<"," << stackmap[pid] <<","<< GetStackSize() << endl;
-    ofs.close();
 
 }
 
