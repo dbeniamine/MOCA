@@ -17,9 +17,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+use strict;
 use Getopt::Long; # options
 use Data::Dumper; # debug
-use strict;
+use List::MoreUtils qw(uniq);
 
 my $prevline="";
 sub printAcc($$$$){
@@ -158,13 +159,17 @@ foreach my $page (sort keys %PAGES){
     if($debug){print "dumping accesses for page $page\n";}
     # print the actual list of accesses
     for my $accid (0 .. $#ACCESSES){
-        my $shared=(scalar(@{$ACCESSES[$accid]->{'IDS'}}) > 1)?"1":"0";
+        # Count the number of threads in the page
+        my @TIDS;
+        foreach my $id (@{$ACCESSES[$accid]->{'IDS'}}){
+            push  @TIDS,"$PAGES{$page}[$id]->{'Task'} ";
+        }
+        my $shared=scalar(uniq(@TIDS));
         foreach my $id (@{$ACCESSES[$accid]->{'IDS'}}){
             # print "ai: $accid p: $page, i: $id, s: $ACCESSES[$accid]->{'Start'}, e: $ACCESSES[$accid]->{'End'}\n";
-            printAcc($PAGES{$page}[$id],$shared,$ACCESSES[$accid]->{'Start'},
-                $ACCESSES[$accid]->{'End'});
+            printAcc($PAGES{$page}[$id],$shared,
+                $ACCESSES[$accid]->{'Start'},$ACCESSES[$accid]->{'End'});
         }
     }
 }
 close FOUT;
-#TODO: print framesoc files from here
