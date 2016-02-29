@@ -315,12 +315,12 @@ then
     # Create the event poducers log (required by framesoc)
     echo "Creating files for Framesoc"
     cd $logdir
-    $install_dir/src/utils/create_event_producer.sh $pgsize $kernLogFile-$f.csv
+    $install_dir/src/utils/create_event_producer.sh $pgsize $kernLogFile-full-trace.csv
     echo -e "\tdone in $($timer $t)"
     cd -
 else
     echo "Not creating framesoc files"
     echo "You can generate them later by running:"
-    echo "cd $logdir; $install_dir/src/utils/create_event_producer.sh $pgsize $kernLogFile-$f.csv"
+    echo "cd $logdir; $install_dir/src/utils/create_event_producer.sh $pgsize $kernLogFile-full-trace.csv"
 fi
 echo -e "Moca analysis done\nTotal time: $($timer $initime)\nLog directory: $logdir\nBye!"
