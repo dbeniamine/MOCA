@@ -242,6 +242,7 @@ struct task_struct *Moca_GetTaskFromData(task_data data)
 int Moca_AddToChunk(task_data data, void *addr, int cpu, int write)
 {
     int status, cur;
+    static int lost=0;
     struct _chunk_entry tmp;
     chunk_entry e;
     cur=Moca_CurrentChunk(data);
@@ -259,7 +260,10 @@ int Moca_AddToChunk(task_data data, void *addr, int cpu, int write)
     {
         case MOCA_HASHMAP_FULL :
             spin_unlock(&data->chunks[cur]->lock);
-            printk(KERN_INFO "Moca chunk full, part of the trace will be lost");
+            if(lost!=0){
+                printk(KERN_INFO "Moca chunk full, part of the trace will be lost");
+                lost=1;
+            }
             return -1;
             break;
         case MOCA_HASHMAP_ERROR :
