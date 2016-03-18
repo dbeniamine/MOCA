@@ -106,7 +106,7 @@ int getStructs(const char* file);
 /* string get_struct_name(string str, int ln, string fname, int rec); */
 
 
-VOID PREMALLOC(ADDRINT retip, THREADID tid, ADDRINT sz)
+VOID PREMALLOC(ADDRINT retip, THREADID tid, ADDRINT sz, const string *binSource)
 {
     int col, ln;
     int id=REAL_TID(tid);
@@ -119,11 +119,12 @@ VOID PREMALLOC(ADDRINT retip, THREADID tid, ADDRINT sz)
         PIN_LockClient();
         PIN_GetSourceLocation 	(retip, &col, &ln, &fname);
         PIN_UnlockClient();
+	Allocs[id].sym=*binSource+string(":");
         if(fname.compare("")!=0){
-            Allocs[id].sym=fname+string(":") + to_string(ln);
+            Allocs[id].sym+=fname+string(":") + to_string(ln);
         }else
         {
-            Allocs[id].sym="UnnamedStruct#" + to_string(anonid++);
+            Allocs[id].sym+="UnnamedStruct#" + to_string(anonid++);
         }
         Allocs[id].sz=sz;
         Allocs[id].ended=0;
@@ -142,23 +143,25 @@ VOID POSTMALLOC(ADDRINT ret, THREADID tid)
 
 VOID binName(IMG img, VOID *v)
 {
+    string* name=new string(IMG_Name(img));
+    string base=basename(name->c_str());
     if (IMG_IsMainExecutable(img))
     {
-        img_name = basename(IMG_Name(img).c_str());
-        fstructStream.open(output_path.Value()+string("/")+img_name+string(".structs.csv"));
+	cout <<output_path.Value()+string("/")+base+string(".structs.csv") << endl;
+        fstructStream.open(output_path.Value()+string("/")+base+string(".structs.csv"));
         fstructStream << "name,start,sz" << endl;
 
     }
-    getStructs(IMG_Name(img).c_str());
+    getStructs(name->c_str());
     RTN mallocRtn = RTN_FindByName(img, "malloc");
     if (RTN_Valid(mallocRtn))
     {
         RTN_Open(mallocRtn);
         RTN_InsertCall(mallocRtn, IPOINT_BEFORE, (AFUNPTR)PREMALLOC,
                 IARG_RETURN_IP, IARG_THREAD_ID,
-                IARG_FUNCARG_ENTRYPOINT_VALUE, 0,  IARG_END);
+                IARG_FUNCARG_ENTRYPOINT_VALUE, 0,IARG_PTR, name,  IARG_END);
         RTN_InsertCall(mallocRtn, IPOINT_AFTER, (AFUNPTR)POSTMALLOC,
-                IARG_FUNCRET_EXITPOINT_VALUE, IARG_THREAD_ID, IARG_END);
+                IARG_FUNCRET_EXITPOINT_VALUE, IARG_THREAD_ID,  IARG_END);
         RTN_Close(mallocRtn);
     }
 }
