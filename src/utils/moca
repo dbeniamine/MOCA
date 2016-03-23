@@ -32,8 +32,6 @@ usage()
     echo "  -D dirname        Set the output directory MUST be an absolute path.
     Default: $logdir"
     echo "  -G                Do generate framesoc's files"
-    echo "  -P                Do use pin (needed for structure name
-    detection)"
     echo -e "\n  The following parameters allows you to do fine tuning on the
     module. By default you shouldn't need to use them.
     + If you encounter performance issues, you can increase the wakeup
@@ -70,8 +68,6 @@ usage()
 timer=$(dirname $0)/timer.sh
 initime=$($timer)
 install_dir="$(dirname $0)/../.."
-pintooldir=$install_dir/src/pintool
-pin=false
 kernLogFile="Moca"
 procdir="/proc/Moca"
 log_thread_interval=.5
@@ -81,7 +77,7 @@ compi=true
 framesoc=false
 preload="$install_dir/src/libs/replace_malloc.so"
 
-while getopts "c:ha:d:f:l:w:p:b:S:C:D:L:nHFGP" opt
+while getopts "c:ha:d:f:l:w:p:b:S:C:D:L:nHFG" opt
 do
     case $opt in
         c)
@@ -145,9 +141,6 @@ do
         G)
             framesoc=true
             ;;
-        P)
-            pin=true
-            ;;
         *)
             usage
             exit 1
@@ -189,10 +182,12 @@ child()
     kill -s SIGSTOP $BASHPID
     if [ -z "$logfile" ]
     then
-        LD_PRELOAD=$preload $cmd $args &
+        cd $WD
+        LD_PRELOAD="$preload" $(dirname $0)/launcher.sh $cmd $args &
         pid=$!
     else
-        LD_PRELOAD=$preload $cmd $args > $logfile 2> $logfile.err &
+        cd $logdir
+        LD_PRELOAD="$preload" $(dirname $0)/launcher.sh $cmd $args > $logfile 2> $logfile.err &
         pid=$!
     fi
     # Store actual pid for stack detection
@@ -236,7 +231,7 @@ abort_on_error()
     fi
 }
 
-
+WD=$PWD
 if [ ! -z $prio ]
 then
     let user_prio=$(( $prio - 1 ))
@@ -246,25 +241,10 @@ fi
 if $compi
 then
     cd $install_dir/src/
-    if $pin
-    then
-        target=""
-    else
-        target="module/moca.ko"
-    fi
-    echo "$PWD make $target"
-    make $target
+    make
     abort_on_error $? "make fail"
 fi
 
-if $pin
-then
-    # disable randomisation
-    # Do pin execution
-    randomize=$(cat /proc/sys/kernel/randomize_va_space)
-    echo 0  > /proc/sys/kernel/randomize_va_space
-    pin -xyzzy -enable_vsm 0 -t $pintooldir/obj-*/*.so -o $logdir -- $cmd $args
-fi
 child &
 pid=$!
 
@@ -287,10 +267,6 @@ t=$($timer)
 echo "Unloading Moca module"
 rmmod moca
 $timer $t
-if $pin
-then
-    echo $randomize > /proc/sys/kernel/randomize_va_space
-fi
 
 t=$($timer)
 echo "Retrieving Moca log"
@@ -302,13 +278,6 @@ line=$(($line-1))
 line+='d'
 sed 1,$line /var/log/kern.log | grep -i "moca" > $logdir/$Moca_log
 echo "File $logdir/$Moca_log created with Moca output in $($timer $t)"
-# Fix pin address
-if $pin
-then
-    cd $logdir
-    $install_dir/src/utils/fix_pin_addr.sh $program 7f0000000000
-    cd -
-fi
 pgsize=4096
 if $framesoc
 then
