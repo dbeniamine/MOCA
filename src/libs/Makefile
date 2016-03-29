@@ -1,9 +1,9 @@
 CC=gcc
 
-all: replace_malloc.so
+all: moca.so
 
 %.so: %.c
-	$(CC) -D__LIBNAME__='"$(PWD)/$@"' -shared -fPIC $^ -g -o $@ -ldl -lelf -lpthread
+	$(CC) -D__LIBNAME__='"$(PWD)/$@"' -shared -fPIC $^ -g -o $@ -ldl -lelf
 
 .PHONY: clean
 

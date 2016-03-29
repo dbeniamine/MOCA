@@ -13,7 +13,6 @@
 
 #include <libelf/libelf.h>
 #include <libelf/gelf.h>
-#include <pthread.h>
 
 
 #define MAXSTACKSIZE 20
@@ -31,19 +30,21 @@ static const char * OutFileName = "structs.csv";
 // Main executable
 static char *mainFile;
 // Lock for naming allocations
-static pthread_mutex_t lock;
 static FILE * OutFile;
 // 1 during init, 0 after, to avoid circular dependencies (malloc/dlsym)
-static int initializing=1;
+static int initializing=-1;
 
-void __attribute__ ((constructor)) init(void);
-
+/*
+ * We call init manually on each replaced function instead of using
+ * _attribute_ constructor to be sure to intercept mallocs done during
+ * external libraries initialization.
+ */
 void init(void){
+    initializing=1;
     real_malloc = dlsym(RTLD_NEXT, "malloc");
     real_calloc = dlsym(RTLD_NEXT, "calloc");
     real_free = dlsym(RTLD_NEXT, "free");
     real_execve = dlsym(RTLD_NEXT, "execve");
-    pthread_mutex_init(&lock,NULL);
     PAGE_SIZE=getpagesize();
     /* Important note: the lib will be re initialized after each call to
      * execve*/
@@ -103,8 +104,10 @@ void* malloc(size_t sz)
 {
     static __thread int no_hook=0;
 
+    if(initializing == -1)
+        init();
 
-    if(initializing) // Avoid circular dependency between malloc and dlsym
+    if(initializing!=0) // Avoid circular dependency between malloc and dlsym
         return initMalloc(sz);
 
     void *ret = real_malloc(sz);
@@ -124,7 +127,10 @@ void* calloc(size_t nmb,size_t sz)
     static __thread int no_hook=0;
     void *ret=NULL;
 
-    if(initializing){ // Avoid circular dependency between calloc and dlsym
+    if(initializing == -1)
+        init();
+
+    if(initializing!=0){ // Avoid circular dependency between calloc and dlsym
         ret=initMalloc(nmb*sz);
         memset(ret,0,nmb*sz);
         return ret;
@@ -141,6 +147,10 @@ void* calloc(size_t nmb,size_t sz)
 }
 
 int execve(const char *filename, char *const argv[], char *const envp[]){
+
+    if(initializing == -1)
+        init();
+
     int pid,st;
     mainFile=basename(filename);
     printf("Executing %s [%s]\n", filename, mainFile);
@@ -260,19 +270,18 @@ char *ShortCallStack(char** calls, size_t size)
 // Print an allocation to the output file
 void print_struct(char *bt,char *name, unsigned long addr, size_t sz){
     static int allocid=0;
-    pthread_mutex_lock(&lock);
     char buff[150];
     char *n;
-    if(strcmp(bt,"")!=0){
+    if(strcmp(bt,"NA")!=0){
         sprintf(buff,"%s#%d",name,allocid);
         n=buff;
+        // There might be a race here but we don't really care
         allocid++;
     }else{
         n=name;
     }
     fprintf(OutFile,"%s,%lu,%lu,%s\n",n,addr,sz,bt);
     fflush(OutFile);
-    pthread_mutex_unlock(&lock);
 }
 
 extern char ** environ;

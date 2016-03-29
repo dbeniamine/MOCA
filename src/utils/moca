@@ -75,7 +75,7 @@ Moca_log="Moca-output.log"
 name=$(basename $0)
 compi=true
 framesoc=false
-preload="$install_dir/src/libs/replace_malloc.so"
+preload="$install_dir/src/libs/moca.so"
 
 while getopts "c:ha:d:f:l:w:p:b:S:C:D:L:nHFG" opt
 do
@@ -182,12 +182,10 @@ child()
     kill -s SIGSTOP $BASHPID
     if [ -z "$logfile" ]
     then
-        cd $WD
-        LD_PRELOAD="$preload" $(dirname $0)/launcher.sh $cmd $args &
+        $cmd $args &
         pid=$!
     else
-        cd $logdir
-        LD_PRELOAD="$preload" $(dirname $0)/launcher.sh $cmd $args > $logfile 2> $logfile.err &
+        $cmd $args > $logfile 2> $logfile.err &
         pid=$!
     fi
     # Store actual pid for stack detection
@@ -244,6 +242,14 @@ then
     make
     abort_on_error $? "make fail"
 fi
+
+if [ -z "$logfile" ]
+then
+    cd $WD
+else
+    cd $logdir
+fi
+LD_PRELOAD="$preload" $(dirname $0)/launcher.sh $cmd $args
 
 child &
 pid=$!
