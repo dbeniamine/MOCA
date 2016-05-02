@@ -74,7 +74,7 @@ void print_struct(char *bt,char *name, unsigned long addr, size_t sz);
 // Remove preload useful before explicitly calling execve
 void remove_preload(void);
 // Retrieve static structures from a binary file
-int get_structs(const char* file);
+int get_structs(const char* file, int offset);
 
 /* =========================================================================
  *                          Wrappers
@@ -151,7 +151,7 @@ int execve(const char *filename, char *const argv[], char *const envp[]){
     if(initializing == -1)
         init();
 
-    int pid,st;
+    int pid,st,i,offset;
     mainFile=basename(filename);
     printf("Executing %s [%s]\n", filename, mainFile);
     char tempfilename[]="/tmp/replacemallocXXXXXX";
@@ -162,7 +162,7 @@ int execve(const char *filename, char *const argv[], char *const envp[]){
      * LD_PRELOAD from the child */
     if(!(pid=fork())){
         remove_preload();
-        snprintf(buff,300,"/usr/bin/ldd %s | awk '{print $3}' > %s", filename, tempfilename);
+        snprintf(buff,300,"/usr/bin/ldd %s | sed -e 's/[^/]*//' > %s", filename, tempfilename);
         system(buff);
         close(fd);
         exit(0);
@@ -171,15 +171,22 @@ int execve(const char *filename, char *const argv[], char *const envp[]){
         waitpid(pid, &st, 0);
     }
     // Retrieve main structures
-    get_structs(filename);
+    get_structs(filename,0);
     // Retrieve structures of shared libraries
     size_t read,len=0;
     char *line=0;
     FILE *fp=fdopen(fd,"r");
     while((read=getline(&line, &len, fp)) != -1)
         if(read>1){
-            line[strlen(line)-1]='\0';// remove trailing '\n'
-            get_structs(line);
+            // Line looks: "/path/to/lib.so (offset)\n"
+            i=0;
+            line[strlen(line)-2]='\0';// remove trailing ')\n'
+            while(line[i]!=' ')
+                ++i;
+            line[i]='\0';
+            i+=2; // Go after the '('
+            offset=sscanf(line+i,"%x",&offset);
+            get_structs(line,offset);
         }
     fclose(fp);
     close(fd);
@@ -310,7 +317,7 @@ void remove_preload(void)
 
 #define ERR -1
 
-int get_structs(const char* file)
+int get_structs(const char* file, int offset)
 {
     Elf *elf;                       /* Our Elf pointer for libelf */
     Elf_Scn *scn=NULL;                   /* Section Descriptor */
@@ -388,7 +395,7 @@ int get_structs(const char* file)
                         sym.st_size >= PAGE_SIZE)
                 {
                     print_struct("NA",elf_strptr(elf, shdr.sh_link, sym.st_name),
-                            sym.st_value, sym.st_size);
+                            sym.st_value+offset, sym.st_size);
                 }
             }
         }
