@@ -171,6 +171,5 @@ foreach my $page (sort keys %PAGES){
                 $ACCESSES[$accid]->{'Start'},$ACCESSES[$accid]->{'End'});
         }
     }
-    exit(1);
 }
 close FOUT;
