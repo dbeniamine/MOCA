@@ -249,6 +249,8 @@ then
 else
     cd $logdir
 fi
+randomize=$(sysctl kernel.randomize_va_space)
+sysctl kernel.randomize_va_space=0
 LD_PRELOAD="$preload" $(dirname $0)/launcher.sh $cmd $args
 
 child &
@@ -272,6 +274,7 @@ $timer $t
 t=$($timer)
 echo "Unloading Moca module"
 rmmod moca
+sysctl kernel.randomize_va_space=$randomize
 $timer $t
 
 t=$($timer)
