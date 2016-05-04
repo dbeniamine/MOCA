@@ -185,7 +185,7 @@ int execve(const char *filename, char *const argv[], char *const envp[]){
                 ++i;
             line[i]='\0';
             i+=2; // Go after the '('
-            offset=sscanf(line+i,"%x",&offset);
+            sscanf(line+i,"%x",&offset);
             get_structs(line,offset);
         }
     fclose(fp);
@@ -330,6 +330,7 @@ int get_structs(const char* file, int offset)
     int fd; 		// File Descriptor
     char *base_ptr;		// ptr to our object in memory
     struct stat elf_stats;	// fstat struct
+    printf("Retrieving structures for file '%s' at offset %d\n",file, offset);
 
     if((fd = open(file, O_RDONLY)) == ERR)
     {
