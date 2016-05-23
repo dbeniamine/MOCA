@@ -74,7 +74,7 @@ void print_struct(char *bt,char *name, unsigned long addr, size_t sz);
 // Remove preload useful before explicitly calling execve
 void remove_preload(void);
 // Retrieve static structures from a binary file
-int get_structs(const char* file, int offset);
+int get_structs(const char* file, unsigned long offset);
 
 /* =========================================================================
  *                          Wrappers
@@ -151,7 +151,8 @@ int execve(const char *filename, char *const argv[], char *const envp[]){
     if(initializing == -1)
         init();
 
-    int pid,st,i,offset;
+    int pid,st,i;
+    unsigned long offset;
     mainFile=basename(filename);
     printf("Executing %s [%s]\n", filename, mainFile);
     char tempfilename[]="/tmp/replacemallocXXXXXX";
@@ -185,7 +186,7 @@ int execve(const char *filename, char *const argv[], char *const envp[]){
                 ++i;
             line[i]='\0';
             i+=2; // Go after the '('
-            sscanf(line+i,"%x",&offset);
+            sscanf(line+i,"%lx",&offset);
             get_structs(line,offset);
         }
     fclose(fp);
@@ -317,7 +318,7 @@ void remove_preload(void)
 
 #define ERR -1
 
-int get_structs(const char* file, int offset)
+int get_structs(const char* file, unsigned long offset)
 {
     Elf *elf;                       /* Our Elf pointer for libelf */
     Elf_Scn *scn=NULL;                   /* Section Descriptor */
@@ -330,7 +331,7 @@ int get_structs(const char* file, int offset)
     int fd; 		// File Descriptor
     char *base_ptr;		// ptr to our object in memory
     struct stat elf_stats;	// fstat struct
-    printf("Retrieving structures for file '%s' at offset %d\n",file, offset);
+    printf("Retrieving structures for file '%s' at offset %lu\n",file, offset);
 
     if((fd = open(file, O_RDONLY)) == ERR)
     {
@@ -391,7 +392,7 @@ int get_structs(const char* file, int offset)
             {
                 // libelf grabs the symbol data using gelf_getsym()
                 gelf_getsym(edata, i, &sym);
-                // Keep only objects big enough to be data structures
+                // Keep only objects big enough
                 if(ELF32_ST_TYPE(sym.st_info)==STT_OBJECT &&
                         sym.st_size >= PAGE_SIZE)
                 {
