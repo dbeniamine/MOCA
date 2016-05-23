@@ -57,5 +57,6 @@ for p in $PIDS
 do
     wait $p
 done
+echo "Appenning stack to data structures"
+$DIR/retrieve_stacks.sh stacks.log structs.csv
 $timer $t
-
