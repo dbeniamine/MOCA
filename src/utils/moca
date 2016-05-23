@@ -249,7 +249,7 @@ then
 else
     cd $logdir
 fi
-randomize=$(sysctl kernel.randomize_va_space)
+randomize=$(sysctl kernel.randomize_va_space  | awk '{print $3}')
 sysctl kernel.randomize_va_space=0
 LD_PRELOAD="$preload" $(dirname $0)/launcher.sh $cmd $args
 
