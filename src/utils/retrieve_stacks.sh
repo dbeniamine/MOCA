@@ -19,7 +19,11 @@ do
     begin=$(hexToDec $begin)
     end=$(hexToDec $end)
     size=$(( $end - $begin ))
-    echo "$name,$begin,$size,NA" >> $2
+    line="$name,$begin,$size,NA"
+    if [ -z "$(grep "$line" $2)" ]
+    then
+        echo $line  >> $2
+    fi
     IFS=,
 done
 IFS=$OFS
